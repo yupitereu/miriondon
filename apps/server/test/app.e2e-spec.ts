@@ -1,5 +1,5 @@
-import path from 'node:path';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -21,9 +21,7 @@ describe('AppController (e2e)', () => {
         continue;
       }
 
-      const match = fs
-        .readFileSync(envPath, 'utf8')
-        .match(/^\s*DATABASE_URL\s*=\s*(.+?)\s*$/m);
+      const match = fs.readFileSync(envPath, 'utf8').match(/^\s*DATABASE_URL\s*=\s*(.+?)\s*$/m);
 
       if (match?.[1]) {
         process.env.DATABASE_URL = match[1];
@@ -70,9 +68,7 @@ describe('AppController (e2e)', () => {
       .get('/users')
       .expect(200)
       .expect((response) => {
-        expect(response.body).toEqual(
-          expect.arrayContaining([expect.objectContaining({ name: userName })])
-        );
+        expect(response.body).toEqual(expect.arrayContaining([expect.objectContaining({ name: userName })]));
       });
   });
 });

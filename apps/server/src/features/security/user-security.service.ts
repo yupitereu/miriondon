@@ -37,10 +37,7 @@ export class UserSecurityService {
     const nextState: UserSecurityState = {
       failedLoginAttempts: currentState.failedLoginAttempts + 1,
       lastFailedLoginAt: now.toISOString(),
-      lockedUntil:
-        currentState.failedLoginAttempts + 1 >= SECURITY_LOCK_THRESHOLD
-          ? new Date(now.getTime() + SECURITY_LOCK_DURATION_MS).toISOString()
-          : currentState.lockedUntil
+      lockedUntil: currentState.failedLoginAttempts + 1 >= SECURITY_LOCK_THRESHOLD ? new Date(now.getTime() + SECURITY_LOCK_DURATION_MS).toISOString() : currentState.lockedUntil
     };
 
     await this.redisService.setJson(this.getKey(userId), nextState, SECURITY_STATE_TTL_SECONDS);
