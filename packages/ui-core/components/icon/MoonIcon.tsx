@@ -7,6 +7,6 @@ type MoonIconProps = {
   size?: IconSize;
 };
 
-export function MoonIcon({ className, size }: MoonIconProps) {
+export const MoonIcon = ({ className, size }: MoonIconProps) => {
   return <Icon icon={Moon} className={className} size={size} />;
-}
+};

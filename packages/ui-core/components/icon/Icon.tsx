@@ -20,6 +20,6 @@ type IconProps = React.SVGProps<SVGSVGElement> & {
 
 export type { IconSize };
 
-export function Icon({ icon: IconComponent, className, size = 'md', ...props }: IconProps) {
+export const Icon = ({ icon: IconComponent, className, size = 'md', ...props }: IconProps) => {
   return <IconComponent aria-hidden focusable="false" className={cn(iconSizes[size], 'shrink-0', className)} {...props} />;
-}
+};

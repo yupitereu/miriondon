@@ -7,6 +7,6 @@ type SunIconProps = {
   size?: IconSize;
 };
 
-export function SunIcon({ className, size }: SunIconProps) {
+export const SunIcon = ({ className, size }: SunIconProps) => {
   return <Icon icon={Sun} className={className} size={size} />;
-}
+};
