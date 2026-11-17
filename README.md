@@ -1,13 +1,18 @@
-# Turborepo starter
+# 미리온돈 (Miriondon)
 
-This is an official starter Turborepo.
+이미 쓴 카드값과 앞으로 나갈 돈까지 반영해 남은 생활비, 카드 실적과 결제 준비액을 확인하는 가계부입니다. Next.js 클라이언트와 NestJS API를 포함한 pnpm·Turborepo 모노레포입니다.
 
-## Using this example
+- 서비스명: 미리온돈
+- 프로젝트 식별자: `miriondon`
+- 앱 패키지: `miriondon-client`, `miriondon-server`
+- [제품 기획안](docs/product-plan.md) · [MVP 기능 명세서](docs/mvp-functional-spec.md) · [화면설계서](docs/screen-design.html) · [성장 검증 전략](docs/growth-strategy.md)
 
-Run the following command:
+## Getting started
+
+Use the Node.js version in `.nvmrc` and the pnpm version in `package.json`, then install dependencies:
 
 ```sh
-npx create-turbo@latest
+pnpm install
 ```
 
 ## What's inside?
@@ -16,11 +21,12 @@ This Turborepo includes the following packages/apps:
 
 ### Apps and Packages
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- `apps/client` (`miriondon-client`): Next.js web client
+- `apps/server` (`miriondon-server`): NestJS API and Vercel entrypoint
+- `packages/ui-core` (`@repo/ui-core`): shared UI primitives and theme
+- `packages/ui-composition` (`@repo/ui-composition`): shared UI compositions
+- `packages/project-config` (`@repo/project-config`): shared lint and TypeScript configuration
+- `docs`: product plans and the interactive HTML screen specification
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
@@ -37,7 +43,7 @@ This Turborepo has some additional tools already setup for you:
 To build all apps and packages, run the following command:
 
 ```
-cd my-turborepo
+cd miriondon
 pnpm build
 ```
 
@@ -46,7 +52,7 @@ pnpm build
 To develop all apps and packages, run the following command:
 
 ```
-cd my-turborepo
+cd miriondon
 pnpm dev
 ```
 
@@ -57,7 +63,7 @@ Turborepo can use a technique known as [Remote Caching](https://turbo.build/repo
 By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup), then enter the following commands:
 
 ```
-cd my-turborepo
+cd miriondon
 npx turbo login
 ```
 

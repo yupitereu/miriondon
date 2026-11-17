@@ -57,6 +57,7 @@ pnpm exec prettier --write <변경한-파일들>
 ### 4.2 TypeScript와 모듈
 
 - `[필수]` 새 코드에서 `any`, `as any`, 불필요한 non-null assertion, 타입 오류를 숨기는 단언을 사용하지 않습니다. 외부 입력은 `unknown`으로 받고 narrowing합니다.
+- `[필수]` 라이브러리·프레임워크·런타임·DOM API에서 `@deprecated`로 지정된 항목(예: React 19의 `React.FormEvent`·`FormEventHandler`)은 사용하지 않고 공식 대체안(`React.SubmitEvent`·`SubmitEventHandler`·`ChangeEvent`·`InputEvent`·`SyntheticEvent` 등)으로 작성합니다.
 - `[필수]` 타입 선언은 `type`을 기본으로 사용합니다. declaration merging, 전역 타입 확장, 외부 라이브러리 요구처럼 필요한 경우에만 `interface`를 사용합니다.
 - `[필수]` 재사용하지 않는 props 타입은 선언부에 인라인으로 작성하고, 재사용되는 타입과 도메인 타입은 의미가 드러나는 파일에 둡니다.
 - `[필수]` 새 코드에 사용하지 않는 import와 변수를 남기지 않습니다. `_` 접두사는 의도적으로 사용하지 않는 매개변수에만 사용합니다.
