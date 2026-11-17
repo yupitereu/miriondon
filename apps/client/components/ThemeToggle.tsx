@@ -1,6 +1,6 @@
 'use client';
 
-import { MoonIcon, SunIcon } from '@repo/ui';
+import { MoonIcon, SunIcon } from '@repo/ui-core';
 import { useState } from 'react';
 
 type Theme = 'light' | 'dark';

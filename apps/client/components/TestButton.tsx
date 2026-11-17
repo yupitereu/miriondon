@@ -1,16 +1,19 @@
 'use client';
-import { Button } from '@repo/ui';
 
-import { apiClient } from '@/lib/clients/apiClient';
+import { dialog } from '@repo/ui-composition';
+import { Button } from '@repo/ui-core';
 
 export const TestButton = () => {
   const handleClick = async () => {
-    const res = await apiClient.get('/users');
-    console.log(res.data);
+    await dialog.alert({
+      title: '알림 테스트',
+      description: 'CommonDialog alert 동작을 확인합니다.',
+      confirmText: '확인'
+    });
   };
 
   return (
-    <Button variant="default" size="lg" className={''} onClick={handleClick}>
+    <Button variant="primary" size="lg" onClick={handleClick}>
       Click me!
     </Button>
   );
