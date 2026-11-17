@@ -12,16 +12,24 @@ const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
 
 export interface SelectTriggerProps extends React.ComponentProps<typeof SelectPrimitive.Trigger> {
+  size?: 'md' | 'lg';
   error?: string;
+  wrapperClassName?: string;
 }
 
-const SelectTrigger = ({ className, children, error, ...props }: SelectTriggerProps) => {
+const SELECT_TRIGGER_SIZE_CLASS = {
+  md: 'min-h-control-md px-2.5 py-1.5 text-sm',
+  lg: 'min-h-control-lg px-3 py-2.5 text-sm'
+} as const;
+
+const SelectTrigger = ({ className, wrapperClassName, size = 'lg', children, error, ...props }: SelectTriggerProps) => {
   return (
-    <div className="flex w-full flex-col gap-1">
+    <div className={cn('flex w-full min-w-0 flex-col gap-1', wrapperClassName)}>
       <SelectPrimitive.Trigger
         aria-invalid={error ? true : undefined}
         className={cn(
-          'flex min-h-control-lg w-full items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 py-2.5 text-left text-sm text-foreground transition-colors',
+          'flex w-full items-center justify-between gap-2 rounded-md border border-border-strong bg-card text-left text-foreground transition-colors',
+          SELECT_TRIGGER_SIZE_CLASS[size],
           'placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25',
           'disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 [&>span]:line-clamp-1',
           error && 'border-destructive focus:border-destructive focus:ring-destructive/25',

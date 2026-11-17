@@ -10,9 +10,10 @@ import { Icon } from '../icon/Icon';
 export interface CheckboxProps extends React.ComponentProps<typeof CheckboxPrimitive.Root> {
   label?: React.ReactNode;
   description?: string;
+  wrapperClassName?: string;
 }
 
-const Checkbox = ({ className, label, description, id, disabled, ...props }: CheckboxProps) => {
+const Checkbox = ({ className, wrapperClassName, label, description, id, disabled, ...props }: CheckboxProps) => {
   const generatedId = React.useId();
   const controlId = id ?? generatedId;
 
@@ -36,11 +37,11 @@ const Checkbox = ({ className, label, description, id, disabled, ...props }: Che
   );
 
   if (!label && !description) {
-    return <div className="inline-flex min-h-touch min-w-touch items-center justify-center">{control}</div>;
+    return <div className={cn('inline-flex min-h-touch min-w-touch items-center justify-center', wrapperClassName)}>{control}</div>;
   }
 
   return (
-    <label htmlFor={controlId} className={cn('inline-flex min-h-touch cursor-pointer items-center gap-2 select-none', disabled && 'cursor-not-allowed opacity-60')}>
+    <label htmlFor={controlId} className={cn('inline-flex min-h-touch cursor-pointer items-center gap-2 select-none', disabled && 'cursor-not-allowed opacity-60', wrapperClassName)}>
       {control}
       <span className="flex flex-col gap-0.5">
         {label ? <span className="text-[13px] font-semibold leading-snug text-foreground">{label}</span> : null}

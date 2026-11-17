@@ -1,6 +1,7 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { cva, type VariantProps } from 'class-variance-authority';
 import { X } from 'lucide-react';
 import * as React from 'react';
 
@@ -16,22 +17,30 @@ const DialogOverlay = ({ className, ...props }: React.ComponentProps<typeof Dial
   return <DialogPrimitive.Overlay className={cn('fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] transition-opacity data-[state=closed]:opacity-0', className)} {...props} />;
 };
 
-export interface DialogContentProps extends React.ComponentProps<typeof DialogPrimitive.Content> {
+const dialogContentVariants = cva(
+  'fixed left-1/2 top-1/2 z-50 flex w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-xl border border-border-strong bg-surface-elevated p-dialog-padding text-popover-foreground shadow-lg focus:outline-none',
+  {
+    variants: {
+      size: {
+        default: 'max-w-dialog',
+        lg: 'max-w-[35rem] lg:max-w-[38.75rem]'
+      }
+    },
+    defaultVariants: {
+      size: 'default'
+    }
+  }
+);
+
+export interface DialogContentProps extends React.ComponentProps<typeof DialogPrimitive.Content>, VariantProps<typeof dialogContentVariants> {
   showCloseButton?: boolean;
 }
 
-const DialogContent = ({ className, children, showCloseButton = true, ...props }: DialogContentProps) => {
+const DialogContent = ({ className, size = 'default', children, showCloseButton = true, ...props }: DialogContentProps) => {
   return (
     <DialogPortal>
       <DialogOverlay />
-      <DialogPrimitive.Content
-        className={cn(
-          'fixed left-1/2 top-1/2 z-50 flex w-[calc(100%-2rem)] max-w-dialog -translate-x-1/2 -translate-y-1/2 flex-col gap-3',
-          'rounded-xl border border-border-strong bg-surface-elevated p-dialog-padding text-popover-foreground shadow-lg focus:outline-none',
-          className
-        )}
-        {...props}
-      >
+      <DialogPrimitive.Content className={cn(dialogContentVariants({ size }), className)} {...props}>
         {children}
         {showCloseButton ? (
           <DialogPrimitive.Close

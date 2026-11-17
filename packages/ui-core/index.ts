@@ -21,6 +21,7 @@ export { MoonIcon } from './components/icon/MoonIcon';
 export { SunIcon } from './components/icon/SunIcon';
 export { Input, type InputProps } from './components/input/Input';
 export { NumberInput, type NumberInputProps } from './components/input/NumberInput';
+export { SearchInput, type SearchInputProps } from './components/input/SearchInput';
 export { NoticeBox, noticeBoxVariants, type NoticeBoxProps } from './components/notice-box/NoticeBox';
 export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from './components/popover/Popover';
 export { ProgressBar, progressIndicatorVariants, type ProgressBarProps } from './components/progress-bar/ProgressBar';
@@ -52,6 +53,7 @@ export {
   type SheetContentProps
 } from './components/sheet/Sheet';
 export { Switch, type SwitchProps } from './components/switch/Switch';
+export { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow, type TableProps } from './components/table/Table';
 export { Tabs, TabsContent, TabsList, TabsTrigger, type TabsListProps, type TabsProps, type TabsTriggerProps, type TabsVariant } from './components/tabs/Tabs';
 export { useIsMobileView } from './hooks/use-mobile';
 export { cn } from './lib/utils';
