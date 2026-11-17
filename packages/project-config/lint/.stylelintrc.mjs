@@ -6,7 +6,7 @@ export default {
     'scss/at-rule-no-unknown': [
       true,
       {
-        ignoreAtRules: ['tailwind']
+        ignoreAtRules: ['tailwind', 'theme', 'apply', 'source', 'utility', 'variant', 'custom-variant', 'plugin', 'config', 'reference']
       }
     ],
     'order/properties-alphabetical-order': true,
@@ -18,6 +18,6 @@ export default {
     'keyframes-name-pattern': '^[a-z][a-z0-9-_]*$',
     'no-invalid-double-slash-comments': null,
     'block-no-empty': null,
-    'import-notation': 'notation'
+    'import-notation': 'string'
   }
 };
