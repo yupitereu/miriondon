@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Moneiet 무료 초대 알파 모바일 퍼스트 반응형 웹 화면설계서. 화면 흐름, 기능 근거, 클릭 가능한 합성 데이터 프로토타입." />
-    <title>Moneiet · 화면설계서</title>
+    <meta name="description" content="미리온돈 무료 초대 알파 모바일 퍼스트 반응형 웹 화면설계서. 화면 흐름, 기능 근거, 클릭 가능한 합성 데이터 프로토타입." />
+    <title>미리온돈 · 화면설계서</title>
     <style>
       :root {
         color-scheme: light;
@@ -468,14 +468,21 @@
         margin: 14px 0 10px;
       }
       .tier-progress-track {
+        align-items: center;
         display: flex;
-        gap: 4px;
-        height: 8px;
+        height: 20px;
+      }
+      .tier-progress-step {
+        align-items: center;
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        position: relative;
       }
       .tier-progress-seg {
         background: var(--line);
-        border-radius: 4px;
         flex: 1;
+        height: 6px;
         overflow: hidden;
       }
       .tier-progress-seg > span {
@@ -483,20 +490,78 @@
         display: block;
         height: 100%;
       }
+      .tier-progress-step:first-child .tier-progress-seg {
+        border-radius: 3px 0 0 3px;
+      }
+      .tier-progress-step:last-child .tier-progress-seg {
+        border-radius: 0 3px 3px 0;
+      }
+      .tier-progress-mark {
+        background: var(--line);
+        border: 1px solid var(--muted);
+        border-radius: 50%;
+        box-sizing: border-box;
+        height: 10px;
+        position: absolute;
+        right: 0;
+        transform: translateX(50%);
+        width: 10px;
+      }
+      .tier-progress-mark.achieved {
+        background: var(--primary);
+        border-color: var(--primary);
+      }
       .tier-progress-labels {
         color: var(--muted);
         display: flex;
         font-size: 11px;
-        gap: 4px;
       }
       .tier-progress-labels > span {
         flex: 1;
+        min-width: 0;
+        overflow-wrap: anywhere;
         text-align: right;
-        white-space: nowrap;
       }
       .tier-progress-labels > span.achieved {
         color: var(--primary);
         font-weight: 600;
+      }
+      .overview-month {
+        display: grid;
+        gap: 18px;
+        grid-template-areas: 'balance tasks' 'data data' 'budget budget' 'cards cards';
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .overview-balance {
+        grid-area: balance;
+      }
+      .overview-tasks {
+        grid-area: tasks;
+      }
+      .overview-data {
+        grid-area: data;
+        margin: 0;
+      }
+      .overview-budget {
+        grid-area: budget;
+        min-width: 0;
+      }
+      .overview-cards {
+        grid-area: cards;
+        min-width: 0;
+      }
+      .category-mobile {
+        display: none;
+      }
+      .category-mobile-item {
+        border-top: 1px solid var(--line);
+        padding: 14px 0;
+      }
+      .category-mobile-amounts {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin: 8px 0;
       }
       .field {
         display: grid;
@@ -847,7 +912,17 @@
         }
       }
 
-      @media (width < 760px) {
+      @media (width < 768px) {
+        .overview-month {
+          grid-template-areas: 'balance' 'data' 'budget' 'tasks' 'cards';
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .category-desktop {
+          display: none;
+        }
+        .category-mobile {
+          display: block;
+        }
         .toolbar {
           position: static;
         }
@@ -975,7 +1050,7 @@
     </header>
     <div class="layout" id="layout">
       <aside class="sidebar">
-        <div class="brand">moneiet<small>지출을 가볍게, 습관은 단단하게</small></div>
+        <div class="brand">미리온돈<small>앞으로 나갈 돈까지 반영한 남은 생활비</small></div>
         <div class="space"><strong id="space-name">우리의 생활비</strong><small>합성 예시 가계부 · 무료 알파</small></div>
         <nav id="navigation" aria-label="화면 목록"></nav>
         <div class="sidebar-footer">인물·거래·잔액은 합성 예시임. 카드 상품 조건은 출처를 표시함.<br />실제 로그인·송금·AI 호출 없음.<br />새로고침하면 데모 데이터 초기화.</div>
@@ -1048,6 +1123,7 @@
         cardAccounts: { A: 'A', B: 'B' },
         cardAssetAccounts: { A: 'asset:1', B: 'asset:4', C: 'asset:4' },
         cardLabels: { A: '예시 카드 A', B: '예시 카드 B', C: '추가한 예시 카드' },
+        cardLast4: { A: '0001', B: '0002', C: '' },
         inactiveCards: [],
         drafts: {},
         importDecisions: {},
@@ -1067,7 +1143,7 @@
         receivableCardFilter: '전체',
         settlementPerson: '전체',
         salaryRows: 0,
-        incomeType: '급여',
+        incomeType: '근로소득',
         installmentFilterStatus: 'active',
         installmentCardFilter: '전체',
         installmentMonthOnly: false,
@@ -1089,7 +1165,7 @@
         fixedIncomes: [
           {
             id: 1,
-            type: '급여',
+            type: '근로소득',
             name: '예시 월 급여',
             owner: '나',
             account: '예시 생활비 계좌',
@@ -1134,7 +1210,7 @@
             fixedIncomeId: 1,
             recurring: true,
             budgetRule: 'next',
-            type: '급여',
+            type: '근로소득',
             name: '예시 10월 급여',
             amount: 3200000,
             attribution: '2026-10',
@@ -1294,7 +1370,11 @@
             ['login', '처음 사용 시작'],
             ['overview', '반복 관리 시작']
           ],
-          rules: ['모바일 퍼스트 반응형 웹(모바일 웹 우선, PC 웹 지원) 무료 초대 알파를 기준으로 설계함.', '실제 서비스와 분리된 합성 데이터 데모임.'],
+          rules: [
+            '모바일 퍼스트 반응형 웹(모바일 웹 우선, PC 웹 지원) 무료 초대 알파를 기준으로 설계함.',
+            '실제 서비스와 분리된 합성 데이터 데모임.',
+            '캡처·글 입력 보조는 지출 기록에서 합성 초안으로 시연함. 가입 전 체험은 후속 UX 실험임.'
+          ],
           proposal: '메뉴 구성·화면 배치·입력 순서는 이번 화면설계의 제안임.'
         },
         login: {
@@ -1330,18 +1410,18 @@
           proposal: '5단계 입력과 잔액·기존 의무의 분리 배치는 설계 제안.'
         },
         overview: {
-          title: '현황',
-          subtitle: '월별 현황과 연간 결산, 자산현황을 확인해요.',
+          title: '결산',
+          subtitle: '월별 현황과 연간 결산을 확인해요.',
           refs: 'BUD-02 · BAL-01 · CARD-02 · ASSET-02',
           ac: 'AC-17 · AC-25 · AC-30',
           in: '로그인·설정 완료 후 기본 화면',
           out: [
             ['expenses', '지출 확인'],
-            ['funds', '지급 관리'],
+            ['funds', '지불 관리'],
             ['expenses', '지출금 회수'],
             ['assets', '잔액 근거']
           ],
-          rules: ['월별 현황과 연간 결산을 탭으로 전환함.', '연간 수입·지출은 예산 반영월 기준이며 예정 내역을 표시함.', '카드 실적은 월별 현황에서 확인함.'],
+          rules: ['월별 현황과 연간 결산을 탭으로 전환함.', '수입은 예산 반영월, 지출은 자동 산정 반영월로 집계하며 예정 내역을 표시함.', '카드 실적은 월별 현황에서 확인함.'],
           proposal: '연간 집계는 시안에 등록된 합성 기록을 사용하며 연말 이월 계산은 연결되지 않음.'
         },
         expenses: {
@@ -1354,7 +1434,7 @@
             ['expense-edit', '지출 입력·수정'],
             ['import', '카드 파일 가져오기'],
             ['installments', '할부거래 관리'],
-            ['funds', '지급 관리'],
+            ['funds', '지불 관리'],
             ['settings', '고정 지출 설정']
           ],
           rules: ['분류·할인·회수는 거래 상세에서 수정함.', '소유자와 실사용자를 분리함.', '구성원은 가계부의 모든 거래를 볼 수 있음.'],
@@ -1376,16 +1456,17 @@
         'expense-edit': {
           title: '지출 기록',
           subtitle: '기본값은 자동 적용하고, 필요한 예외만 바꿔요.',
-          refs: 'EXP-01~04 · SET-01 · FUND-02',
-          ac: 'AC-09~11 · AC-20 · AC-21 · AC-35 · AC-58',
+          refs: 'EXP-01~05 · SET-01 · FUND-02',
+          ac: 'AC-09~11 · AC-35 · AC-58 · AC-87~89',
           in: '지출 추가 또는 기존 거래 수정',
           out: [
             ['expenses', '저장·취소 후 목록'],
             ['expenses', '지출금 회수 확인']
           ],
           rules: [
+            '캡처·글은 AI 초안 검토 후 폼에 반영하며 별도 지출 저장이 필요함.',
             '분류와 분할 합계 검증 실패 시 저장을 막음.',
-            '지급 대기 거래의 결제계좌 변경 시 3가지 자금 처리(잔여 조정/이관/회수) 선택 제공.',
+            '지불 대기 거래의 결제계좌 변경 시 3가지 자금 처리(잔여 조정/이관/회수) 선택 제공.',
             '회수 대상 금액을 이미 회수한 금액보다 작게 줄일 수 없으며, 입금 내역 선 정정이 필요함.'
           ],
           proposal: '분할·회수 동시 지정은 명세의 미확정 항목으로, 데모에서는 각각 단독으로만 확인 가능.'
@@ -1415,19 +1496,19 @@
           in: '지출 내역·지출 기록·카드 조건',
           out: [
             ['expense-edit', '할부 지출 추가·수정'],
-            ['funds', '지급 관리'],
+            ['funds', '지불 관리'],
             ['expenses', '지출 내역']
           ],
           rules: [
             '할부 원거래와 월별 회차 거래를 연결하고 남은 원금·회차를 집계함.',
-            '미지급 회차는 유이자·수수료 변동에 맞춰 실제 청구 금액으로 보정할 수 있음.',
-            '남은 지급 전 회차를 조기 완납(일시불 선결제)하거나 할부 취소로 정리할 수 있음.'
+            '미지불 회차는 유이자·수수료 변동에 맞춰 실제 청구 금액으로 보정할 수 있음.',
+            '남은 준비 필요 회차를 조기 완납(일시불 선결제)하거나 할부 취소로 정리할 수 있음.'
           ],
           proposal: '신규 할부 등록·회차 금액 보정·조기 완납·할부 취소 흐름을 브라우저에서 직접 체험할 수 있음.'
         },
         funds: {
-          title: '지급 관리',
-          subtitle: '계좌별 지급 상태를 확인하고 선택한 거래를 한 번에 변경해요.',
+          title: '지불 관리',
+          subtitle: '계좌별 지불 상태를 확인하고 선택한 거래를 한 번에 변경해요.',
           refs: 'FUND-01~02 · BAL-01',
           ac: 'AC-15~17 · AC-36~37 · AC-43',
           in: '월별 현황·거래 등록·금액 보정',
@@ -1435,7 +1516,7 @@
             ['assets', '실제 잔액 갱신'],
             ['overview', '생활비 재확인']
           ],
-          rules: ['거래 전체 금액 단위로 선택·전체 선택함.', '실제 송금은 은행 등에서 직접 수행하며, 이 화면은 지급 대기 상태 기록용임.', '차액 조정은 한 번 소진하고 음수 잔여를 보존함.'],
+          rules: ['거래 전체 금액 단위로 선택·전체 선택함.', '실제 송금은 은행 등에서 직접 수행하며, 이 화면은 지불 대기 상태 기록용임.', '차액 조정은 한 번 소진하고 음수 잔여를 보존함.'],
           proposal: '이체 0원 상계와 조정 배분 순서는 설계 제안. 오입력 취소는 가장 최근 처리에 한해 데모 제공함.'
         },
         assets: {
@@ -1443,7 +1524,7 @@
           subtitle: '현재 가진 돈과 예정 반영 후 금액을 구분해요.',
           refs: 'ASSET-01~03 · BAL-01',
           ac: 'AC-29~34 · AC-39',
-          in: '요약의 잔액 근거·지급 관리·지출금 회수',
+          in: '요약의 잔액 근거·지불 관리·지출금 회수',
           out: [
             ['cards', '자산 설정'],
             ['funds', '지출예정 근거'],
@@ -1496,7 +1577,7 @@
           ac: 'AC-18~20',
           in: '메뉴·예정 입금 근거',
           out: [
-            ['income-edit', '급여·비급여 입력'],
+            ['income-edit', '종류별 수입 입력'],
             ['assets', '입금 계좌 잔액']
           ],
           rules: ['급여 귀속월·실제 지급일·예산 반영월을 분리함.', '받은 수입을 예정금으로 다시 더하지 않음.', '용돈은 지출이며 별도 개인 추적을 강제하지 않음.'],
@@ -1504,9 +1585,9 @@
         },
         'income-edit': {
           title: '수입 기록',
-          subtitle: '명세서의 지급·공제를 입력하면 실수령액을 계산해요.',
-          refs: 'INC-01~04',
-          ac: 'AC-18 · AC-19 · AC-38 · AC-61',
+          subtitle: '수입 종류와 실수령액을 기록하고, 필요한 상세만 추가해요.',
+          refs: 'INC-01~05',
+          ac: 'AC-18 · AC-19 · AC-61 · AC-75~81',
           in: '수입 목록의 추가·수정',
           out: [
             ['income', '저장 후 수입 목록'],
@@ -1514,7 +1595,7 @@
             ['assets', '입금 후 잔액 갱신']
           ],
           rules: [
-            '급여 항목을 추가·수정할 수 있음.',
+            '수입 종류별로 입력하며 세무 상세는 선택함. 미입력 세금은 0원이 아님.',
             '고정 수입은 가계부 설정의 고정 수입 · 지출 탭에서 등록·관리함.',
             '자동 생성된 예정 수입은 실제 입금 시 동일 기록에서 실수령액 보정 후 입금 완료 처리함.'
           ],
@@ -1553,14 +1634,227 @@
       };
       const navItems = [
         ['flow', '↗', 'UX 흐름도'],
-        ['overview', '◫', '현황'],
+        ['overview', '◫', '결산'],
         ['expenses', '≡', '지출 내역'],
         ['income', '＋', '수입 내역'],
+        ['assets', '◇', '자산 현황'],
         ['settings-asset', '⚙', '가계부 설정'],
         ['login', '→', '로그인 · 초대'],
         ['onboarding', '◇', '시작 설정'],
         ['operations', '⌘', '운영 도구']
       ];
+      const incomeTypes = ['근로소득', '사업소득', '이자소득', '배당소득', '연금소득', '기타소득', '퇴직소득', '자산 처분', '그 밖의 입금', '종류 확인 필요'];
+      const incomeSubtypes = {
+        근로소득: ['급여', '상여', '성과급', '일용근로'],
+        사업소득: ['용역', '판매', '부동산 임대'],
+        이자소득: ['예적금 이자', '채권 이자', '대여금 이자'],
+        배당소득: ['주식 배당', '펀드/ETF 분배금'],
+        연금소득: ['공적연금', '사적연금'],
+        기타소득: ['강연료', '원고료', '상금'],
+        퇴직소득: ['퇴직금', '퇴직연금 일시금'],
+        '자산 처분': ['주식 매각', '부동산 매각', '금 매각'],
+        '그 밖의 입금': ['증여', '상속', '지원금', '세금 환급']
+      };
+      const incomeSubtypeHtml = (prefix, type, item) =>
+        field(`${prefix}-subtype`, '세부 항목 · 직접 입력 가능', item?.subtype || '', 'text', `list="${prefix}-subtypes"`) +
+        `<datalist id="${prefix}-subtypes">${(incomeSubtypes[type] || []).map((value) => `<option value="${esc(value)}"></option>`).join('')}</datalist>`;
+      const incomeMoneyFields = [
+        ['gross', '지급 총액'],
+        ['national', '소득세'],
+        ['local', '지방소득세'],
+        ['foreign', '국외 원천징수'],
+        ['insurance', '보험료'],
+        ['fee', '수수료'],
+        ['other', '기타 차감액']
+      ];
+      const incomeMoneySchema = {
+        사업소득: {
+          gross: '매출 · 지급 총액',
+          deductions: ['national', 'local', 'foreign', 'fee', 'other'],
+          note: '부가세를 포함해 받을 금액이면 지급 총액에도 포함해요. 부가세와 사업상 필요경비는 입금 차감액으로 자동 계산하지 않아요.'
+        },
+        이자소득: { gross: '이자 지급액', deductions: ['national', 'local', 'foreign'], national: '이자소득 원천징수세액', note: '원금은 제외하고 이자만 기록해요. 세율은 자동 적용하지 않아요.' },
+        배당소득: {
+          gross: '배당 · 분배금',
+          deductions: ['national', 'local', 'foreign', 'fee', 'other'],
+          national: '배당소득 원천징수세액',
+          note: '국내 세금과 국외 원천징수는 실제 차감 내역대로 나눠 기록해요.'
+        },
+        연금소득: {
+          gross: '연금 지급 총액',
+          deductions: ['national', 'local', 'insurance', 'other'],
+          national: '연금소득 원천징수세액',
+          note: '공적·사적연금과 수령 방식을 구분하고 실제 차감된 세금·보험료만 입력해요.'
+        },
+        기타소득: {
+          gross: '기타소득 지급 총액',
+          deductions: ['national', 'local', 'foreign', 'other'],
+          national: '기타소득 원천징수세액',
+          note: '필요경비는 세무상 참고 정보예요. 실제 입금액에서 뺀 돈으로 자동 계산하지 않아요.'
+        },
+        퇴직소득: {
+          gross: '퇴직급여 총액',
+          deductions: ['national', 'local', 'other'],
+          national: '퇴직소득세',
+          note: '연금계좌 이체·과세이연 여부는 별도로 기록해요. 생활비 입금액은 실제 받은 금액으로 확인해 주세요.'
+        },
+        '자산 처분': {
+          gross: '처분대금',
+          deductions: ['national', 'local', 'fee', 'other'],
+          national: '처분 시 실제 원천징수세액',
+          note: '입금 전 실제 차감액만 아래에 적어요. 취득가액과 처분 부대비용은 손익 참고 정보이며 실수령액에서 다시 빼지 않아요.'
+        },
+        '그 밖의 입금': { gross: '차감 전 입금 대상 금액', deductions: ['fee', 'other'], note: '입금 사유를 기록해요. 증여·상속·지원금·환급을 소득세상 소득으로 일괄 판단하지 않아요.' },
+        '종류 확인 필요': { gross: '확인된 지급 총액', deductions: ['fee', 'other'], note: '확인된 금액만 기록하고 소득 종류를 확인한 뒤 보완하세요. 소득세 항목을 임의로 만들지 않아요.' }
+      };
+      const recordedIncomeRow = (amount) => ({ name: '지급액', amount, kind: '지급', code: null, tax: '확인 필요' });
+      const incomeRecordDetails = (item) => item?.financialDetails || (item && Number.isSafeInteger(item.amount) ? { rows: [recordedIncomeRow(item.amount)], complete: true } : null);
+      const salaryRecordRows = (item) =>
+        item?.salary?.length
+          ? structuredClone(item.salary)
+          : item && Number.isSafeInteger(item.amount)
+            ? [recordedIncomeRow(item.amount)]
+            : structuredClone(state.salaryTemplate || defaultSalaryRows());
+      const incomePayTaxTypes = ['근로소득', '사업소득', '이자소득', '배당소득', '연금소득', '기타소득', '퇴직소득'];
+      const incomeMoneyDraftKey = (type) => `${state.incomeEditing || 'new'}:${type}`;
+      const incomeMoneyRows = (type, data) => {
+        if (data?.rows)
+          return data.rows.map((item) => ({
+            ...item,
+            tax: item.kind === '지급' && incomePayTaxTypes.includes(type) ? item.tax || '확인 필요' : null
+          }));
+        const schema = incomeMoneySchema[type];
+        return ['gross', ...schema.deductions].map((key) => ({
+          code: key,
+          name: key === 'gross' ? schema.gross : schema[key] || incomeMoneyFields.find(([id]) => id === key)[1],
+          kind: key === 'gross' ? '지급' : '공제',
+          tax: key === 'gross' && incomePayTaxTypes.includes(type) ? '확인 필요' : null,
+          amount: data?.[key] ?? null
+        }));
+      };
+      const incomeMoneyDetailsHtml = (prefix, type, data = {}) => {
+        const draft = prefix === 'income' ? state.incomeMoneyDrafts?.[incomeMoneyDraftKey(type)] : state.fixedIncomeMoneyDrafts?.[type];
+        const rows = incomeMoneyRows(type, draft || data).sort((a, b) => (a.kind === '지급' ? 0 : 1) - (b.kind === '지급' ? 0 : 1));
+        const section = (kind) =>
+          `<div class="salary-group"><div class="split-line"><strong>${kind === '지급' ? '지급' : '차감'} 항목</strong><button type="button" class="small" data-action="income-money-add" data-prefix="${prefix}" data-kind="${kind}">추가</button></div>${rows.map((item, index) => (item.kind !== kind ? '' : `<div class="line-item${kind === '지급' && incomePayTaxTypes.includes(type) ? '' : ' deduction'}" data-income-money-row="${prefix}" data-kind="${kind}" data-code="${esc(item.code || '')}"><input id="${prefix}-money-name-${index}" data-money-name value="${esc(item.name)}" aria-label="${kind === '지급' ? '지급' : '차감'} 항목명" placeholder="항목명" required /><input id="${prefix}-money-amount-${index}" data-money-amount type="number" value="${esc(item.amount)}" aria-label="${kind === '지급' ? '지급' : '차감'} 금액 · 원" min="0" step="1" required />${kind === '지급' && incomePayTaxTypes.includes(type) ? `<select id="${prefix}-money-tax-${index}" data-money-tax aria-label="지급 항목 과세 구분">${['확인 필요', '과세', '비과세'].map((value) => `<option value="${value}" ${(item.tax || '확인 필요') === value ? 'selected' : ''}>${value}</option>`).join('')}</select>` : ''}<button type="button" class="small" data-action="income-money-remove" data-prefix="${prefix}" data-index="${index}">제거</button></div>`)).join('')}${rows.some((item) => item.kind === kind) ? '' : '<p class="caption">등록된 항목이 없어요.</p>'}</div>`;
+        return `<div data-income-money-editor="${prefix}" data-income-money-type="${esc(type)}"><h3>${esc(type)} 금액 상세</h3><p class="caption">${esc(incomeMoneySchema[type].note)}</p><div class="stack">${section('지급')}${section('공제')}</div><button type="button" class="small" data-action="income-zero-deductions" data-prefix="${prefix}">빈 차감액 0원 입력</button><p class="caption">항목을 추가·제거할 수 있어요. 차감이 없으면 해당 항목을 제거하거나 0원을 입력하세요. 미입력은 0원으로 계산하지 않아요. 지급 한 건만 기록하고 공제를 모두 제거할 수도 있어요.</p><div class="split-line total-line"><span>실수령액 · 지급 합계 − 차감 합계</span><strong><output id="${prefix}-money-net" aria-live="polite">계산에 필요한 금액을 입력해 주세요.</output></strong></div></div>`;
+      };
+      const incomeTaxFields = {
+        근로소득: [['employment', '근로 구분', ['확인 필요', '상용근로', '일용근로']]],
+        사업소득: [
+          ['business', '사업장 · 거래처'],
+          ['vatStatus', '부가세 포함 여부', ['확인 필요', '포함', '별도', '해당 없음']],
+          ['vat', '부가세 금액 · 원', 'number']
+        ],
+        이자소득: [['asset', '관련 자산 · 금융상품']],
+        배당소득: [['asset', '관련 자산 · 금융상품']],
+        연금소득: [
+          ['pension', '연금 구분', ['확인 필요', '공적연금', '사적연금']],
+          ['payment', '수령 방식', ['확인 필요', '정기 수령', '일시금']]
+        ],
+        기타소득: [
+          ['reason', '확인한 지급 사유'],
+          ['expense', '확인된 필요경비 · 원', 'number']
+        ],
+        퇴직소득: [
+          ['serviceStart', '근속 시작일', 'date'],
+          ['serviceEnd', '근속 종료일', 'date'],
+          ['pensionAccount', '연금계좌 이체 · 과세이연 확인 내용']
+        ],
+        '자산 처분': [
+          ['asset', '처분한 자산'],
+          ['disposalDate', '처분일', 'date'],
+          ['cost', '취득가액 · 원', 'number'],
+          ['costs', '처분 부대비용 · 원', 'number'],
+          ['gain', '확인된 손익 · 원', 'signed']
+        ],
+        '그 밖의 입금': [['reason', '실제 입금 사유']]
+      };
+      const incomeKindDetailsHtml = (prefix, type, data = {}) => {
+        const fields = incomeTaxFields[type] || [];
+        return fields.length
+          ? `<h3>${esc(type)} 추가 정보 · 선택</h3><div class="grid">${fields.map(([key, label, input]) => (Array.isArray(input) ? select(`${prefix}-tax-${key}`, label, input, data?.[key] || '확인 필요') : field(`${prefix}-tax-${key}`, label, data?.[key] ?? '', ['number', 'signed'].includes(input) ? 'number' : input || 'text', input === 'number' ? 'min="0" step="1"' : input === 'signed' ? 'step="1"' : ''))).join('')}</div>`
+          : '';
+      };
+      const incomePeriodHtml = (item) =>
+        field('income-tax-periodStart', '소득 귀속 기간 시작 · 선택', item?.taxDetails?.periodStart || '', 'date') +
+        field('income-tax-periodEnd', '소득 귀속 기간 종료 · 선택', item?.taxDetails?.periodEnd || '', 'date');
+      const readIncomeTaxDetails = (prefix) =>
+        Object.fromEntries(
+          [...document.querySelectorAll(`[id^="${prefix}-tax-"]`)].map((el) => [el.id.replace(`${prefix}-tax-`, ''), el.type === 'number' ? (el.value === '' ? null : Number(el.value)) : el.value])
+        );
+      const readIncomeMoneyDetails = (prefix) => {
+        if (!document.querySelector(`[data-income-money-editor="${prefix}"]`)) return null;
+        const rows = [...document.querySelectorAll(`[data-income-money-row="${prefix}"]`)].map((row) => ({
+          name: row.querySelector('[data-money-name]').value.trim(),
+          amount: row.querySelector('[data-money-amount]').value === '' ? null : Number(row.querySelector('[data-money-amount]').value),
+          kind: row.dataset.kind,
+          code: row.dataset.code || null,
+          tax: row.dataset.kind === '지급' ? row.querySelector('[data-money-tax]')?.value || null : null
+        }));
+        const summary = incomeRowsSummary(rows);
+        return { rows, complete: !summary.error };
+      };
+      const incomeRowsSummary = (rows) => {
+        const fail = (error) => ({ net: null, payTotal: null, deductTotal: null, error });
+        if (!rows.some((r) => r.kind === '지급')) return fail('지급 항목을 1개 이상 추가해 주세요.');
+        if (rows.some((r) => !r.name.trim() || r.amount === null || r.amount === undefined)) return fail('항목명과 지급·공제 금액을 입력해 주세요.');
+        if (rows.some((r) => !Number.isSafeInteger(r.amount) || r.amount < 0)) return fail('금액은 0 이상의 정수로 입력해 주세요.');
+        const payTotal = rows.filter((r) => r.kind === '지급').reduce((sum, r) => sum + r.amount, 0);
+        const deductTotal = rows.filter((r) => r.kind === '공제').reduce((sum, r) => sum + r.amount, 0);
+        const net = payTotal - deductTotal;
+        if (!Number.isSafeInteger(payTotal) || !Number.isSafeInteger(deductTotal) || !Number.isSafeInteger(net) || net < 0) return fail('공제 합계와 지급 합계를 확인해 주세요.');
+        return { net, payTotal, deductTotal, error: '' };
+      };
+      const incomeMoneySummary = (details, type) => incomeRowsSummary(incomeMoneyRows(type, details));
+      const rememberIncomeMoneyDraft = (prefix, type, details) => {
+        if (prefix === 'income') {
+          state.incomeMoneyDrafts ||= {};
+          state.incomeMoneyDrafts[incomeMoneyDraftKey(type)] = details;
+        } else {
+          state.fixedIncomeMoneyDrafts ||= {};
+          state.fixedIncomeMoneyDrafts[type] = details;
+        }
+      };
+      const updateIncomeMoneySummary = (prefix, type) => {
+        const output = document.getElementById(`${prefix}-money-net`);
+        if (!output) return;
+        const details = readIncomeMoneyDetails(prefix);
+        rememberIncomeMoneyDraft(prefix, type, details);
+        const result = incomeMoneySummary(details, type);
+        output.textContent = result.net === null ? result.error : won(result.net);
+      };
+      const refreshIncomeMoneyEditor = (prefix, type, details) => {
+        rememberIncomeMoneyDraft(prefix, type, details);
+        document.querySelector(`[data-income-money-editor="${prefix}"]`).outerHTML = incomeMoneyDetailsHtml(prefix, type, details);
+        updateIncomeMoneySummary(prefix, type);
+        if (prefix === 'income') {
+          state.drafts[draftKey()] = (state.drafts[draftKey()] || []).filter((item) => !item.id.startsWith('income-money-'));
+          captureDraft();
+        }
+      };
+      const clearIncomeMoneyDrafts = () => {
+        const key = `${state.incomeEditing || 'new'}:`;
+        Object.keys(state.incomeMoneyDrafts || {})
+          .filter((k) => k.startsWith(key))
+          .forEach((k) => delete state.incomeMoneyDrafts[k]);
+        Object.keys(state.drafts)
+          .filter((k) => k.startsWith(`income-edit:${key}`))
+          .forEach((k) => delete state.drafts[k]);
+      };
+      const incomeBudgetAmount = (income) => (income.type === '자산 처분' ? (income.budgetAmount ?? 0) : income.amount);
+      const expenseMonthFor = ({ date, selectedMonth, existing = null, installment = false }) => {
+        if (existing && (existing.installment || existing.earlyPayoffPlanId || existing.date === date)) return existing.month || existing.date.slice(0, 7);
+        return installment ? selectedMonth : date.slice(0, 7);
+      };
+      const expenseFormMonth = () =>
+        expenseMonthFor({
+          date: $('#expense-date')?.value || '',
+          selectedMonth: state.month,
+          existing: state.transactions.find((t) => t.id === editing),
+          installment: $('#expense-payment')?.value === '할부'
+        });
+      const installmentRoundMonth = (selectedMonth, enteredRound, round) => addMonthsYM(selectedMonth, round - enteredRound);
       const inMonth = (t) => (t.month || t.date.slice(0, 7)) === state.month;
       const monthTransactions = () => state.transactions.filter(inMonth);
       const cancelledFor = (id) =>
@@ -1581,8 +1875,8 @@
       const budgetComparison = (budget) => {
         const incomes = state.incomes.filter((i) => i.month === state.month);
         if (!incomes.length) return '<p>등록된 수입이 없어요. 수입을 등록하면 예산과 비교할 수 있어요.</p>';
-        const completed = incomes.filter((i) => i.status === '입금 완료').reduce((sum, i) => sum + i.amount, 0);
-        const planned = incomes.filter((i) => i.status === '입금 예정').reduce((sum, i) => sum + i.amount, 0);
+        const completed = incomes.filter((i) => i.status === '입금 완료').reduce((sum, i) => sum + incomeBudgetAmount(i), 0);
+        const planned = incomes.filter((i) => i.status === '입금 예정').reduce((sum, i) => sum + incomeBudgetAmount(i), 0);
         const total = completed + planned;
         const amount = budget.reduce((sum, value) => sum + value, 0);
         const difference = amount - total;
@@ -1594,7 +1888,7 @@
       const remaining = () => state.budget.reduce((a, b) => a + b, 0) + state.carry.reduce((a, b) => a + b, 0) - spent();
       const accountFor = (t) => state.cardAccounts[t.card];
       const paymentStatus = (t) => t.paymentStatus || (t.prepared ? (t.card === '현금' ? 'done' : 'waiting') : 'before');
-      const paymentStatusLabel = (t) => ({ before: '지급 전', waiting: '지급 대기', done: '지급 완료' })[paymentStatus(t)];
+      const paymentStatusLabel = (t) => ({ before: '준비 필요', waiting: '지불 대기', done: '지불 완료' })[paymentStatus(t)];
       const fundAccount = (t) =>
         accountFor(t) || (t.card?.startsWith('asset:') ? Object.keys(state.cardAccounts).find((card) => state.cardAssetAccounts[card] === t.card && state.cardAccounts[card]) || t.card : '현금');
       const fundAccountVisible = (account) => state.fundAllAccounts || state.fundAccountSelection.has(account);
@@ -1643,6 +1937,10 @@
         assetRows()
           .filter((a) => a.type === '계좌' && (!a.inactive || `asset:${a.index}` === selected))
           .map((a) => [`asset:${a.index}`, `${a.name} · 소유자 ${personName(a.owner)}`]);
+      const expensePaymentOwner = (value) => {
+        const owner = isExpenseAccount(value) ? assetAt(Number(value.slice(6)))?.owner : value === '현금' || Object.hasOwn(state.cardLabels, value) ? '나' : null;
+        return owner ? personName(owner) : '';
+      };
       const expensePaymentLabel = (value) =>
         isExpenseAccount(value) ? assetAt(Number(value.slice(6)))?.name || '계좌 확인 필요' : value === '현금' ? '현금' : state.cardLabels[value] || `카드 ${value}`;
       const addMonthsYM = (ym, offset) => {
@@ -1713,16 +2011,21 @@
           recurring: true,
           budgetRule: rule.budgetRule,
           type: rule.type,
+          subtype: rule.subtype || '',
+          financialDetails: rule.financialDetails ? structuredClone(rule.financialDetails) : null,
+          payer: rule.payer || '',
+          taxDetails: { ...rule.taxDetails, taxYear: null, periodStart: '', periodEnd: '' },
+          budgetAmount: rule.type === '자산 처분' ? 0 : rule.amount,
           name: `${rule.name} (${sourceMonth.slice(5)}월분)`,
           amount: rule.amount,
-          attribution: sourceMonth,
+          attribution: rule.type === '근로소득' ? sourceMonth : '해당 없음',
           date: dateForMonthDay(sourceMonth, rule.day),
           month: budgetMonth,
           status: '입금 예정',
           owner: rule.owner,
           account: rule.account,
           memo: '',
-          salary: rule.type === '급여' ? (rule.salary || []).map((s) => ({ ...s })) : []
+          salary: rule.type === '근로소득' ? (rule.salary || []).map((s) => ({ ...s })) : []
         });
         return true;
       };
@@ -1932,9 +2235,11 @@
       const captureDraft = () => {
         const form = $('#main form');
         if (!form) return;
-        state.drafts[draftKey()] = [...form.querySelectorAll('input,select,textarea')]
+        const fields = [...form.querySelectorAll('input,select,textarea')]
           .filter((e) => e.id)
           .map((e) => ({ id: e.id, value: e.id === 'asset-amount' && e.dataset.autoMode === 'yes' ? e.dataset.manualValue || '' : e.value, checked: e.checked }));
+        const missingFields = current === 'income-edit' ? (state.drafts[draftKey()] || []).filter((old) => !fields.some((item) => item.id === old.id)) : [];
+        state.drafts[draftKey()] = [...missingFields, ...fields];
         if (current === 'expense-edit' && $('#split-rows')) state.splitDraft = readSplitRows();
         if (current === 'onboarding') Object.assign(state.setup, readForm('setup-form'));
       };
@@ -1995,6 +2300,7 @@
       };
       const navigate = (id) => {
         captureDraft();
+        if (current === 'expense-edit' && id !== 'expense-edit') clearExpenseAssist(false);
         if (current === 'onboarding' && ['cards', 'import'].includes(id)) {
           state.returnSetup = true;
           state.setupReturnScroll = window.scrollY;
@@ -2005,9 +2311,9 @@
         else location.hash = id;
       };
       const heading = (actions = '') =>
-        `${['import', 'funds', 'installments', 'settlement', 'receivables'].includes(current) ? go('expenses', '← 지출 내역', 'small') : current === 'expense-edit' && ['receivables', 'installments'].includes(state.expenseReturn) ? button('expense-cancel', state.expenseReturn === 'receivables' ? '← 지출금 회수 관리' : '← 할부거래 관리', 'small') : ''}<div class="breadcrumb">${esc(state.setup['setup-name'] || '우리의 생활비')} / ${['cards', 'card-add'].includes(current) ? '가계부 설정 / ' : ''}${screens[current].title}</div><div class="page-heading"><div><h1>${current === 'assets' ? '현황' : screens[current].title}</h1><p class="muted">${screens[current].subtitle}</p></div><div class="actions">${actions}</div></div>`;
+        `${['import', 'funds', 'installments', 'settlement', 'receivables'].includes(current) ? go('expenses', '← 지출 내역', 'small') : current === 'expense-edit' && ['receivables', 'installments'].includes(state.expenseReturn) ? button('expense-cancel', state.expenseReturn === 'receivables' ? '← 지출금 회수 관리' : '← 할부거래 관리', 'small') : ''}<div class="breadcrumb">${esc(state.setup['setup-name'] || '우리의 생활비')} / ${['cards', 'card-add'].includes(current) ? '가계부 설정 / ' : ''}${screens[current].title}</div><div class="page-heading"><div><h1>${screens[current].title}</h1><p class="muted">${screens[current].subtitle}</p></div><div class="actions">${actions}</div></div>`;
       const overviewTabNav = (active) =>
-        `<nav class="tabs" aria-label="현황 보기"><button type="button" data-action="overview-month" aria-pressed="${active === 'month'}">월별 현황</button><button type="button" data-action="overview-year" aria-pressed="${active === 'year'}">연간 결산</button><button type="button" data-action="overview-assets" aria-pressed="${active === 'assets'}">자산현황</button></nav>`;
+        `<nav class="tabs" aria-label="결산 보기"><button type="button" data-action="overview-month" aria-pressed="${active === 'month'}">월별</button><button type="button" data-action="overview-year" aria-pressed="${active === 'year'}">연간</button></nav>`;
       const steps = (labels, active) =>
         `<div class="steps" aria-label="진행 단계">${labels.map((label, i) => `<div class="step${active === i ? ' active' : ''}" ${active === i ? 'aria-current="step"' : ''}>${i + 1}. ${label}</div>`).join('')}</div>`;
       const views = {
@@ -2018,28 +2324,28 @@
               ['onboarding', '가계부 시작 설정', '현재 잔액 / 시작금액'],
               ['overview', '월별 현황', '남은 돈 / 다음 할 일']
             ]
-          )}</section><section class="card"><div class="stamp">02 / REPEAT ROUTINE</div><h2>파일부터 지급 관리까지</h2>${flowLine([
+          )}</section><section class="card"><div class="stamp">02 / REPEAT ROUTINE</div><h2>파일부터 지불 관리까지</h2>${flowLine([
             ['import', '카드 파일 가져오기', '대조 / 중복 / 분류'],
             ['expenses', '지출 확인 · 수정', '분할 / 할인 / 회수'],
-            ['funds', '지급 관리', '거래 선택 / 차액 조정'],
+            ['funds', '지불 관리', '거래 선택 / 차액 조정'],
             ['assets', '실제 잔액 확인', '계좌별 직접 갱신']
-          ])}<p class="caption">실제 이체는 은행에서 진행한 뒤 돌아와 지급 대기 상태로 기록해요. 파일 가져오기에 실패하거나 취소하면 기존 거래를 유지하고 파일 선택 화면으로 돌아가요.</p></section><section class="card"><div class="stamp">03 / CONNECTED FLOWS</div><h2>입금 · 공동 관리 · 카드 판단</h2>${flowLine(
+          ])}<p class="caption">실제 이체는 은행에서 진행한 뒤 돌아와 지불 대기 상태로 기록해요. 파일 가져오기에 실패하거나 취소하면 기존 거래를 유지하고 파일 선택 화면으로 돌아가요.</p></section><section class="card"><div class="stamp">03 / CONNECTED FLOWS</div><h2>입금 · 공동 관리 · 카드 판단</h2>${flowLine(
             [
               ['income', '수입 입력', '지급일 / 귀속월 / 예산월'],
               ['expenses', '지출금 회수', '지출 상세 / 입금 기록'],
               ['assets', '자산 · 잔액 확인', '실제 금액 / 예정 입출금']
             ]
           )}${flowLine([
-            ['cards', '카드 · 예정 포함 실적', '상품 확인 / 개인 조건'],
+            ['cards', '카드 · 이용 실적', '상품 확인 / 개인 조건'],
             ['settings', '고정 수입 · 지출', '설정 탭 / 매월 자동 생성'],
             ['installments', '할부거래 관리', '월별 일정 / 보정 / 완납']
           ])}</section><section class="card"><h2>전체 화면 목록 · ${Object.keys(screens).length}개</h2><div class="index-list">${Object.entries(screens)
             .map(([id, s], i) => link(id, `<span class="caption">S${String(i).padStart(2, '0')}</span>　${s.title}`))
             .join(
               ''
-            )}</div></section><section class="card"><h2>화면설계의 범위와 검토 방법</h2><div class="grid"><div><h3>핵심 체험</h3><p class="caption">① 지출 분할 합계 오류 확인<br />② 파일 대조의 중복 선택·필수 분류<br />③ 2만 원 5건 중 3건 지급 대기 처리<br />④ 6만 원 회수 대상의 부분 회수</p></div><div><h3>명세에서 미확정인 항목</h3><p class="caption">파일 지원 형식·AI 동의, 부분 취소·월 경계 세부 계산 사례, 자금 처리·예정 거래 세부 대조, 보안·외부 AI 운영 정책은 구현 전 결정이 필요해요. 각 화면의 오른쪽에 제안 경계를 표시했어요.</p></div></div><p class="caption">근거: <a href="./product-plan.md">제품 기획안</a> · <a href="./mvp-functional-spec.md">MVP 기능 명세서</a> · 예시 기준일 2026.11.04 / 거래·자산 금액은 전부 예시 데이터</p></section></div>`,
+            )}</div></section><section class="card"><h2>화면설계의 범위와 검토 방법</h2><div class="grid"><div><h3>핵심 체험</h3><p class="caption">① 지출 분할 합계 오류 확인<br />② 파일 대조의 중복 선택·필수 분류<br />③ 2만 원 5건 중 3건 지불 대기 처리<br />④ 6만 원 회수 대상의 부분 회수</p></div><div><h3>명세에서 미확정인 항목</h3><p class="caption">파일 지원 형식·AI 동의, 부분 취소·월 경계 세부 계산 사례, 자금 처리·예정 거래 세부 대조, 보안·외부 AI 운영 정책은 구현 전 결정이 필요해요. 각 화면의 오른쪽에 제안 경계를 표시했어요.</p></div></div><p class="caption">근거: <a href="./product-plan.md">제품 기획안</a> · <a href="./mvp-functional-spec.md">MVP 기능 명세서</a> · 예시 기준일 2026.11.04 / 거래·자산 금액은 전부 예시 데이터</p></section></div>`,
         login: () =>
-          `${heading()}<section class="card login"><div class="brand">moneiet</div><h1>같은 가계부에서,<br />생활비를 함께 관리해요.</h1><p class="muted">이미 쓴 돈과 앞으로 나갈 돈을 함께 살펴보세요.</p>${state.inviteValid ? badge('유효한 초대 · 합성 예시') : badge('사용할 수 없는 초대', true)}<button type="button" class="kakao" data-action="login" ${!state.inviteValid ? 'disabled' : ''}>카카오로 계속하기 · 모의 로그인</button>${state.inviteValid ? `<div class="card"><h2>우리의 생활비에 초대받았어요</h2><p class="caption">참여하면 이 가계부의 과거 기록과 현재 기록을 함께 볼 수 있어요.</p>${button('join', '초대받은 가계부에 바로 참여', 'primary')}</div><p class="caption" style="margin-top:16px">새로 관리할 공간이 필요한가요?</p>${go('onboarding', '개인 · 공동 가계부 만들기')}` : notice('초대가 만료되었거나 접근할 수 없어요. 초대한 사람에게 새 초대를 요청해 주세요.', 'warning')}<p class="caption" style="margin-top:22px">가입과 동기화는 실제 서비스에서 제공돼요.<br />이 화면에서는 카카오에 실제로 연결하지 않아요.</p>${button('toggle-invite', state.inviteValid ? '만료된 초대 상태 보기' : '유효한 초대로 돌아가기', 'quiet small')}</section>`,
+          `${heading()}<section class="card login"><div class="brand">미리온돈</div><h1>같은 가계부에서,<br />생활비를 함께 관리해요.</h1><p class="muted">이미 쓴 돈과 앞으로 나갈 돈을 함께 살펴보세요.</p>${state.inviteValid ? badge('유효한 초대 · 합성 예시') : badge('사용할 수 없는 초대', true)}<button type="button" class="kakao" data-action="login" ${!state.inviteValid ? 'disabled' : ''}>카카오로 계속하기 · 모의 로그인</button>${state.inviteValid ? `<div class="card"><h2>우리의 생활비에 초대받았어요</h2><p class="caption">참여하면 이 가계부의 과거 기록과 현재 기록을 함께 볼 수 있어요.</p>${button('join', '초대받은 가계부에 바로 참여', 'primary')}</div><p class="caption" style="margin-top:16px">새로 관리할 공간이 필요한가요?</p>${go('onboarding', '개인 · 공동 가계부 만들기')}` : notice('초대가 만료되었거나 접근할 수 없어요. 초대한 사람에게 새 초대를 요청해 주세요.', 'warning')}<p class="caption" style="margin-top:22px">가입과 동기화는 실제 서비스에서 제공돼요.<br />이 화면에서는 카카오에 실제로 연결하지 않아요.</p>${button('toggle-invite', state.inviteValid ? '만료된 초대 상태 보기' : '유효한 초대로 돌아가기', 'quiet small')}</section>`,
         onboarding: () => {
           const step = state.setupStep;
           const d = state.setup;
@@ -2047,7 +2353,7 @@
             `${select('setup-type', '가계부 유형', ['개인 가계부', '공동 가계부'], d['setup-type'])}${field('setup-name', '가계부 이름', d['setup-name'] || '우리의 생활비')}${field('setup-month', '관리 시작월', d['setup-month'] || '2026-11', 'month')}<p class="caption">선택한 달 1일부터 관리해요. 과거 월을 선택해 이전 지출을 함께 기록할 수도 있어요.</p>`,
             `<h2>사용할 분류와 기본 예산</h2><p class="caption">추천 분류를 눌러 추가하거나 직접 입력해 주세요. 모든 분류는 한 단계로 관리해요.</p><div class="actions">${['의료/건강', '문화/여가'].map((c) => `<button type="button" data-action="add-category" data-value="${c}">${c} ＋</button>`).join('')}</div><div id="extra-categories"></div>${categories.map((c, i) => field(`setup-budget-${i}`, c, d[`setup-budget-${i}`] ?? state.budget[i], 'number', 'min="0" step="1" required')).join('')}${field('setup-custom', '직접 추가할 분류', d['setup-custom'] || '')}<p class="caption">기본 예산은 새 달이 열릴 때 적용되며, 월별 예산은 언제든 따로 바꿀 수 있어요.</p>`,
             `<div class="grid"><div>${field('setup-account', '생활비 계좌 표시명', d['setup-account'] || '예시 생활비 계좌')}${field('setup-owner', '결제수단 소유자', personName('나'))}</div><div>${select('setup-card', '카드', ['예시 카드 A', '예시 카드 B'], d['setup-card'])}${field('setup-payment-account', '카드 결제 계좌', '예시 결제 계좌 A')}${go('cards', '등록 가능한 카드 · 조건 살펴보기', 'small')}</div></div>`,
-            `<div class="notice">월초 잔액을 따로 찾지 않아도 돼요. 지금 확인한 잔액만 먼저 입력하고, 거래 내역은 나중에 채울 수 있어요. 과거 월부터 시작한다면 전월 이월금을 직접 입력(또는 0원)해 주세요.</div><div class="grid">${field('setup-actual', '생활비 계좌 현재 실제 잔액', d['setup-actual'] ?? 2000000, 'number', 'min="0" step="1" required')}${field('setup-asof', '잔액 확인 시점', d['setup-asof'] || '2026-11-04T09:00', 'datetime-local', 'required')}</div><h3>현재 연결 자료 · 예시</h3><p>미입금 ${won(assetInflow())} · 지급 전 지출 ${won(obligations())} · 시작월 지출 ${won(spent())}</p><p class="caption">등록된 거래를 바탕으로 계산한 합계예요. 아직 입력하지 않은 자료는 0원으로 단정하지 않아요.</p>${go('import', '카드 파일 대조 후 돌아오기', 'small')}`,
+            `<div class="notice">월초 잔액을 따로 찾지 않아도 돼요. 지금 확인한 잔액만 먼저 입력하고, 거래 내역은 나중에 채울 수 있어요. 과거 월부터 시작한다면 전월 이월금을 직접 입력(또는 0원)해 주세요.</div><div class="grid">${field('setup-actual', '생활비 계좌 현재 실제 잔액', d['setup-actual'] ?? 2000000, 'number', 'min="0" step="1" required')}${field('setup-asof', '잔액 확인 시점', d['setup-asof'] || '2026-11-04T09:00', 'datetime-local', 'required')}</div><h3>현재 연결 자료 · 예시</h3><p>미입금 ${won(assetInflow())} · 준비 필요 지출 ${won(obligations())} · 시작월 지출 ${won(spent())}</p><p class="caption">등록된 거래를 바탕으로 계산한 합계예요. 아직 입력하지 않은 자료는 0원으로 단정하지 않아요.</p>${go('import', '카드 파일 대조 후 돌아오기', 'small')}`,
             setupReview()
           ][step];
           return `${heading()}${steps(['가계부', '분류 · 예산', '결제수단', '현재 자료', '시작금액'], step)}<form id="setup-form" class="card"><div class="stamp">STEP ${step + 1} / 5</div>${content}<div id="setup-error" class="form-error" role="alert"></div><div class="form-footer">${step ? button('setup-back', '이전') : go('login', '취소')}${button(step === 4 ? 'setup-save' : 'setup-next', step === 4 ? '이 기준으로 시작하기' : '다음', 'primary')}</div></form>`;
@@ -2074,19 +2380,32 @@
               ['전체 구성원 합계', allIncomes, allTransactions],
               ...memberNames.map((name) => [name, allIncomes.filter((i) => ownerName(i.owner) === name), allTransactions.filter((t) => ownerName(transactionOwner(t)) === name)])
             ];
-            const incomeTotal = incomes.reduce((sum, i) => sum + i.amount, 0);
+            const incomeTotal = incomes.reduce((sum, i) => sum + incomeBudgetAmount(i), 0);
             const totalExpense = transactions.reduce((sum, t) => sum + expenseFor(t), 0);
             const deductions = new Map();
+            incomes.forEach((i) =>
+              (i.salary || [])
+                .filter((item) => item.kind === '공제')
+                .forEach((item) => {
+                  const name = item.name.trim() || '이름 없는 공제';
+                  deductions.set(name, (deductions.get(name) || 0) + item.amount);
+                })
+            );
             incomes
-              .filter((i) => i.type === '급여')
-              .forEach((i) =>
-                (i.salary || [])
-                  .filter((item) => item.kind === '공제')
-                  .forEach((item) => {
-                    const name = item.name.trim() || '이름 없는 공제';
-                    deductions.set(name, (deductions.get(name) || 0) + item.amount);
+              .filter((income) => income.financialDetails)
+              .forEach((income) =>
+                incomeMoneyRows(income.type, income.financialDetails)
+                  .filter((r) => r.kind === '공제' && Number.isSafeInteger(r.amount))
+                  .forEach((r) => {
+                    deductions.set(r.name, (deductions.get(r.name) || 0) + r.amount);
                   })
               );
+            const incomeKindRows = incomeTypes
+              .filter((type) => incomes.some((i) => i.type === type))
+              .map((type) => {
+                const items = incomes.filter((i) => i.type === type);
+                return row([type, money(items.reduce((sum, i) => sum + i.amount, 0)), money(items.reduce((sum, i) => sum + incomeBudgetAmount(i), 0))]);
+              });
             const categoryTotals = new Map();
             transactions.forEach((t) => {
               if (t.allocations?.length) {
@@ -2096,29 +2415,33 @@
               } else categoryTotals.set(t.category, (categoryTotals.get(t.category) || 0) + expenseFor(t));
             });
             const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
-            return `${heading(`<div class="actions">${button('prev-year', '‹ 이전 해', 'small')}<strong>${year}년</strong>${button('next-year', '다음 해 ›', 'small')}</div>`)}${overviewTabs}<p class="caption">예산 반영월 기준 · 예정 수입과 예정 지출을 포함한 전체 기록이에요.<br />지출은 결제수단 소유자, 수입과 급여 공제는 귀속자 기준으로 집계해요.</p><section class="card" style="margin-bottom:18px"><h2>구성원별 연간 합계</h2>${table(
+            return `${heading(`<div class="actions">${button('prev-year', '‹ 이전 해', 'small')}<strong>${year}년</strong>${button('next-year', '다음 해 ›', 'small')}</div>`)}${overviewTabs}<p class="caption">수입 예산 반영월 · 지출 반영월 기준으로 예정 내역까지 포함해요.<br />지출은 결제수단 소유자, 수입과 세금·공제는 귀속자 기준으로 집계해요.</p><section class="card" style="margin-bottom:18px"><h2>구성원별 연간 합계</h2>${table(
               ['구성원', '수입 금액', '지출 금액'],
               summaries.map(([name, memberIncomes, memberTransactions]) =>
                 row([
                   esc(name),
-                  memberIncomes.length ? money(memberIncomes.reduce((sum, i) => sum + i.amount, 0)) : '—',
+                  memberIncomes.length ? money(memberIncomes.reduce((sum, i) => sum + incomeBudgetAmount(i), 0)) : '—',
                   memberTransactions.length ? money(memberTransactions.reduce((sum, t) => sum + expenseFor(t), 0)) : '—'
                 ])
               )
-            )}</section><div class="card" style="margin-bottom:18px">${select('annual-member', '연간 결산 상세', [['all', '전체 구성원 합계'], ...memberNames.map((name) => [name, name])], selectedOwner)}</div><div class="grid three"><section class="card"><h2>수입</h2><div class="value medium">${won(incomeTotal)}</div><p class="caption">입금 예정 포함</p></section><section class="card"><h2>생활비 반영 지출</h2><div class="value medium">${won(totalExpense)}</div><p class="caption">고정지출·할부 등 예정 포함</p></section><section class="card"><h2>연말 남은 생활비</h2><div class="value medium">—</div><p class="caption">${selectedOwner === 'all' ? '연말 이월 계산 연결 후 표시돼요' : '공동 예산이라 전체 합계에서만 보여요'}</p></section></div><section class="card" style="margin-top:18px"><h2>월별 수입 · 지출</h2>${table(
-              ['예산 반영월', '수입 금액', '지출 금액'],
+            )}</section><div class="card" style="margin-bottom:18px">${select('annual-member', '연간 결산 상세', [['all', '전체 구성원 합계'], ...memberNames.map((name) => [name, name])], selectedOwner)}</div><div class="grid three"><section class="card"><h2>생활비 반영 수입</h2><div class="value medium">${won(incomeTotal)}</div><p class="caption">입금 예정 포함</p></section><section class="card"><h2>생활비 반영 지출</h2><div class="value medium">${won(totalExpense)}</div><p class="caption">고정지출·할부 등 예정 포함</p></section><section class="card"><h2>연말 남은 생활비</h2><div class="value medium">—</div><p class="caption">${selectedOwner === 'all' ? '연말 이월 계산 연결 후 표시돼요' : '공동 예산이라 전체 합계에서만 보여요'}</p></section></div><section class="card" style="margin-top:18px"><h2>월별 수입 · 지출</h2>${table(
+              ['집계월', '수입 금액', '지출 금액'],
               months.map((month) => {
                 const mi = incomes.filter((i) => i.month === month);
                 const mt = transactions.filter((t) => (t.month || t.date.slice(0, 7)) === month);
-                return row([`${month.slice(5)}월`, mi.length ? money(mi.reduce((sum, i) => sum + i.amount, 0)) : '—', mt.length ? money(mt.reduce((sum, t) => sum + expenseFor(t), 0)) : '—']);
+                return row([
+                  `${month.slice(5)}월`,
+                  mi.length ? money(mi.reduce((sum, i) => sum + incomeBudgetAmount(i), 0)) : '—',
+                  mt.length ? money(mt.reduce((sum, t) => sum + expenseFor(t), 0)) : '—'
+                ]);
               })
-            )}<p class="caption">—는 등록된 기록이 없다는 뜻이며, 빠진 내역이 없다는 의미는 아니에요.</p></section><section class="card" style="margin-top:18px"><h2>급여 공제 내역</h2><p class="caption">급여명세서에 입력한 공제 항목 합계예요. 연말정산 귀속 기준과는 다를 수 있어요.</p>${
+            )}<p class="caption">—는 등록된 기록이 없다는 뜻이며, 빠진 내역이 없다는 의미는 아니에요.</p></section><section class="card" style="margin-top:18px"><h2>종류별 수입</h2>${table(['수입 종류', '실수령액', '생활비 예산 반영액'], incomeKindRows)}<p class="caption">예정 포함 · 예산 반영월 기준이며 신고용 소득 합계가 아니에요. 자산 처분대금은 수익과 달라요.</p></section><section class="card" style="margin-top:18px"><h2>세금 · 공제 내역</h2><p class="caption">입력한 원천징수·보험료 등 장부 항목만 합산해요. 세무상 확정된 금액이 아니며 귀속 기준이 다를 수 있어요.</p>${
               deductions.size
                 ? table(
                     ['공제 항목', '공제 합계 금액'],
                     [...deductions.entries()].map(([name, amount]) => row([esc(name), money(amount)]))
                   )
-                : '<p>등록된 급여 공제 내역이 없어요.</p>'
+                : '<p>등록된 세금·공제 상세가 없어요.</p>'
             }</section><section class="card" style="margin-top:18px"><h2>분류별 생활비 반영 지출</h2>${
               categoryTotals.size
                 ? table(
@@ -2139,23 +2462,11 @@
             !currentMonth
               ? notice('선택한 달은 전월 이월·실제 잔액 이력이 연결되지 않은 미리보기 상태예요. 생성된 예정 수입·고정지출·할부 회차는 아래에서 바로 확인할 수 있어요.') +
                 `<section class="card"><div class="split-line"><h2>${esc(state.month)} 예정 지출 · 할부 (${monthTransactions().length}건)</h2><div class="actions">${go('expenses', '지출 내역 보기', 'small')}${button('this-month', '2026년 11월로 돌아가기', 'small')}</div></div>${monthTransactions().length ? expenseTable(monthTransactions()) : '<p class="caption">등록되거나 생성된 지출이 없어요.</p>'}</section><section class="card" style="margin-top:18px"><div class="split-line"><h2>월별 예산과 수입</h2>${canConfigure() ? button('monthly-budget-edit', '월별 예산 수정', 'small') : ''}</div>${budgetComparison(state.budget)}</section>`
-              : `<div class="grid"><section class="card hero"><div>예정 지출을 포함한 남은 생활비</div><div class="value">${won(remaining())}</div><p class="caption">월 예산 ${won(state.budget.reduce((a, b) => a + b, 0))} + 이월 ${won(state.carry.reduce((a, b) => a + b, 0))}<br />− 생활비 반영 지출 ${won(spent())}</p><p class="caption">회수 대상 금액이 반영된 예산상 금액으로, 지금 인출 가능한 현금과 달라요.</p></section><section class="card"><h2>이번에 확인할 일</h2><div class="split-line"><span>카드 A 지급 전 ${pendingFor('A').length}건</span>${go('funds', '지급 관리 →', 'small')}</div><div class="split-line"><span>이달 거래의 미회수 금액 ${won([...byPerson.values()].reduce((sum, value) => sum + value, 0))}</span>${button('receivables-month', '지출금 회수 관리 →', 'small')}</div><div class="split-line"><span>실제 잔액 · 수동 갱신</span>${go('assets', '잔액 근거 →', 'small')}</div></section></div><div class="notice warning" style="margin-top:18px">자료 기준 · 예시 카드 A 11.04 / 카드 B 11.02 · 실제 잔액 확인 11.04 09:00. 등록된 최신 기록 기준이며 실시간 은행 잔액은 아니에요.</div>${monthlySurplusReportCard([...byPerson.values()].reduce((sum, value) => sum + value, 0))}<section class="card" style="margin-top:18px"><div class="split-line"><h2>분류별 예산 · 지출</h2>${canConfigure() ? button('monthly-budget-edit', '월별 예산 수정', 'small') : ''}</div>${table(
-                  ['분류', '월 예산', '전월 이월', '지출 · 예정 포함', '남은 금액'],
-                  categories.map((c, i) => {
-                    const expense = monthTransactions().reduce(
-                      (sum, t) => sum + (t.allocations ? t.allocations.filter((a) => a.category === c).reduce((v, a) => v + a.amount, 0) : t.category === c ? t.expense : 0),
-                      0
-                    );
-                    const cancelled = monthTransactions()
-                      .filter((t) => !t.receivableCurrent && !t.allocations && t.category === c)
-                      .reduce((sum, t) => sum + cancelledFor(t.id), 0);
-                    return row([esc(c), money(state.budget[i]), money(state.carry[i]), money(expense + cancelled), money(state.budget[i] + state.carry[i] - expense - cancelled)]);
-                  })
-                )}<div class="notice">${budgetComparison(state.budget)}</div></section><div class="grid" style="margin-top:18px">${cardPerformancePanel('A', exampleCardTiers)}${cardPerformancePanel('B', exampleCardTiers, true)}${state.registeredCard ? cardPerformancePanel('C', state.registeredCard.conditions.tiers, state.registeredCard.product.source !== '공용') : ''}</div>`
+              : monthlyOverview(byPerson)
           }`;
         },
         expenses: () =>
-          `${heading(`${button('settings-recurring', '고정 지출 설정', 'small')}${go('import', '카드 내역 가져오기')}${go('expense-edit', '지출 추가', 'primary')}`)}<div class="actions">${monthNavHtml()}</div><div class="actions">${go('funds', `지급 관리 · 지급 전 ${state.transactions.filter((t) => paymentStatus(t) === 'before' && accountFor(t)).length}건`)}${go('installments', `할부거래 관리 · 진행 ${(state.installmentPlans || []).filter((p) => installmentPlanState(p) === 'active').length}건`)}${button('receivables-month', `지출금 회수 관리 · ${won(receivableTotal())}`)}</div><div class="card" style="margin-top:16px"><div class="grid">${field('expense-search', '사용처 · 분류 검색', state.expenseSearch, 'search')}${select('expense-card-filter', '결제수단', [['전체', '전체'], ['A', state.cardLabels.A], ['B', state.cardLabels.B], ['현금', '현금'], ...expenseAccountOptions(state.expenseCardFilter)], state.expenseCardFilter)}</div><p class="caption">${esc(state.month)} · 일반 · 고정 · 할부 지출 분리 보기</p><div id="expense-list">${expenseSectionsHtml(filteredExpenses())}</div></div>`,
+          `${heading(`${button('settings-recurring', '고정 지출 설정', 'small')}${go('import', '카드 내역 가져오기')}${go('expense-edit', '지출 추가', 'primary')}`)}<div class="actions">${monthNavHtml()}</div><div class="actions">${go('funds', `지불 관리 · 준비 필요 ${state.transactions.filter((t) => paymentStatus(t) === 'before' && accountFor(t)).length}건`)}${go('installments', `할부거래 관리 · 진행 ${(state.installmentPlans || []).filter((p) => installmentPlanState(p) === 'active').length}건`)}${button('receivables-month', `지출금 회수 관리 · ${won(receivableTotal())}`)}</div><div class="card" style="margin-top:16px"><div class="grid">${field('expense-search', '사용처 · 분류 검색', state.expenseSearch, 'search')}${select('expense-card-filter', '결제수단', [['전체', '전체'], ['A', state.cardLabels.A], ['B', state.cardLabels.B], ['현금', '현금'], ...expenseAccountOptions(state.expenseCardFilter)], state.expenseCardFilter)}</div><p class="caption">${esc(state.month)} · 일반 · 고정 · 할부 지출 분리 보기</p><div id="expense-list">${expenseSectionsHtml(filteredExpenses())}</div></div>`,
         receivables: () =>
           `${heading()}<div class="actions">${monthNavHtml()}<button type="button" class="small${state.receivableFilterMonth ? '' : ' primary'}" data-action="receivables-all-months">전체 기간</button><button type="button" class="small${state.receivableFilterMonth ? ' primary' : ''}" data-action="receivables-month">${esc(state.month)} 거래만</button></div><div class="tabs" aria-label="회수 상태"><button type="button" data-action="receivables-tab" data-value="waiting" aria-pressed="${state.receivableTab === 'waiting'}">회수 대기</button><button type="button" data-action="receivables-tab" data-value="done" aria-pressed="${state.receivableTab === 'done'}">회수 완료</button></div><div class="card"><div class="split-line"><p>${state.receivableFilterMonth ? `${esc(state.receivableFilterMonth)} 거래` : '전체 기간'} · ${state.receivableTab === 'waiting' ? '미회수 금액이 있는 거래' : '회수 대상 금액을 모두 회수한 거래'}</p></div><div class="grid">${field('expense-search', '사용처 · 분류 검색', state.receivableSearch, 'search')}${select('expense-card-filter', '결제수단', [['전체', '전체'], ['A', state.cardLabels.A], ['B', state.cardLabels.B], ['현금', '현금'], ...expenseAccountOptions(state.receivableCardFilter)], state.receivableCardFilter)}</div><div id="expense-list">${expenseTable(filteredExpenses(), state.receivableTab === 'waiting')}</div>${state.receivableTab === 'waiting' ? `<div id="bulk-receivable-bar" class="selection-bar" aria-live="polite">${bulkSelectionBar()}</div>` : '<p class="caption">상대별 회수한 금액과 회수 기록은 지출 상세의 회수 금액 관리에서 확인하고 정정할 수 있어요.</p>'}</div>`,
         'expense-edit': () => {
@@ -2178,29 +2489,29 @@
             })) || [{ category: t?.category || '', gross: '', discount: '0' }];
           }
           const isDoneEdit = Boolean(t && paymentStatus(t) === 'done');
-          return `${heading()}<form id="expense-form" class="stack"><section class="card">${
+          return `${heading()}${expenseAssistHtml()}<form id="expense-form" class="stack"><section class="card">${
             isDoneEdit
-              ? `<div class="notice"><strong>지급 완료된 거래는 금액과 결제수단을 수정할 수 없어요.</strong><p class="caption">이미 출금이 완료된 기록을 보호하기 위해 결제수단·승인금액·할인 수정이 제한돼요. 수정이 필요하면 먼저 지급 상태를 '지급 대기' 또는 '지급 전'으로 변경해 저장한 뒤 다시 수정해 주세요.</p></div>`
+              ? `<div class="notice"><strong>지불 완료된 거래는 금액과 결제수단을 수정할 수 없어요.</strong><p class="caption">이미 출금이 완료된 기록을 보호하기 위해 결제수단·승인금액·할인 수정이 제한돼요. 수정이 필요하면 먼저 지불 상태를 '지불 대기' 또는 '준비 필요'으로 변경해 저장한 뒤 다시 수정해 주세요.</p></div>`
               : ''
           }${
             t?.fixedExpenseId
               ? `<div class="notice"><strong>고정 지출에서 자동 생성된 이 달 건이에요.</strong><p class="caption">여기서 수정한 내용은 이 달 내역에만 반영되며 고정 지출 설정이나 다른 달 내역은 바뀌지 않아요.</p></div>`
               : ''
-          }<div class="grid">${field('expense-name', '사용처', t?.name || '예시 마트', 'text', 'required')}${field('expense-details', '상세내역 · 선택', t?.details ?? '', 'text', 'placeholder="구매한 물품이나 지출 내용을 입력하세요"')}${field('expense-date', '거래일', t?.date || '2026-11-04', 'date', 'required')}${select('expense-card', '결제수단', fixedExpensePaymentOptions(t?.card), t?.card || 'A').replace('<select ', `<select ${isDoneEdit ? 'disabled ' : ''}`)}${select(
+          }<div class="grid">${field('expense-name', '사용처', t?.name || '예시 마트', 'text', 'required')}${field('expense-details', '상세내역 · 선택', t?.details ?? '', 'text', 'placeholder="구매한 물품이나 지출 내용을 입력하세요"')}${field('expense-date', '거래일', t?.date || dateForMonthDay(state.month, 4), 'date', 'required')}${select('expense-card', '결제수단', fixedExpensePaymentOptions(t?.card), t?.card || 'A').replace('<select ', `<select ${isDoneEdit ? 'disabled ' : ''}`)}${select(
             'expense-status',
-            '지급 상태',
+            '지불 상태',
             [
-              ['before', '지급 전'],
-              ['waiting', '지급 대기'],
-              ['done', '지급 완료']
+              ['before', '준비 필요'],
+              ['waiting', '지불 대기'],
+              ['done', '지불 완료']
             ],
             t ? paymentStatus(t) : state.month < '2026-11' ? 'done' : 'before'
-          )}${field('expense-month', '예산 반영월', t?.month || state.month, 'month', 'required')}${field('expense-amount', '승인금액 · 카드사 할인 전', t?.installment ? t.approval : (t?.basis ?? t?.amount ?? 100000), 'number', `min="1" step="1" required ${t?.installment || isDoneEdit ? 'readonly' : ''}`)}${field('expense-discount', '카드사 할인', t?.discount || 0, 'number', `min="0" step="1" required ${t?.installment || isDoneEdit ? 'readonly' : ''}`)}${select('expense-payment', '납부방식', ['일시불', '할부'], t?.installment ? '할부' : state.expenseDefaultPayment || '일시불').replace('<select ', `<select ${t ? 'disabled ' : ''}`)}<div id="installment-fields" class="grid" hidden>${select('installment-type', '할부 유형', ['무이자', '유이자', '부분 무이자'], t?.installmentType || '무이자')}${field('installment-count', '할부 개월 수', t?.installmentCount || 3, 'number', 'min="2" max="36" step="1"')}${field('installment-current', '이번 회차', t?.installmentCurrent || 1, 'number', `min="1" max="${t?.installmentCount || 36}" step="1"`)}${field('installment-principal', '이번 회차 납부원금 · 원', t?.installment ? (t.basePrincipal ?? t.basis ?? t.amount) : '', 'number', 'min="1" step="1"')}${field('installment-interest', '이번 회차 이자·수수료 · 원', t?.installment ? (t.feeAmount ?? Math.max(0, (t.amount || 0) - (t.basePrincipal ?? t.amount ?? 0))) : 0, 'number', 'min="0" step="1"')}<input type="hidden" id="installment-amount" name="installment-amount" value="${esc(t?.installment ? t.basis : '')}" /><div class="split-line total-line" style="grid-column:1 / -1"><span>이번 회차 총 납부액</span><strong id="installment-total-text">${t?.installment ? won(t.basis) : '0원'}</strong></div></div>${select('expense-user', '실사용자 (구성원 · 외부인)', actualUsersList(), t?.actualUser || personName('나'))}</div><label class="checks" id="expense-performance-wrap" style="margin:6px 0 12px"><input id="expense-performance" type="checkbox" ${t?.performanceExcluded ? '' : 'checked'} /> 카드 이용 실적에 반영</label><fieldset class="asset-kind-group"><legend>지출 분류 · 필수</legend><div id="split-rows">${splitRowsHtml(state.splitDraft)}</div>${button('split-add', '분류 추가', 'small')}<div id="split-discount-tools" hidden>${button('split-discount-auto', '할인 자동 배분', 'small')}<p class="caption">버튼을 누르면 카드사 할인을 분류별 금액에 비례해 나눠요. 직접 수정할 수 있고, 합계는 전체 카드사 할인과 같아야 해요.</p></div><p class="caption">분류를 추가하면 결제 금액을 항목별로 나눠 입력할 수 있어요.</p></fieldset><p class="caption">${t?.installment ? `총 승인 ${won(t.approval)} 중 ${t.installmentCurrent || 1}/${t.installmentCount || 3}회차(${won(t.amount)})가 이번 달 생활비에 반영돼요. 전체 회차·선결제 조정은 할부거래 관리에서 처리해요. ` : ''}지급 상태(지급 전·대기·완료)는 실제 자금 이동에 맞춰 선택하며, 상태를 바꿔도 계좌 실제 잔액은 자동으로 바뀌지 않아요.</p>${t?.installment ? `<div class="actions">${go('installments', '할부거래 관리에서 전체 일정 보기', 'small')}</div>` : ''}</section><section class="card" id="manage-form"><h2>회수 금액</h2><p class="caption">회수할 금액이 있다면 상대를 추가해 주세요. 실사용자와 회수 상대는 따로 지정할 수 있어요.</p><div id="manage-rows"></div>${button('manage-add', '추가', 'small')}<div id="manage-error" class="form-error" role="alert"></div><div id="manage-preview" class="caption"></div></section><section class="card"><h2>반영 미리보기</h2><div id="expense-preview"></div><div id="expense-error" class="form-error" role="alert"></div><div class="form-footer">${button('expense-cancel', '취소')}${button('expense-save', '지출 저장', 'primary')}</div></section></form>`;
+          )}${field('expense-amount', '승인금액 · 카드사 할인 전', t?.installment ? t.approval : (t?.basis ?? t?.amount ?? 100000), 'number', `min="1" step="1" required ${t?.installment || isDoneEdit ? 'readonly' : ''}`)}${field('expense-discount', '카드사 할인', t?.discount || 0, 'number', `min="0" step="1" required ${t?.installment || isDoneEdit ? 'readonly' : ''}`)}${select('expense-payment', '납부방식', ['일시불', '할부'], t?.installment ? '할부' : state.expenseDefaultPayment || '일시불').replace('<select ', `<select ${t ? 'disabled ' : ''}`)}<div id="installment-fields" class="grid" hidden>${select('installment-type', '할부 유형', ['무이자', '유이자', '부분 무이자'], t?.installmentType || '무이자')}${field('installment-count', '할부 개월 수', t?.installmentCount || 3, 'number', 'min="2" max="36" step="1"')}${field('installment-current', '이번 회차', t?.installmentCurrent || 1, 'number', `min="1" max="${t?.installmentCount || 36}" step="1"`)}${field('installment-principal', '이번 회차 납부원금 · 원', t?.installment ? (t.basePrincipal ?? t.basis ?? t.amount) : '', 'number', 'min="1" step="1"')}${field('installment-interest', '이번 회차 이자·수수료 · 원', t?.installment ? (t.feeAmount ?? Math.max(0, (t.amount || 0) - (t.basePrincipal ?? t.amount ?? 0))) : 0, 'number', 'min="0" step="1"')}<input type="hidden" id="installment-amount" name="installment-amount" value="${esc(t?.installment ? t.basis : '')}" /><div class="split-line total-line" style="grid-column:1 / -1"><span>이번 회차 총 납부액</span><strong id="installment-total-text">${t?.installment ? won(t.basis) : '0원'}</strong></div></div>${select('expense-user', '실사용자 (구성원 · 외부인)', actualUsersList(), t?.actualUser || expensePaymentOwner(t?.card || 'A'))}</div><label class="checks" id="expense-performance-wrap" style="margin:6px 0 12px"><input id="expense-performance" type="checkbox" ${t?.performanceExcluded ? '' : 'checked'} /> 카드 이용 실적에 반영</label><fieldset class="asset-kind-group"><legend>지출 분류 · 필수</legend><div id="split-rows">${splitRowsHtml(state.splitDraft)}</div>${button('split-add', '분류 추가', 'small')}<div id="split-discount-tools" hidden>${button('split-discount-auto', '할인 자동 배분', 'small')}<p class="caption">버튼을 누르면 카드사 할인을 분류별 금액에 비례해 나눠요. 직접 수정할 수 있고, 합계는 전체 카드사 할인과 같아야 해요.</p></div><p class="caption">분류를 추가하면 결제 금액을 항목별로 나눠 입력할 수 있어요.</p></fieldset><p class="caption">${t?.installment ? `총 승인 ${won(t.approval)} 중 ${t.installmentCurrent || 1}/${t.installmentCount || 3}회차(${won(t.amount)})가 이번 달 생활비에 반영돼요. 전체 회차·선결제 조정은 할부거래 관리에서 처리해요. ` : ''}준비 필요는 지불할 금액을 아직 확보하지 않은 상태, 지불 대기는 금액을 확보하고 실제 지불을 기다리는 상태, 지불 완료는 카드대금 납부·상대방 송금·현금 지급이 끝난 상태예요. 결제계좌로 준비금을 옮긴 것만으로는 지불 완료가 되지 않아요. 상태를 바꿔도 계좌 실제 잔액은 자동으로 바뀌지 않아요.</p>${t?.installment ? `<div class="actions">${go('installments', '할부거래 관리에서 전체 일정 보기', 'small')}</div>` : ''}</section><section class="card" id="manage-form"><h2>회수 금액</h2><p class="caption">회수할 금액이 있다면 상대를 추가해 주세요. 실사용자와 회수 상대는 따로 지정할 수 있어요.</p><div id="manage-rows"></div>${button('manage-add', '추가', 'small')}<div id="manage-error" class="form-error" role="alert"></div><div id="manage-preview" class="caption"></div></section><section class="card"><h2>반영 미리보기</h2><div id="expense-preview"></div><div id="expense-error" class="form-error" role="alert"></div><div class="form-footer">${button('expense-cancel', '취소')}${button('expense-save', '지출 저장', 'primary')}</div></section></form>`;
         },
         import: () => {
           const tab = state.importTab || 'card';
           const cardContent = `<div class="grid">${select('import-card', '대상 카드', ['예시 카드 B'])}${select('import-kind', '파일 목적', ['이용 · 승인내역', '결제예정 · 청구내역'])}</div><div class="drop-zone"><h2>카드에서 내려받은 파일</h2><p class="caption">카드사별 이용내역·청구내역 파일을 올려 기존 거래와 대조해요.</p><p class="caption">이 화면에서는 예시 파일로 대조 흐름을 미리 체험할 수 있어요.</p>${button('import-preview', '예시 파일로 대조 체험', 'primary')}</div><p class="caption" style="margin-top:18px">예시 결과: 신규 1건 · 예정 보정 1건 · 중복 후보 1건. 업로드한 파일은 분석 후 바로 폐기해요.</p>`;
-          const templateContent = `<div class="notice">다른 가계부 이관이나 과거 거래를 한 번에 등록하는 표준 양식이에요. 지난 달 이전 거래는 '지급 완료' 상태로 등록돼 현재 지급 관리 목록에 섞이지 않아요.</div><div class="actions" style="margin-bottom:16px">${button('download-template', '표준 템플릿 양식(.xlsx) 다운로드', 'small')}</div><div class="drop-zone"><h2>작성한 표준 템플릿 파일 업로드</h2><p class="caption">열 구성: 일자(필수) · 유형(수입/지출, 필수) · 금액(필수) · 분류(필수) · 결제수단 · 사용처 · 상세내역 · 메모 · 실사용자(구성원·외부인)</p><p>등록되지 않은 분류나 결제수단은 업로드 과정에서 새로 만들거나 기존 항목에 연결할 수 있어요.</p>${button('import-template-preview', '예시 파일로 일괄 등록 체험', 'primary')}</div>`;
+          const templateContent = `<div class="notice">다른 가계부 이관이나 과거 거래를 한 번에 등록하는 표준 양식이에요. 지난 달 이전 거래는 '지불 완료' 상태로 등록돼 현재 지불 관리 목록에 섞이지 않아요.</div><div class="actions" style="margin-bottom:16px">${button('download-template', '표준 템플릿 양식(.xlsx) 다운로드', 'small')}</div><div class="drop-zone"><h2>작성한 표준 템플릿 파일 업로드</h2><p class="caption">열 구성: 일자(필수) · 유형(수입/지출, 필수) · 금액(필수) · 분류(필수) · 결제수단 · 사용처 · 상세내역 · 메모 · 실사용자(구성원·외부인)</p><p>등록되지 않은 분류나 결제수단은 업로드 과정에서 새로 만들거나 기존 항목에 연결할 수 있어요.</p>${button('import-template-preview', '예시 파일로 일괄 등록 체험', 'primary')}</div>`;
           return `${heading()}${steps(['파일 선택 · 방식', '대조 · 분류', '반영 결과'], state.importStep)}${
             [
               `<section class="card"><div class="tabs" style="margin-bottom:18px"><button type="button" data-action="import-tab" data-value="card" aria-pressed="${tab === 'card'}">카드사 파일 대조</button><button type="button" data-action="import-tab" data-value="template" aria-pressed="${tab === 'template'}">표준 양식(CSV/Excel) 일괄 업로드</button></div>${tab === 'card' ? cardContent : templateContent}</section>`,
@@ -2244,7 +2555,7 @@
                   ])
                 ]
               )}<div id="import-error" class="form-error" role="alert"></div><div class="actions" style="margin-top:16px">${button('import-fail', '읽기 실패 상태 보기', 'small')}${button('import-timeout', '시간 초과 상태 보기', 'small')}</div><div class="form-footer">${button('import-cancel', '취소 · 파일 폐기')}${button('import-commit', '확인한 내용 반영', 'primary')}</div></section>`,
-              `<section class="card empty"><strong>확인한 내용을 반영했어요</strong><p>신규 ${state.importResult?.additions.length || 0}건 · 연결 보정 ${state.importResult?.changed || 0}건 · 미등록·제외 ${state.importResult?.excluded || 0}건</p><p>${state.importTemplateMode ? '표준 양식의 과거 거래를 지급 완료 상태로 등록했어요.' : '예시 파일 처리를 마쳤어요. 실제 파일 저장이나 외부 전송은 하지 않아요.'}</p>${go('expenses', '지출 내역 확인', 'primary')}${go('funds', '지급 관리 확인')}</section>`
+              `<section class="card empty"><strong>확인한 내용을 반영했어요</strong><p>신규 ${state.importResult?.additions.length || 0}건 · 연결 보정 ${state.importResult?.changed || 0}건 · 미등록·제외 ${state.importResult?.excluded || 0}건</p><p>${state.importTemplateMode ? '표준 양식의 과거 거래를 지불 완료 상태로 등록했어요.' : '예시 파일 처리를 마쳤어요. 실제 파일 저장이나 외부 전송은 하지 않아요.'}</p>${go('expenses', '지출 내역 확인', 'primary')}${go('funds', '지불 관리 확인')}</section>`
             ][state.importStep]
           }`;
         },
@@ -2283,10 +2594,10 @@
                   const remSum = remaining.reduce((sum, r) => sum + r.amount, 0);
                   const paidSum = rounds.filter((r) => paymentStatus(r) === 'done').reduce((sum, r) => sum + r.amount, 0);
                   const stateText = pState === 'cancelled' ? '할부 취소' : pState === 'done' ? '완납 완료' : `${remaining.length}회 남음`;
-                  return `<section class="card"><div class="split-line"><div><h2>${esc(p.name)}</h2><p class="caption">${esc(expensePaymentLabel(p.card))} · ${esc(p.category)} · 시작일 ${esc(p.startDate)} · 총 승인 ${won(p.approval)}${p.discount ? ` (할인 ${won(p.discount)})` : ''}</p></div><div class="actions">${badge(p.interestType || '무이자')}${badge(stateText, pState === 'cancelled')}</div></div><div class="grid" style="margin:12px 0 16px"><div><span class="caption">남은 청구 예정액</span><div><strong>${won(remSum)}</strong></div></div><div><span class="caption">지급 완료 회차 합계</span><div><strong>${won(paidSum)}</strong>${p.settledNote ? ` <span class="caption">· ${esc(p.settledNote)}</span>` : ''}</div></div></div>${
+                  return `<section class="card"><div class="split-line"><div><h2>${esc(p.name)}</h2><p class="caption">${esc(expensePaymentLabel(p.card))} · ${esc(p.category)} · 시작일 ${esc(p.startDate)} · 총 승인 ${won(p.approval)}${p.discount ? ` (할인 ${won(p.discount)})` : ''}</p></div><div class="actions">${badge(p.interestType || '무이자')}${badge(stateText, pState === 'cancelled')}</div></div><div class="grid" style="margin:12px 0 16px"><div><span class="caption">남은 청구 예정액</span><div><strong>${won(remSum)}</strong></div></div><div><span class="caption">지불 완료 회차 합계</span><div><strong>${won(paidSum)}</strong>${p.settledNote ? ` <span class="caption">· ${esc(p.settledNote)}</span>` : ''}</div></div></div>${
                     rounds.length
                       ? table(
-                          ['회차', '예산 반영월 · 예정일', '원금 기준', '실제 · 보정 청구액', '지급 상태', '동작'],
+                          ['회차', '반영월 · 예정일', '원금 기준', '실제 · 보정 청구액', '지불 상태', '동작'],
                           rounds.map((r) => {
                             const baseAmt = r.basePrincipal ?? r.basis ?? r.amount;
                             const feeDiff = r.amount - baseAmt;
@@ -2315,10 +2626,10 @@
             .map(([value, label]) => `<button type="button" data-action="installment-status-tab" data-value="${value}" aria-pressed="${state.installmentFilterStatus === value}">${label}</button>`)
             .join(
               ''
-            )}</div><div class="card" style="margin-bottom:18px"><div class="grid">${select('installment-card-filter', '카드 필터', [['전체', '전체 카드'], ...cardKeys.map((c) => [c, expensePaymentLabel(c)])], state.installmentCardFilter)}<div><p class="caption" style="margin-top:26px">원거래 기준으로 남은 할부와 회차별 청구 예정 금액을 확인하고 보정해요.</p></div></div></div><div class="stack">${planCards}</div><section class="card" style="margin-top:18px"><h2>월별 할부 청구 예정표</h2><p class="caption">진행 중인 할부의 지급 전·대기 회차를 예산 반영월별로 합산한 금액이에요.</p>${
+            )}</div><div class="card" style="margin-bottom:18px"><div class="grid">${select('installment-card-filter', '카드 필터', [['전체', '전체 카드'], ...cardKeys.map((c) => [c, expensePaymentLabel(c)])], state.installmentCardFilter)}<div><p class="caption" style="margin-top:26px">원거래 기준으로 남은 할부와 회차별 청구 예정 금액을 확인하고 보정해요.</p></div></div></div><div class="stack">${planCards}</div><section class="card" style="margin-top:18px"><h2>월별 할부 청구 예정표</h2><p class="caption">진행 중인 할부의 준비 필요·지불 대기 회차를 예산 반영월별로 합산한 금액이에요.</p>${
             timelineRows.length
               ? table(
-                  ['예산 반영월', '예정 건수', '할부 내역', '월 청구 합계'],
+                  ['반영월', '예정 건수', '할부 내역', '월 청구 합계'],
                   timelineRows.map(([ym, items]) =>
                     row([`<strong>${esc(ym)}</strong>`, `${items.length}건`, items.map((r) => `${esc(r.name)} (${won(r.amount)})`).join('<br />'), money(items.reduce((sum, r) => sum + r.amount, 0))])
                   )
@@ -2332,11 +2643,11 @@
           const total = selected.reduce((sum, t) => sum + t.amount, 0);
           const groups = fundGroups(selected);
           const summaryGroups = state.prepareStatus === 'before' ? fundGroups(selected.length ? selected : items) : [];
-          const statusNames = { before: '지급 전', waiting: '지급 대기', done: '지급 완료' };
+          const statusNames = { before: '준비 필요', waiting: '지불 대기', done: '지불 완료' };
           const actionsForStatus = {
-            before: `<button type="button" data-action="fund-status-review" data-value="done" ${selected.length ? '' : 'disabled'}>지급 완료로 변경</button><button type="button" class="primary" data-action="prepare-review" ${selected.length ? '' : 'disabled'}>지급 대기로 변경</button>`,
-            waiting: `<button type="button" data-action="fund-status-review" data-value="before" ${selected.length ? '' : 'disabled'}>지급 전으로 되돌리기</button><button type="button" class="primary" data-action="fund-status-review" data-value="done" ${selected.length ? '' : 'disabled'}>지급 완료로 변경</button>`,
-            done: `<button type="button" data-action="fund-status-review" data-value="before" ${selected.length ? '' : 'disabled'}>지급 전으로 되돌리기</button><button type="button" class="primary" data-action="fund-status-review" data-value="waiting" ${selected.length ? '' : 'disabled'}>지급 대기로 되돌리기</button>`
+            before: `<button type="button" data-action="fund-status-review" data-value="done" ${selected.length ? '' : 'disabled'}>지불 완료로 변경</button><button type="button" class="primary" data-action="prepare-review" ${selected.length ? '' : 'disabled'}>지불 대기로 변경</button>`,
+            waiting: `<button type="button" data-action="fund-status-review" data-value="before" ${selected.length ? '' : 'disabled'}>준비 필요으로 되돌리기</button><button type="button" class="primary" data-action="fund-status-review" data-value="done" ${selected.length ? '' : 'disabled'}>지불 완료로 변경</button>`,
+            done: `<button type="button" data-action="fund-status-review" data-value="before" ${selected.length ? '' : 'disabled'}>준비 필요으로 되돌리기</button><button type="button" class="primary" data-action="fund-status-review" data-value="waiting" ${selected.length ? '' : 'disabled'}>지불 대기로 되돌리기</button>`
           };
           const extraAdjustAccounts = fundAccountOptions()
             .map(([value]) => value)
@@ -2346,16 +2657,16 @@
               ([value, label]) =>
                 `<label class="checks"><input type="checkbox" data-fund-account="${esc(value)}" ${state.fundAllAccounts || state.fundAccountSelection.has(value) ? 'checked' : ''} /> ${esc(label)}</label>`
             )
-            .join('')}</div></details><div class="tabs" aria-label="지급 상태">${Object.entries(statusNames)
+            .join('')}</div></details><div class="tabs" aria-label="지불 상태">${Object.entries(statusNames)
             .map(
               ([value, label]) =>
                 `<button type="button" data-action="fund-status" data-value="${value}" aria-pressed="${state.prepareStatus === value}">${label} ${state.transactions.filter((t) => fundAccountVisible(fundAccount(t)) && paymentStatus(t) === value && (!state.fundMonthOnly || (t.month || t.date.slice(0, 7)) === state.month)).length}건</button>`
             )
             .join(
               ''
-            )}</div><p class="caption">${state.fundMonthOnly ? `${esc(state.month)} 예산 반영월 기준 거래예요.` : '선택한 계좌·현금의 전체 기간 거래예요.'} 실제 이체와 출금을 마친 뒤 상태를 기록하며, 계좌 실제 잔액은 자동으로 바뀌지 않아요.</p>${
+            )}</div><p class="caption">${state.fundMonthOnly ? `${esc(state.month)} 지출 반영월 기준 거래예요.` : '선택한 계좌·현금의 전체 기간 거래예요.'} 실제 이체와 출금을 마친 뒤 상태를 기록하며, 계좌 실제 잔액은 자동으로 바뀌지 않아요.</p>${
             state.prepareStatus === 'before'
-              ? `<section class="card fund-summary"><h2>계좌별 확보 필요 금액</h2><p class="caption">${selected.length ? `선택한 ${selected.length}건 기준` : '표시 중인 지급 전 거래 전체 기준 (거래를 선택하면 해당 건만 계산해요)'}</p>${
+              ? `<section class="card fund-summary"><h2>계좌별 확보 필요 금액</h2><p class="caption">${selected.length ? `선택한 ${selected.length}건 기준` : '표시 중인 준비 필요 거래 전체 기준 (거래를 선택하면 해당 건만 계산해요)'}</p>${
                   summaryGroups.length
                     ? table(
                         ['계좌 · 현금', '거래 합계', '조정 금액', '확보 필요'],
@@ -2370,14 +2681,14 @@
                           ])
                         )
                       )
-                    : '<p class="caption">지급 대기할 거래가 없어요.</p>'
+                    : '<p class="caption">지불 대기할 거래가 없어요.</p>'
                 }${
                   extraAdjustAccounts.length
                     ? `<div class="actions" style="margin-top:8px">${extraAdjustAccounts
                         .map((acc) => `<button type="button" class="small" data-action="adjust-edit" data-value="${esc(acc)}">${esc(fundAccountLabel(acc))} 조정 ${won(adjustment(acc))} 수정</button>`)
                         .join('')}</div>`
                     : ''
-                }<p class="caption">확보 필요 금액은 거래 합계에 조정 금액을 반영한 값이며 0원 아래로 내려가지 않아요. 다른 계좌라면 이 금액만큼 이체하고, 같은 계좌라면 출금 전까지 남겨두세요.</p>${button('adjust-edit', '조정 금액 수정', 'small')}${fundAccountVisible('B') ? button('adjust-example', '지급 대기 거래 10,000원 감액 예시', 'small') : ''}${state.lastPreparation ? button('prepare-undo', '최근 지급 대기 변경 취소', 'small') : ''}${go('assets', '실제 잔액 확인', 'small')}</section>`
+                }<p class="caption">확보 필요 금액은 거래 합계에 조정 금액을 반영한 값이며 0원 아래로 내려가지 않아요. 다른 계좌라면 이 금액만큼 이체하고, 같은 계좌라면 출금 전까지 남겨두세요.</p>${button('adjust-edit', '조정 금액 수정', 'small')}${fundAccountVisible('B') ? button('adjust-example', '지불 대기 거래 10,000원 감액 예시', 'small') : ''}${state.lastPreparation ? button('prepare-undo', '최근 지불 대기 변경 취소', 'small') : ''}${go('assets', '실제 잔액 확인', 'small')}</section>`
               : ''
           }<section class="card"><div class="split-line"><h2>${statusNames[state.prepareStatus]} · ${items.length}건</h2></div>${table(
             [
@@ -2442,7 +2753,7 @@
             const amount = r.amount - r.paid - (r.cancelled || 0);
             if (amount > 0) byPerson.set(r.person, (byPerson.get(r.person) || 0) + amount);
           });
-          return `${heading(`${byPerson.size ? button('asset-receivables', '미회수 금액', 'small') : ''}${go('asset-edit', '자산 · 부채 추가', 'primary')}`)}${overviewTabNav('assets')}<p class="caption">가계부 전체 자산 기준 · 직접 입력한 실제 잔액·평가액이에요.</p><div class="grid three"><section class="card"><span>전체 구성원 자산 합계</span><div class="value medium">${won(assets)}</div></section><section class="card"><span>전체 구성원 부채 합계</span><div class="value medium">${won(debt)}</div></section><section class="card"><span>전체 구성원 순자산</span><div class="value medium">${won(assets - debt)}</div></section></div><section class="card balance-context"><h2>자산별 상세</h2>${balanceDifference() !== 0 ? `<div class="notice warning split-line" role="status"><span>예정 입출금을 반영한 계좌·현금 합계가 장부상 남은 생활비보다 <strong>${won(Math.abs(balanceDifference()))} ${balanceDifference() > 0 ? '더 많아요' : '더 적어요'}</strong>. <span class="caption">예시 계산</span></span>${button('balance-difference-detail', '계산 내역 보기', 'small')}</div>` : ''}${assetDetails || '<p class="caption">등록된 자산이 없어요.</p>'}<p class="caption">부채는 남은 원금 기준으로 입력해 주세요. 여러 카드가 같은 계좌를 쓰더라도 자산은 한 번만 합산하며, 잔액을 고쳐도 새 수입·지출이 생기지 않아요. (예정 입출금 연계 및 공통 시세는 연결 전이에요.)</p></section>`;
+          return `${heading(`${byPerson.size ? button('asset-receivables', '미회수 금액', 'small') : ''}${go('asset-edit', '자산 · 부채 추가', 'primary')}`)}<p class="caption">가계부 전체 자산 기준 · 직접 입력한 실제 잔액·평가액이에요.</p><div class="grid three"><section class="card"><span>전체 구성원 자산 합계</span><div class="value medium">${won(assets)}</div></section><section class="card"><span>전체 구성원 부채 합계</span><div class="value medium">${won(debt)}</div></section><section class="card"><span>전체 구성원 순자산</span><div class="value medium">${won(assets - debt)}</div></section></div><section class="card balance-context"><h2>자산별 상세</h2>${balanceDifference() !== 0 ? `<div class="notice warning split-line" role="status"><span>예정 입출금을 반영한 계좌·현금 합계가 장부상 남은 생활비보다 <strong>${won(Math.abs(balanceDifference()))} ${balanceDifference() > 0 ? '더 많아요' : '더 적어요'}</strong>. <span class="caption">예시 계산</span></span>${button('balance-difference-detail', '계산 내역 보기', 'small')}</div>` : ''}${assetDetails || '<p class="caption">등록된 자산이 없어요.</p>'}<p class="caption">부채는 남은 원금 기준으로 입력해 주세요. 여러 카드가 같은 계좌를 쓰더라도 자산은 한 번만 합산하며, 잔액을 고쳐도 새 수입·지출이 생기지 않아요. (예정 입출금 연계 및 공통 시세는 연결 전이에요.)</p></section>`;
         },
         'asset-edit': () => {
           const a = assetAt(state.assetEditIndex) || { name: '', type: '계좌', amount: 0, time: '2026-11-05T09:00', owner: '나' };
@@ -2494,7 +2805,7 @@
               return `<section class="member-group"><h3>${esc(personName(owner))}</h3>${categories || '<p class="caption">등록된 자산이 없어요.</p>'}</section>`;
             })
             .join('');
-          return `${heading()}${settingsTabs('cards')}<section class="card" style="margin-top:18px"><div class="split-line"><h2>자산</h2>${button('account-add', '자산 등록', 'primary')}</div><p class="caption">등록할 때 구분을 선택해요. 현금은 구성원마다 기본 제공하며 삭제할 수 없어요.</p>${groups}</section><section class="card" style="margin-top:18px"><div class="split-line"><h2>카드</h2>${go('card-add', '카드 등록', 'primary')}</div><section class="member-group"><h3>${esc(personName('나'))}</h3><div class="grid">${['A', 'B'].map((c, i) => `<section class="card" id="card-${c}"><div class="split-line"><h3>${esc(state.cardLabels[c])}</h3>${badge(state.inactiveCards.includes(c) ? '사용 중지' : '사용 중')}</div><p class="caption">소유자 ${esc(personName('나'))} · 예시 결제 계좌 ${c}<br />${i ? '개인 조건 · 일부 미확정' : '공용 검수 조건'} · 예시 조건 v1 / 확인일 11.04</p><div class="actions">${button('card-edit', '수정', 'small').replace('data-action="card-edit"', `data-action="card-edit" data-card="${c}"`)}${button('card-conditions', '조건 확인', 'small').replace('data-action="card-conditions"', `data-action="card-conditions" data-card="${c}"`)}${state.inactiveCards.includes(c) ? '' : button('card-disable', '사용 중지', 'small').replace('data-action="card-disable"', `data-action="card-disable" data-card="${c}"`)}</div></section>`).join('')}</div>${state.personalCard ? `<section class="card" id="card-C" style="margin-top:18px"><h3>${esc(state.cardLabels.C)}</h3>${badge(state.inactiveCards.includes('C') ? '사용 중지' : state.registeredCard?.product.source === 'AI' ? 'AI 조건 · 운영자 검수 전' : state.registeredCard?.product.id === 'kb-easy' ? '공식 자료 · 운영자 검수 전' : '공용 상품', state.registeredCard?.product.source === 'AI')}<p class="caption">${esc(state.registeredCard?.product.type || '신용카드')} · ${esc(assetAt(Number(state.cardAssetAccounts.C?.split(':')[1]))?.name || '계좌 확인 필요')}${state.registeredCard?.settings.dueDay ? ` · 매월 ${esc(state.registeredCard.settings.dueDay)}일 결제` : ''}${state.registeredCard?.product.id === 'kb-easy' ? `<br />선택서비스: ${esc(state.registeredCard.settings.easyChoice || '미설정')}` : ''}</p><p class="caption">공용 조건이 생겨도 개인 설정과 과거 계산을 자동으로 덮어쓰지 않아요.</p><div class="actions"><button type="button" class="small" data-action="card-edit" data-card="C">수정</button><button type="button" class="small" data-action="card-conditions" data-card="C">조건 확인</button>${state.inactiveCards.includes('C') ? '' : '<button type="button" class="small" data-action="card-disable" data-card="C">사용 중지</button>'}</div></section>` : ''}</section>${owners
+          return `${heading()}${settingsTabs('cards')}<section class="card" style="margin-top:18px"><div class="split-line"><h2>자산</h2>${button('account-add', '자산 등록', 'primary')}</div><p class="caption">등록할 때 구분을 선택해요. 현금은 구성원마다 기본 제공하며 삭제할 수 없어요.</p>${groups}</section><section class="card" style="margin-top:18px"><div class="split-line"><h2>카드</h2>${go('card-add', '카드 등록', 'primary')}</div><section class="member-group"><h3>${esc(personName('나'))}</h3><div class="grid">${['A', 'B'].map((c, i) => `<section class="card" id="card-${c}"><div class="split-line"><h3>${esc(state.cardLabels[c])} · ${esc(state.cardLast4[c])}</h3>${badge(state.inactiveCards.includes(c) ? '사용 중지' : '사용 중')}</div><p class="caption">소유자 ${esc(personName('나'))} · 예시 결제 계좌 ${c}<br />${i ? '개인 조건 · 일부 미확정' : '공용 검수 조건'} · 예시 조건 v1 / 확인일 11.04</p><div class="actions">${button('card-edit', '수정', 'small').replace('data-action="card-edit"', `data-action="card-edit" data-card="${c}"`)}${button('card-conditions', '조건 확인', 'small').replace('data-action="card-conditions"', `data-action="card-conditions" data-card="${c}"`)}${state.inactiveCards.includes(c) ? '' : button('card-disable', '사용 중지', 'small').replace('data-action="card-disable"', `data-action="card-disable" data-card="${c}"`)}</div></section>`).join('')}</div>${state.personalCard ? `<section class="card" id="card-C" style="margin-top:18px"><h3>${esc(state.cardLabels.C)} · ${esc(state.cardLast4.C)}</h3>${badge(state.inactiveCards.includes('C') ? '사용 중지' : state.registeredCard?.product.source === 'AI' ? 'AI 조건 · 운영자 검수 전' : state.registeredCard?.product.id === 'kb-easy' ? '공식 자료 · 운영자 검수 전' : '공용 상품', state.registeredCard?.product.source === 'AI')}<p class="caption">${esc(state.registeredCard?.product.type || '신용카드')} · ${esc(assetAt(Number(state.cardAssetAccounts.C?.split(':')[1]))?.name || '계좌 확인 필요')}${state.registeredCard?.settings.dueDay ? ` · 매월 ${esc(state.registeredCard.settings.dueDay)}일 결제` : ''}${state.registeredCard?.product.id === 'kb-easy' ? `<br />선택서비스: ${esc(state.registeredCard.settings.easyChoice || '미설정')}` : ''}</p><p class="caption">공용 조건이 생겨도 개인 설정과 과거 계산을 자동으로 덮어쓰지 않아요.</p><div class="actions"><button type="button" class="small" data-action="card-edit" data-card="C">수정</button><button type="button" class="small" data-action="card-conditions" data-card="C">조건 확인</button>${state.inactiveCards.includes('C') ? '' : '<button type="button" class="small" data-action="card-disable" data-card="C">사용 중지</button>'}</div></section>` : ''}</section>${owners
             .filter((owner) => owner !== '나')
             .map((owner) => `<section class="member-group"><h3>${esc(personName(owner))}</h3><p class="caption">등록된 카드가 없어요.</p></section>`)
             .join('')}</section>`;
@@ -2559,7 +2870,7 @@
           const setup = reg.settings;
           const options = [['', '계좌를 선택해 주세요'], ...destinationOptions().filter(([value]) => value !== 'external')];
           const isDebit = product.type === '체크카드';
-          return `${heading()}${navigation}<form id="card-registration-form" class="card"><h2>내 카드 설정</h2><p>${esc(product.name)} · ${esc(product.type)} ${badge(product.id === 'kb-easy' ? '공식 자료 · 운영자 검수 전' : product.source === 'AI' ? 'AI 조건 · 일부 확인 필요' : '공용 조건')}</p><div class="grid">${field('card-label', '카드 표시명', setup.label || product.name, 'text', 'required')}${select('card-owner', '소유자', [['나', personName('나')]], '나')}${select('card-account', isDebit ? '일반 결제 출금계좌' : '카드대금 결제계좌', options, setup.account || '')}${isDebit ? '' : select('card-due-day', '결제일', [['', '선택해 주세요'], ...Array.from({ length: 31 }, (_, i) => [String(i + 1), `매월 ${i + 1}일`])], setup.dueDay || '')}</div><p class="caption">결제일별 청구기간은 카드사 기준을 확인해 주세요.</p><label class="checks"><input id="card-transit" type="checkbox" ${setup.transit ? 'checked' : ''} /> 후불교통 기능 사용</label><div id="card-transit-fields" ${setup.transit && isDebit ? '' : 'hidden'}><div class="grid">${select('card-transit-account', '후불교통 출금계좌', options, setup.transitAccount || setup.account || '')}${select('card-transit-day', '후불교통 출금일', [['', '선택해 주세요'], ...Array.from({ length: 31 }, (_, i) => [String(i + 1), `매월 ${i + 1}일`])], setup.transitDay || '')}</div></div>${isDebit ? '<p class="caption">체크카드 일반 결제는 연결 계좌에서 바로 출금되며 지급 관리 대상이 아니에요. 후불교통은 따로 출금될 수 있어요.</p>' : '<p class="caption">신용카드 이용액은 결제계좌에 확보하고 실제 카드대금 출금과는 구분해요.</p>'}${
+          return `${heading()}${navigation}<form id="card-registration-form" class="card"><h2>내 카드 설정</h2><p>${esc(product.name)} · ${esc(product.type)} ${badge(product.id === 'kb-easy' ? '공식 자료 · 운영자 검수 전' : product.source === 'AI' ? 'AI 조건 · 일부 확인 필요' : '공용 조건')}</p><div class="grid">${field('card-label', '카드 표시명', setup.label || product.name, 'text', 'required')}${field('card-last4', '카드번호 마지막 4자리 · 필수', setup.last4 || '', 'text', 'required inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" placeholder="예: 0001" aria-describedby="card-last4-help"')}${select('card-owner', '소유자', [['나', personName('나')]], '나')}${select('card-account', isDebit ? '일반 결제 출금계좌' : '카드대금 결제계좌', options, setup.account || '')}${isDebit ? '' : select('card-due-day', '결제일', [['', '선택해 주세요'], ...Array.from({ length: 31 }, (_, i) => [String(i + 1), `매월 ${i + 1}일`])], setup.dueDay || '')}</div><p class="caption">결제일별 청구기간은 카드사 기준을 확인해 주세요.</p><label class="checks"><input id="card-transit" type="checkbox" ${setup.transit ? 'checked' : ''} /> 후불교통 기능 사용</label><div id="card-transit-fields" ${setup.transit && isDebit ? '' : 'hidden'}><div class="grid">${select('card-transit-account', '후불교통 출금계좌', options, setup.transitAccount || setup.account || '')}${select('card-transit-day', '후불교통 출금일', [['', '선택해 주세요'], ...Array.from({ length: 31 }, (_, i) => [String(i + 1), `매월 ${i + 1}일`])], setup.transitDay || '')}</div></div>${isDebit ? '<p class="caption">체크카드 일반 결제는 연결 계좌에서 바로 출금되며 지불 관리 대상이 아니에요. 후불교통은 따로 출금될 수 있어요.</p>' : '<p class="caption">신용카드 이용액은 결제계좌에 확보하고 실제 카드대금 출금과는 구분해요.</p>'}${
             product.id === 'kb-easy'
               ? select(
                   'card-easy-choice',
@@ -2573,7 +2884,7 @@
                   setup.easyChoice || ''
                 )
               : ''
-          }${field('card-issued', '발급일 · 신규 발급 혜택 확인 시 입력', setup.issued || '', 'date')}<div id="card-error" class="form-error" role="alert"></div><div class="form-footer">${button('card-step-back', '이전')}${button('card-save', '카드 등록', 'primary')}</div></form>`;
+          }${field('card-issued', '발급일 · 신규 발급 혜택 확인 시 입력', setup.issued || '', 'date')}<p id="card-last4-help" class="caption">이용내역에서 카드를 구분하는 데 사용해요. 전체 카드번호·유효기간·CVC는 입력하지 마세요.</p><div id="card-error" class="form-error" role="alert"></div><div class="form-footer">${button('card-step-back', '이전')}${button('card-save', '카드 등록', 'primary')}</div></form>`;
         },
         income: () =>
           `${heading(`${button('settings-recurring', '고정 수입 설정', 'small')}${go('income-edit', '수입 추가', 'primary')}`)}<div class="actions">${monthNavHtml()}</div><section class="card"><p class="caption">${esc(state.month)} · 예산 반영월 기준</p>${
@@ -2585,11 +2896,11 @@
                       .filter((i) => i.month === state.month)
                       .map((i) =>
                         row([
-                          `${esc(i.type)} · ${esc(i.name)} ${i.recurring ? badge('고정수입 · 자동 선반영') : ''}`,
-                          esc(i.attribution),
+                          `${esc(i.type)} · ${esc(i.name)}${i.subtype ? `<span class="row-sub">${esc(i.subtype)}</span>` : ''} ${i.recurring ? badge('고정수입 · 자동 선반영') : ''}`,
+                          esc(i.attribution || '—'),
                           esc(i.date),
                           esc(i.month),
-                          money(i.amount),
+                          `${money(i.amount)}${i.type === '자산 처분' ? `<span class="row-sub">예산 반영 ${won(incomeBudgetAmount(i))}</span>` : ''}`,
                           badge(i.status),
                           `<button type="button" class="small" data-action="income-edit-existing" data-id="${i.id}">${i.status === '입금 예정' ? '입금 처리 · 수정' : '상세 · 수정'}</button>`
                         ])
@@ -2602,11 +2913,10 @@
           const existing = state.incomeEditing ? state.incomes.find((i) => i.id === state.incomeEditing) : null;
           const accountOpts = activeBankAccountNames();
           if (existing?.account && !accountOpts.includes(existing.account)) accountOpts.push(existing.account);
-          return `${heading()}<form id="income-form" class="stack"><section class="card"><div class="tabs"><button type="button" data-action="income-type" data-value="급여" aria-pressed="${state.incomeType === '급여'}">급여</button><button type="button" data-action="income-type" data-value="비급여" aria-pressed="${state.incomeType === '비급여'}">비급여</button></div>${
-            existing?.recurring
-              ? `<div class="notice"><strong>고정 수입에서 자동 생성된 이 달 건이에요.</strong><p class="caption">실제 입금일과 실수령액을 확인한 뒤 입금 상태를 '입금 완료'로 바꿔 저장해 주세요. 여기서 수정한 내용은 이 달 내역에만 반영되며 고정 수입 설정이나 다른 달 내역은 바뀌지 않아요.</p></div>`
-              : ''
-          }<div class="grid">${field('income-name', '내용', state.incomeType === '급여' ? '예시 11월 급여' : '예시 비급여 수입', 'text', 'required')}${select('income-owner', '귀속자', joinedMemberOptions(), existing?.owner || '나')}${select('income-account', '입금 계좌', accountOpts, existing?.account || accountOpts[0] || '예시 생활비 계좌')}${field('income-date', '실제 입금일 · 예정일', '2026-11-25', 'date', 'required')}${state.incomeType === '급여' ? field('income-attribution', '급여명세서 귀속 연월', '2026-11', 'month', 'required') : ''}${field('income-month', '생활비 예산 반영월', state.month, 'month', 'required')}${select('income-status', '입금 상태', ['입금 예정', '입금 완료'])}</div><div class="notice" style="margin-top:14px"><strong>매월 반복되는 고정 수입은 가계부 설정에서 관리해요.</strong><p class="caption">고정 급여·비급여의 예정일과 예산 반영 방식 설정은 가계부 설정 > 고정 수입 · 지출 탭에서 모든 구성원이 편집할 수 있어요.</p>${button('settings-recurring', '고정 수입 · 지출 설정으로 이동', 'small')}</div></section><section class="card">${state.incomeType === '급여' ? `<h2>지급 · 공제 항목</h2>${salaryEditorHtml(state.salaryTemplate, 'inc')}<div class="split-line total-line" style="margin-top:14px"><span>실수령액 · 지급 합계 − 공제 합계</span><strong id="inc-salary-net"></strong></div><p class="caption">지급 항목만 급여명세서에 맞춰 과세 구분(과세·비과세)을 선택해 주세요. 공제 항목은 항목명과 금액만 입력하며, 입력한 항목 구성은 다음 달에도 불러와 쓸 수 있고 과거 기록은 그대로 유지해요.</p>` : field('income-simple-amount', '수입 금액', 100000, 'number', 'min="1" step="1" required')}${field('income-memo', '메모')}<div id="income-error" class="form-error" role="alert"></div><div class="form-footer">${go('income', '취소')}${button('income-save', '수입 저장', 'primary')}</div></section></form>`;
+          const salaryDetail = state.incomeType === '근로소득';
+          return `${heading()}<form id="income-form" class="stack"><section class="card"><h2>수입 기본 정보</h2><div class="grid">${select('income-type', '수입 종류', incomeTypes, state.incomeType)}${incomeSubtypeHtml('income', state.incomeType, existing?.type === state.incomeType ? existing : null)}${field('income-name', '내용', existing?.name || '', 'text', 'required')}${field('income-payer', '지급처 · 선택', existing?.payer || '')}${select('income-owner', '귀속자', joinedMemberOptions(), existing?.owner || '나')}${select('income-account', '입금 계좌', accountOpts, existing?.account || accountOpts[0])}${field('income-date', '실제 입금일 · 예정일', existing?.date || '2026-11-25', 'date', 'required')}${state.incomeType === '근로소득' ? field('income-attribution', '급여명세서 귀속 연월 · 선택', existing?.attribution === '해당 없음' ? '' : existing?.attribution || '', 'month') : incomePeriodHtml(existing?.type === state.incomeType ? existing : null)}${field('income-month', '생활비 예산 반영월', existing?.month || state.month, 'month', 'required')}${select('income-status', '입금 상태', ['입금 예정', '입금 완료'], existing?.status || '입금 예정')}</div>${existing?.recurring ? notice('고정 수입에서 생성된 이 달 건이에요. 수정은 이 기록에만 반영돼요.') : ''}<p class="caption">이체·대출금·원금 반환·지출금 회수는 새 소득으로 기록하지 않아요.</p>${button('settings-recurring', '고정 수입 · 지출 설정', 'small')}</section>
+          <section class="card"><h2>수입 금액</h2>${salaryDetail ? `${salaryEditorHtml(state.salaryTemplate, 'inc')}<div class="split-line total-line"><span>실수령액 · 지급 합계 − 공제 합계</span><strong id="inc-salary-net"></strong></div><p class="caption">명세서에 따라 기록해요. 세금·보험료 자동 계산은 하지 않아요.</p>` : incomeMoneyDetailsHtml('income', state.incomeType, existing?.type === state.incomeType ? incomeRecordDetails(existing) : null)}${incomeKindDetailsHtml('income', state.incomeType, existing?.type === state.incomeType ? existing.taxDetails : {})}${state.incomeType === '자산 처분' ? field('income-budget-amount', '생활비 예산에 반영할 금액 · 원', existing?.budgetAmount ?? 0, 'number', 'min="0" step="1" required') + '<p class="caption">처분대금 전체가 수익은 아니에요. 예산에는 직접 배정한 금액만 반영해요.</p>' : ''}</section>
+          <section class="card">${field('income-memo', '메모', existing?.memo || '')}<div id="income-error" class="form-error" role="alert"></div><div class="form-footer">${go('income', '취소')}${button('income-save', '수입 저장', 'primary')}</div></section></form>`;
         },
         settings: () => {
           const section = state.settingsSection || 'budget';
@@ -2663,7 +2973,7 @@
                   ['구분 · 내용', '귀속자 · 입금 계좌', '예정일 · 반영 방식', '예정 실수령액', '상태', '관리'],
                   (state.fixedIncomes || []).map((r) =>
                     row([
-                      `<strong>${esc(r.type)} · ${esc(r.name)}</strong><span class="row-sub">${r.type === '급여' ? `지급 ${(r.salary || []).filter((s) => s.kind !== '공제').length} · 공제 ${(r.salary || []).filter((s) => s.kind === '공제').length} 항목` : '간편 수입'}</span>`,
+                      `<strong>${esc(r.type)} · ${esc(r.name)}</strong><span class="row-sub">${r.type === '근로소득' ? `지급 ${(r.salary || []).filter((s) => s.kind !== '공제').length} · 공제 ${(r.salary || []).filter((s) => s.kind === '공제').length} 항목` : '간편 수입'}</span>`,
                       `${esc(personName(r.owner))}<span class="row-sub">${esc(r.account)}</span>`,
                       `매월 ${r.day}일<span class="row-sub">${r.budgetRule === 'next' ? '익월 예산 배정' : '입금 당월 반영'} · ${esc(r.startMonth)}~</span>`,
                       r.discount ? `${money(r.amount)}<span class="row-sub">할인 전 ${won(r.approval ?? r.amount + r.discount)} · 할인 ${won(r.discount)}</span>` : money(r.amount),
@@ -2770,8 +3080,13 @@
         });
         const bar = segments.length
           ? `<div class="tier-progress"><div class="tier-progress-track">${segments
-              .map((s) => `<div class="tier-progress-seg"><span style="width:${s.percent}%"></span></div>`)
-              .join('')}</div><div class="tier-progress-labels">${segments.map((s) => `<span class="${s.achieved ? 'achieved' : ''}">${s.i + 1}단계 ${won(s.target)}</span>`).join('')}</div></div>`
+              .map(
+                (s) =>
+                  `<div class="tier-progress-step"><div class="tier-progress-seg"><span style="width:${s.percent}%" aria-hidden="true"></span></div><span class="tier-progress-mark${s.achieved ? ' achieved' : ''}" role="img" aria-label="${s.i + 1}단계 ${s.achieved ? '달성' : '미달'}"></span></div>`
+              )
+              .join(
+                ''
+              )}</div><div class="tier-progress-labels">${segments.map((s) => `<span class="${s.achieved ? 'achieved' : ''}">${s.i + 1}단계<br />${won(s.target)}</span>`).join('')}</div></div>`
           : '';
         const rows = segments
           .map(
@@ -2788,48 +3103,38 @@
             : achievedCount > 0
               ? badge(`${achievedCount}단계 달성 · 다음 ${won(nextTier.remaining)} 남음`)
               : badge(`미달 · 1단계 ${won(nextTier.remaining)} 남음`, true);
-        return `<section class="card"><div class="split-line"><h2>${esc(state.cardLabels[card] || `카드 ${card}`)} · 예정 포함 실적</h2>${statusBadge}</div><div class="value medium">${won(amount)}</div><p class="caption">예시 계산${uncertain ? ' · 일부 조건 확인 필요' : ''} · 실적 단계별 현황</p>${titanium}${bar}${rows || '<p class="caption">확인된 실적 단계가 없어요.</p>'}</section>`;
+        return `<section class="card"><div class="split-line"><h2>${esc(state.cardLabels[card] || `카드 ${card}`)} · 이용 실적</h2>${statusBadge}</div><div class="value medium">${won(amount)}</div><p class="caption">예정 거래 포함 · 예시 계산${uncertain ? ' · 일부 조건 확인 필요' : ''} · 실적 단계별 현황</p>${titanium}${bar}${rows || '<p class="caption">확인된 실적 단계가 없어요.</p>'}</section>`;
       };
-      const monthlySurplusReportCard = (monthUncollected) => {
-        const prevCarry = state.carry.reduce((a, b) => a + b, 0);
-        const nextCarry = remaining();
-        const carryDelta = nextCarry - prevCarry;
-        const statusBadge = nextCarry >= 0 ? badge(carryDelta >= 0 ? '흑자 · 이월 증가' : '흑자 유지') : badge('적자 · 예산 초과', true);
-        const categoryStats = categories.map((c, i) => {
+      const monthlyOverview = (byPerson) => {
+        const categoryStats = categories.map((category, i) => {
           const expense = monthTransactions().reduce(
-            (sum, t) => sum + (t.allocations ? t.allocations.filter((a) => a.category === c).reduce((v, a) => v + a.amount, 0) : t.category === c ? t.expense : 0),
+            (sum, t) => sum + (t.allocations ? t.allocations.filter((a) => a.category === category).reduce((value, a) => value + a.amount, 0) : t.category === category ? t.expense : 0),
             0
           );
           const cancelled = monthTransactions()
-            .filter((t) => !t.receivableCurrent && !t.allocations && t.category === c)
+            .filter((t) => !t.receivableCurrent && !t.allocations && t.category === category)
             .reduce((sum, t) => sum + cancelledFor(t.id), 0);
-          return { name: c, diff: state.budget[i] - (expense + cancelled) };
+          const budget = state.budget[i];
+          const carry = state.carry[i];
+          const spent = expense + cancelled;
+          const available = budget + carry;
+          return { category, budget, carry, spent, remaining: available - spent, ratio: available > 0 ? `${Math.round((spent / available) * 100)}%` : '—' };
         });
-        const saved = categoryStats
-          .filter((x) => x.diff > 0)
-          .sort((a, b) => b.diff - a.diff)
-          .slice(0, 2);
-        const over = categoryStats
-          .filter((x) => x.diff < 0)
-          .sort((a, b) => a.diff - b.diff)
-          .slice(0, 2);
-        const userMap = new Map();
-        monthTransactions().forEach((t) => {
-          const u = t.actualUser || personName('나');
-          userMap.set(u, (userMap.get(u) || 0) + (t.expense || 0));
-        });
-        const totalUserExp = [...userMap.values()].reduce((a, b) => a + b, 0);
-        const isShared = (state.members || []).filter((m) => m.status === 'joined').length > 1 || userMap.size > 1;
-        const userSummary =
-          isShared && totalUserExp > 0
-            ? `<p class="caption">공동 실사용 비중 · ${[...userMap.entries()].map(([u, amt]) => `${esc(u)} ${won(amt)} (${Math.round((amt / totalUserExp) * 100)}%)`).join(' · ')}</p>`
-            : '';
-        const isDeficitPreview = state.transactions.some((t) => t.id === 9999);
-        const deficitNotice =
-          nextCarry < 0
-            ? `<div class="notice warning" style="margin-top:12px">예산 초과로 다음 달 시작 이월금에서 <strong>${won(Math.abs(nextCarry))}</strong>이 차감돼요. 초과 분류 지출을 조정하거나 다음 달 지출을 줄여 메워야 해요.</div>`
-            : '';
-        return `<section class="card" style="margin-top:18px"><div class="split-line"><h2>월간 이월 리포트</h2>${statusBadge}</div><div class="grid three" style="margin-top:12px"><div><span class="caption">예상 익월 이월금</span><div class="value medium">${won(nextCarry)}</div></div><div><span class="caption">전월 이월 대비</span><div class="value medium">${carryDelta > 0 ? '+' : ''}${won(carryDelta)}</div></div><div><span class="caption">이달 미회수 정산</span><div class="value medium">${won(monthUncollected)}</div></div></div>${deficitNotice}<div class="grid" style="margin-top:12px"><div><strong class="caption">예산 절약 상위</strong><p class="caption">${saved.length ? saved.map((x) => `${esc(x.name)} +${won(x.diff)}`).join(' · ') : '절약 분류 없음'}</p></div><div><strong class="caption">예산 초과 분류</strong><p class="caption">${over.length ? over.map((x) => `${esc(x.name)} ${won(x.diff)}`).join(' · ') : '초과 분류 없음'}</p></div></div>${monthUncollected > 0 ? `<p class="caption">예상 이월금에는 아직 받지 않은 미회수 금액 ${won(monthUncollected)}이 반영되어 있어요. 회수 완료 시 실제 가용 현금으로 들어와요.</p>` : ''}${userSummary}<div class="actions" style="margin-top:12px">${button('toggle-deficit-preview', isDeficitPreview ? '원래 예시로 돌아가기' : '적자 상태 미리보기', 'quiet small')}</div></section>`;
+        const overCount = categoryStats.filter((item) => item.remaining < 0).length;
+        const totalCarry = state.carry.reduce((sum, value) => sum + value, 0);
+        const uncollected = [...byPerson.values()].reduce((sum, value) => sum + value, 0);
+        const deficitPreview = state.transactions.some((t) => t.id === 9999);
+        return `<div class="overview-month"><section class="card hero overview-balance"><div>예정 지출을 포함한 남은 생활비</div><div class="value">${won(remaining())}</div><p class="caption">월 예산 ${won(state.budget.reduce((sum, value) => sum + value, 0))} + 이월 ${won(totalCarry)}<br />− 생활비 반영 지출 ${won(spent())}</p><p class="caption">회수 대상 금액이 반영된 예산상 금액으로, 지금 인출 가능한 현금과 달라요.</p></section><section class="card overview-tasks"><h2>이번에 확인할 일</h2><div class="split-line"><span>카드 A 준비 필요 ${pendingFor('A').length}건</span>${go('funds', '지불 관리 →', 'small')}</div><div class="split-line"><span>이달 거래의 미회수 금액 ${won(uncollected)}</span>${button('receivables-month', '지출금 회수 관리 →', 'small')}</div><div class="split-line"><span>실제 잔액 · 수동 갱신</span>${go('assets', '잔액 근거 →', 'small')}</div></section><p class="caption overview-data">자료 기준 · 예시 카드 A 11.04 / 카드 B 11.02 · 실제 잔액 입력 11.04 09:00 · 실시간 은행 잔액과 다름</p><section class="card overview-budget"><div class="split-line"><h2>분류별 예산 · 지출</h2>${canConfigure() ? button('monthly-budget-edit', '월별 예산 수정', 'small') : ''}</div><p class="caption" role="status">전월 이월 ${won(totalCarry)} 반영 · 예산 초과 ${overCount}개 분류 · 소진율은 월 예산과 이월 합계 기준</p>${remaining() < 0 ? notice(`예정 지출 반영 후 생활비가 ${won(Math.abs(remaining()))} 초과됐어요. 음수 잔액은 다음 달로 이월돼요.`, 'warning') : ''}<div class="category-desktop">${table(
+          ['분류', '월 예산', '전월 이월', '지출 · 예정 포함', '소진율', '남은 금액'],
+          categoryStats.map((item) => row([esc(item.category), money(item.budget), money(item.carry), money(item.spent), item.ratio, money(item.remaining)]))
+        )}</div><div class="category-mobile">${categoryStats
+          .map(
+            (item) =>
+              `<div class="category-mobile-item"><strong>${esc(item.category)}</strong><div class="category-mobile-amounts"><div><span class="caption">월 예산</span><div>${money(item.budget)}</div></div><div><span class="caption">지출 · 예정 포함</span><div>${money(item.spent)}</div></div></div><div class="split-line"><strong>${item.remaining < 0 ? '초과' : '남은 금액'}</strong><strong>${money(Math.abs(item.remaining))}</strong></div><p class="caption">전월 이월 ${won(item.carry)} 반영 · 소진율 ${item.ratio}</p></div>`
+          )
+          .join(
+            ''
+          )}</div><div class="notice">${budgetComparison(state.budget)}</div><div class="actions">${button('toggle-deficit-preview', deficitPreview ? '원래 예시로 돌아가기' : '적자 상태 미리보기', 'quiet small')}</div></section><section class="overview-cards"><h2>카드별 이용 실적</h2><p class="caption">예정 거래 포함</p><div class="grid">${cardPerformancePanel('A', exampleCardTiers)}${cardPerformancePanel('B', exampleCardTiers, true)}${state.registeredCard ? cardPerformancePanel('C', state.registeredCard.conditions.tiers, state.registeredCard.product.source !== '공용') : ''}</div></section></div>`;
       };
       const receivables = () => {
         if (!state.receivables)
@@ -2945,7 +3250,7 @@
           assigned += value;
           return value;
         });
-        return `<h2>첫 달 시작금액 · 전월 이월 기준</h2><div class="split-line"><div class="value">${won(currentStart)}</div>${button('setup-recalc-start', '현재 잔액 기준 자동 역산', 'small')}</div><div class="grid">${field('setup-start-total', '첫 달 총 시작금액(이월금) 직접 입력', currentStart, 'number', 'step="1" required')}</div><p class="caption">역산 근거: ${won(n.actual)} 현재 잔액 + ${won(n.future)} 미입금 − ${won(n.obligation)} 지급 전 지출 − ${won(n.total)} 첫 달 예산 + ${won(n.expense)} 첫 달 지출</p>${notice('자동 역산은 생활비 포함 계좌 + 현금만 포함(결제 전용 계좌 제외)하며 시작월 1일·상태 기준이에요. 월 중 가입으로 1일~가입일 거래를 생략했다면 직접 수정해 주세요. 시작월 중에는 언제든 바꿀 수 있어요.')}<h3>분류별 시작금액 배분 · 수정 가능</h3><div class="grid">${categories.map((c, i) => field(`setup-allocation-${i}`, c, state.setup[`setup-allocation-${i}`] ?? parts[i], 'number', 'step="1" required')).join('')}</div><p class="caption">배분 합계는 시작금액과 같아야 해요. 예산이 0원인 항목은 직접 입력해 주세요.</p>`;
+        return `<h2>첫 달 시작금액 · 전월 이월 기준</h2><div class="split-line"><div class="value">${won(currentStart)}</div>${button('setup-recalc-start', '현재 잔액 기준 자동 역산', 'small')}</div><div class="grid">${field('setup-start-total', '첫 달 총 시작금액(이월금) 직접 입력', currentStart, 'number', 'step="1" required')}</div><p class="caption">역산 근거: ${won(n.actual)} 현재 잔액 + ${won(n.future)} 미입금 − ${won(n.obligation)} 준비 필요 지출 − ${won(n.total)} 첫 달 예산 + ${won(n.expense)} 첫 달 지출</p>${notice('자동 역산은 생활비 포함 계좌 + 현금만 포함(결제 전용 계좌 제외)하며 시작월 1일·상태 기준이에요. 월 중 가입으로 1일~가입일 거래를 생략했다면 직접 수정해 주세요. 시작월 중에는 언제든 바꿀 수 있어요.')}<h3>분류별 시작금액 배분 · 수정 가능</h3><div class="grid">${categories.map((c, i) => field(`setup-allocation-${i}`, c, state.setup[`setup-allocation-${i}`] ?? parts[i], 'number', 'step="1" required')).join('')}</div><p class="caption">배분 합계는 시작금액과 같아야 해요. 예산이 0원인 항목은 직접 입력해 주세요.</p>`;
       };
       const defaultSalaryRows = () => [
         { name: '기본급', amount: 3500000, kind: '지급', tax: '과세' },
@@ -2958,7 +3263,7 @@
         { name: '고용보험', amount: 20000, kind: '공제' }
       ];
       const salaryPayRowHtml = (r, i, prefix) =>
-        `<div class="line-item" data-salary-pay-row="${prefix}"><input id="${prefix}-pay-name-${i}" name="${prefix}-pay-name-${i}" type="text" value="${esc(r.name)}" aria-label="지급 항목명" placeholder="예: 기본급" required /><input id="${prefix}-pay-amount-${i}" name="${prefix}-pay-amount-${i}" type="number" value="${esc(r.amount)}" aria-label="지급 금액(원)" placeholder="0" min="0" step="1" required /><select id="${prefix}-pay-tax-${i}" name="${prefix}-pay-tax-${i}" aria-label="과세 구분">${['과세', '비과세'].map((opt) => `<option value="${opt}" ${(r.tax === '비과세' ? '비과세' : '과세') === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select><button type="button" class="small" data-action="salary-remove-row" data-prefix="${prefix}" data-kind="지급" data-index="${i}">삭제</button></div>`;
+        `<div class="line-item" data-salary-pay-row="${prefix}"><input id="${prefix}-pay-name-${i}" name="${prefix}-pay-name-${i}" type="text" value="${esc(r.name)}" aria-label="지급 항목명" placeholder="예: 기본급" required /><input id="${prefix}-pay-amount-${i}" name="${prefix}-pay-amount-${i}" type="number" value="${esc(r.amount)}" aria-label="지급 금액(원)" placeholder="0" min="0" step="1" required /><select id="${prefix}-pay-tax-${i}" name="${prefix}-pay-tax-${i}" aria-label="과세 구분">${['확인 필요', '과세', '비과세'].map((opt) => `<option value="${opt}" ${(r.tax || '확인 필요') === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select><button type="button" class="small" data-action="salary-remove-row" data-prefix="${prefix}" data-kind="지급" data-index="${i}">삭제</button></div>`;
       const salaryDeductRowHtml = (r, i, prefix) =>
         `<div class="line-item deduction" data-salary-deduct-row="${prefix}"><input id="${prefix}-deduct-name-${i}" name="${prefix}-deduct-name-${i}" type="text" value="${esc(r.name)}" aria-label="공제 항목명" placeholder="예: 국민연금" required /><input id="${prefix}-deduct-amount-${i}" name="${prefix}-deduct-amount-${i}" type="number" value="${esc(r.amount)}" aria-label="공제 금액(원)" placeholder="0" min="0" step="1" required /><button type="button" class="small" data-action="salary-remove-row" data-prefix="${prefix}" data-kind="공제" data-index="${i}">삭제</button></div>`;
       const salaryRowsByKind = (rows, prefix) => {
@@ -2978,35 +3283,34 @@
       };
       const salaryEditorHtml = (rows, prefix) => {
         const grouped = salaryRowsByKind(rows, prefix);
-        return `<div class="stack" data-salary-editor="${prefix}"><div class="salary-group"><div class="split-line" style="margin-bottom:8px"><div><strong>지급 항목</strong> <span class="caption" data-salary-pay-total="${prefix}"></span></div><button type="button" class="small" data-action="salary-add-pay" data-prefix="${prefix}">＋ 지급 항목 추가</button></div><div id="${prefix}-salary-pay-rows">${grouped.payHtml(grouped.pay)}</div></div><div class="salary-group"><div class="split-line" style="margin-bottom:8px"><div><strong>공제 항목</strong> <span class="caption" data-salary-deduct-total="${prefix}"></span></div><button type="button" class="small" data-action="salary-add-deduct" data-prefix="${prefix}">＋ 공제 항목 추가</button></div><div id="${prefix}-salary-deduct-rows">${grouped.deductHtml(grouped.deduct)}</div><p class="caption">항목명과 금액만 입력해요.</p></div></div>`;
+        return `<div class="stack" data-salary-editor="${prefix}"><div class="salary-group"><div class="split-line" style="margin-bottom:8px"><div><strong>지급 항목</strong> <span class="caption" data-salary-pay-total="${prefix}"></span></div><button type="button" class="small" data-action="salary-add-pay" data-prefix="${prefix}">＋ 지급 항목 추가</button></div><div id="${prefix}-salary-pay-rows">${grouped.payHtml(grouped.pay)}</div></div><div class="salary-group"><div class="split-line" style="margin-bottom:8px"><div><strong>공제 항목</strong> <span class="caption" data-salary-deduct-total="${prefix}"></span></div><button type="button" class="small" data-action="salary-add-deduct" data-prefix="${prefix}">＋ 공제 항목 추가</button></div><div id="${prefix}-salary-deduct-rows">${grouped.deductHtml(grouped.deduct)}</div><p class="caption">항목명과 금액만 입력해요. 지급 한 건만 남기고 공제를 모두 제거할 수도 있어요.</p></div></div>`;
       };
       const salaryEditorValues = (prefix) => {
         const payRows = [...document.querySelectorAll(`[data-salary-pay-row="${prefix}"]`)].map((_, i) => ({
           name: $(`#${prefix}-pay-name-${i}`)?.value ?? '',
-          amount: Number($(`#${prefix}-pay-amount-${i}`)?.value ?? 0),
+          amount: $(`#${prefix}-pay-amount-${i}`)?.value ? Number($(`#${prefix}-pay-amount-${i}`).value) : null,
           kind: '지급',
-          tax: $(`#${prefix}-pay-tax-${i}`)?.value === '비과세' ? '비과세' : '과세'
+          tax: $(`#${prefix}-pay-tax-${i}`)?.value || '확인 필요'
         }));
         const deductRows = [...document.querySelectorAll(`[data-salary-deduct-row="${prefix}"]`)].map((_, i) => ({
           name: $(`#${prefix}-deduct-name-${i}`)?.value ?? '',
-          amount: Number($(`#${prefix}-deduct-amount-${i}`)?.value ?? 0),
+          amount: $(`#${prefix}-deduct-amount-${i}`)?.value ? Number($(`#${prefix}-deduct-amount-${i}`).value) : null,
           kind: '공제'
         }));
         return [...payRows, ...deductRows];
       };
       const salaryEditorSummary = (rows) => {
-        const payTotal = rows.filter((r) => r.kind !== '공제').reduce((sum, r) => sum + (Number.isFinite(r.amount) ? r.amount : 0), 0);
-        const deductTotal = rows.filter((r) => r.kind === '공제').reduce((sum, r) => sum + (Number.isFinite(r.amount) ? r.amount : 0), 0);
-        return { payTotal, deductTotal, netTotal: payTotal - deductTotal };
+        const summary = incomeRowsSummary(rows);
+        return { ...summary, netTotal: summary.net };
       };
       const updateSalarySummaryUI = (prefix) => {
-        const { payTotal, deductTotal, netTotal } = salaryEditorSummary(salaryEditorValues(prefix));
+        const { payTotal, deductTotal, netTotal, error } = salaryEditorSummary(salaryEditorValues(prefix));
         const payEl = document.querySelector(`[data-salary-pay-total="${prefix}"]`);
         const deductEl = document.querySelector(`[data-salary-deduct-total="${prefix}"]`);
-        const netEl = $(`#${prefix}-salary-net`);
-        if (payEl) payEl.textContent = `합계 ${won(payTotal)}`;
-        if (deductEl) deductEl.textContent = `합계 ${won(deductTotal)}`;
-        if (netEl) netEl.textContent = won(netTotal);
+        const netEl = document.getElementById(`${prefix}-salary-net`);
+        if (payEl) payEl.textContent = payTotal === null ? '금액 입력 필요' : `합계 ${won(payTotal)}`;
+        if (deductEl) deductEl.textContent = deductTotal === null ? '금액 입력 필요' : `합계 ${won(deductTotal)}`;
+        if (netEl) netEl.textContent = netTotal === null ? error : netTotal < 0 ? '공제 합계가 지급 합계보다 커요.' : won(netTotal);
       };
       const refreshSalaryEditor = (prefix, nextRows) => {
         if (prefix === 'inc') state.salaryTemplate = nextRows;
@@ -3016,13 +3320,7 @@
         $(`#${prefix}-salary-deduct-rows`).innerHTML = grouped.deductHtml(grouped.deduct);
         updateSalarySummaryUI(prefix);
       };
-      const salaryValidError = (rows) => {
-        if (!rows.some((r) => r.kind !== '공제')) return '지급 항목을 1개 이상 입력해 주세요.';
-        if (rows.some((r) => !r.name.trim() || !Number.isSafeInteger(r.amount) || r.amount < 0)) {
-          return '지급·공제 항목의 이름과 0원 이상 정수 금액을 확인해 주세요.';
-        }
-        return '';
-      };
+      const salaryValidError = (rows) => incomeRowsSummary(rows).error;
       const splitRowsHtml = (rows) =>
         rows
           .map(
@@ -3170,10 +3468,10 @@
         $('#installment-current').max = $('#installment-count').value || 36;
         $('#installment-amount').disabled = !installment;
 
-        const targetMonth = $('#expense-month')?.value || state.month;
+        const targetMonth = expenseFormMonth() || state.month;
         const cardVal = $('#expense-card')?.value || 'A';
         const statusVal = $('#expense-status')?.value || 'before';
-        const statusLabel = { before: '지급 전', waiting: '지급 대기', done: '지급 완료' }[statusVal];
+        const statusLabel = { before: '준비 필요', waiting: '지불 대기', done: '지불 완료' }[statusVal];
         const isCash = cardVal === '현금';
         const isAcct = isExpenseAccount(cardVal);
         const cardName = expensePaymentLabel(cardVal);
@@ -3245,18 +3543,18 @@
 
         const fundLines = [];
         if (!isCash && !isAcct) {
-          if (statusVal === 'before') fundLines.push(`<div>${esc(targetAccountLabel)} · 지급 전 목록에 ${won(v.net)} 추가 (카드 대금 확보 필요)</div>`);
+          if (statusVal === 'before') fundLines.push(`<div>${esc(targetAccountLabel)} · 준비 필요 목록에 ${won(v.net)} 추가 (카드 대금 확보 필요)</div>`);
           else if (statusVal === 'waiting') fundLines.push(`<div>${esc(targetAccountLabel)} · 준비금 ${won(v.net)} 확보 상태로 반영 (실제 출금 전)</div>`);
-          else fundLines.push(`<div>${esc(targetAccountLabel)} · ${won(v.net)} 지급 완료 처리 (추가 준비 없음 · 계좌 실제 잔액 불변)</div>`);
+          else fundLines.push(`<div>${esc(targetAccountLabel)} · ${won(v.net)} 지불 완료 처리 (추가 준비 없음 · 계좌 실제 잔액 불변)</div>`);
         } else if (statusVal === 'done') {
-          fundLines.push(`<div>${esc(targetAccountLabel)} · ${won(v.net)} 지급 완료 (실제 계좌 잔액은 자산현황에서 별도 갱신)</div>`);
+          fundLines.push(`<div>${esc(targetAccountLabel)} · ${won(v.net)} 지불 완료 (실제 계좌 잔액은 자산현황에서 별도 갱신)</div>`);
         } else {
           fundLines.push(`<div>${esc(targetAccountLabel)} · ${esc(statusLabel)} 상태로 ${won(v.net)} 등록</div>`);
         }
         if (old) {
           if (old.card === cardVal && paymentStatus(old) === 'waiting' && v.net !== old.amount) {
             const adj = v.net - old.amount;
-            fundLines.push(`<div class="caption">기존 준비금 ${won(old.amount)} → ${won(v.net)} 변경 (다음 지급 조정 ${adj >= 0 ? '+' : ''}${won(adj)})</div>`);
+            fundLines.push(`<div class="caption">기존 준비금 ${won(old.amount)} → ${won(v.net)} 변경 (다음 지불 조정 ${adj >= 0 ? '+' : ''}${won(adj)})</div>`);
           } else if (old.card !== cardVal) {
             fundLines.push(
               `<div class="caption">결제수단 변경: ${esc(expensePaymentLabel(old.card))} → ${esc(cardName)}${paymentStatus(old) === 'waiting' ? ' (저장 시 기존 계좌 준비금 처리 선택)' : ''}</div>`
@@ -3312,7 +3610,7 @@
           `<div class="preview-hero"><div class="preview-hero-head"><strong>${esc(targetMonth)} 내 지출 반영액</strong>${installment ? badge(`${esc(instType)} 할부 ${instCurrent}/${instCount}회차`) : ''}${old ? badge('수정 후 기준') : ''}</div><div class="value${v.expense < 0 ? ' negative' : ''}">${hasValidAmount ? won(v.expense) : '—'}</div><div class="caption">${formula}${diffText}</div></div>` +
           `<div class="preview-list">` +
           `<div class="preview-row"><div class="preview-row-label">예산 · 분류</div><div class="preview-row-detail">${budgetLines}</div></div>` +
-          `<div class="preview-row"><div class="preview-row-label">계좌 · 지급 상태</div><div class="preview-row-detail">${fundLines.join('')}</div></div>` +
+          `<div class="preview-row"><div class="preview-row-label">계좌 · 지불 상태</div><div class="preview-row-detail">${fundLines.join('')}</div></div>` +
           cardLine +
           receivableLine +
           `</div>` +
@@ -3333,10 +3631,11 @@
         if (settingsRouteMap[route]) state.settingsSection = settingsRouteMap[route];
         current = route === 'settings-asset' ? 'cards' : settingsRouteMap[route] ? 'settings' : screens[route] ? route : 'flow';
         const s = screens[current];
+        if (current !== 'expense-edit' && expenseAssist.context !== null) clearExpenseAssist(false);
         $('#navigation').innerHTML = navItems
           .map(
             ([id, icon, title], i) =>
-              `${i === 1 ? '<div class="nav-label">가계부</div>' : id === 'login' ? '<div class="nav-label">시작 · 운영 검토</div>' : ''}<a href="#${id}" ${id === current || (id === 'overview' && current === 'assets') || (id === 'settings-asset' && ['cards', 'settings', 'card-add'].includes(current)) ? 'aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true">${icon}</span>${title}</a>`
+              `${i === 1 ? '<div class="nav-label">가계부</div>' : id === 'login' ? '<div class="nav-label">시작 · 운영 검토</div>' : ''}<a href="#${id}" ${id === current || (id === 'settings-asset' && ['cards', 'settings', 'card-add'].includes(current)) ? 'aria-current="page"' : ''}><span class="nav-icon" aria-hidden="true">${icon}</span>${title}</a>`
           )
           .join('');
         const id = Object.keys(screens).indexOf(current);
@@ -3371,8 +3670,7 @@
               date: item.date,
               month: item.month,
               status: item.status,
-              attribution: item.attribution,
-              'simple-amount': item.amount
+              attribution: item.attribution
             })) {
               const el = document.getElementById(`income-${key}`);
               if (el) el.value = value;
@@ -3402,12 +3700,15 @@
           window.scrollTo(0, scroll);
         }
 
-        if (current === 'income-edit' && state.incomeType === '급여') updateSalarySummaryUI('inc');
+        if (current === 'income-edit') {
+          if (state.incomeType === '근로소득') updateSalarySummaryUI('inc');
+          else updateIncomeMoneySummary('income', state.incomeType);
+        }
         if (current === 'cards' && state.cardFocus) {
           document.getElementById(`card-${state.cardFocus}`)?.scrollIntoView({ block: 'start' });
           state.cardFocus = null;
         }
-        document.title = `${s.title} · Moneiet 화면설계서`;
+        document.title = `${s.title} · 미리온돈 화면설계서`;
       };
       const isLedgerMember = (person) => ['나', '예시 구성원'].includes(person);
       const sourceOptions = (person) => [
@@ -3521,8 +3822,206 @@
           limit: row.querySelector('[data-tier-limit]').value
         }))
       });
+      let expenseAssist = { text: '', imageUrl: '', imageName: '', scenario: 'simple', error: '', candidate: null, snapshot: null, sequence: 0, context: null };
+      const clearExpenseAssist = (refresh = true) => {
+        if (expenseAssist.imageUrl) URL.revokeObjectURL(expenseAssist.imageUrl);
+        expenseAssist = { text: '', imageUrl: '', imageName: '', scenario: 'simple', error: '', candidate: null, snapshot: null, sequence: expenseAssist.sequence + 1, context: null };
+        if (refresh) syncExpenseAssist();
+      };
+      const expenseAssistHtml = () => {
+        const context = `${editing || 'new'}:${state.month}`;
+        if (expenseAssist.context !== context) {
+          clearExpenseAssist(false);
+          expenseAssist.context = context;
+        }
+        return `<details class="card" id="expense-assist"><summary><strong>AI로 초안 작성 · 선택</strong></summary><p>결제 문자·알림 캡처를 붙여넣거나 첨부하고, 지출을 글로 설명할 수 있어요.</p><p class="caption">참고화면: 실제 LLM 호출·이미지 인식·외부 전송 없이 합성 예시로 흐름을 시연해요. 직접 올린 이미지는 이 화면에서 미리보기만 해요.</p><label class="field" for="expense-assist-text">지출 설명<textarea id="expense-assist-text" rows="3" placeholder="예: 예시 마트에서 카드로 10만원 결제, 식품 8만원과 생활용품 2만원">${esc(expenseAssist.text)}</textarea></label><label class="field" for="expense-assist-file">결제 내역 이미지 · PNG/JPEG/WebP, 10MB 이하<input id="expense-assist-file" type="file" accept="image/png,image/jpeg,image/webp" /></label><p class="caption">이 영역에 이미지 붙여넣기 또는 파일 끌어놓기를 지원해요.</p><div id="expense-assist-image">${expenseAssist.imageUrl ? `<img src="${esc(expenseAssist.imageUrl)}" alt="첨부한 결제 내역 미리보기" style="max-height:180px;max-width:100%" /><p>${esc(expenseAssist.imageName)}</p>` : ''}</div><div class="actions"><button type="button" class="small" data-action="expense-assist-example" data-value="simple">단건 예시</button><button type="button" class="small" data-action="expense-assist-example" data-value="split">분류 분할 예시</button><button type="button" class="small" data-action="expense-assist-example" data-value="duplicate">중복 확인 예시</button>${button('expense-assist-failure', '해석 실패 시연', 'small')}</div><div id="expense-assist-error" class="form-error" role="alert">${esc(expenseAssist.error)}</div><div id="expense-assist-status" class="caption" role="status"></div><div class="actions">${button('expense-assist-clear', '입력 비우기', 'small')}${button('expense-assist-review', '초안 만들기 · 시연', 'primary')}</div></details>`;
+      };
+      const syncExpenseAssist = () => {
+        const region = $('#expense-assist');
+        if (!region) return;
+        const open = region.open;
+        region.outerHTML = expenseAssistHtml();
+        $('#expense-assist').open = open;
+      };
+      const setExpenseAssistImage = (file) => {
+        if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+          expenseAssist.error = 'PNG·JPEG·WebP 이미지 한 장을 10MB 이하로 올려 주세요.';
+          syncExpenseAssist();
+          return;
+        }
+        if (expenseAssist.imageUrl) URL.revokeObjectURL(expenseAssist.imageUrl);
+        expenseAssist.imageUrl = URL.createObjectURL(file);
+        expenseAssist.imageName = file.name || '붙여넣은 이미지';
+        expenseAssist.error = '';
+        expenseAssist.candidate = null;
+        expenseAssist.sequence++;
+        syncExpenseAssist();
+      };
+      const expenseAssistExample = (scenario) => {
+        const options = fixedExpensePaymentOptions();
+        const card = options.find(([key]) => isCardPaymentMethod(key))?.[0] || null;
+        const categories = activeCategories();
+        const date = dateForMonthDay(state.month, 4);
+        if (scenario === 'duplicate') {
+          const previous = state.transactions.find((t) => !t.installment && t.id !== editing);
+          if (previous)
+            return {
+              name: previous.name,
+              date: previous.date,
+              card: previous.card,
+              amount: previous.approval ?? previous.basis ?? previous.amount,
+              discount: previous.discount || 0,
+              details: previous.details || null,
+              parts: [{ category: previous.category === '분할' ? '' : previous.category, gross: previous.approval ?? previous.basis ?? previous.amount }],
+              text: `${previous.date} ${previous.name} 결제 내역을 기록해 줘.`
+            };
+        }
+        const split = scenario === 'split';
+        return {
+          name: split ? '예시 마트' : '예시 상점',
+          date,
+          card,
+          amount: split ? 100000 : 12000,
+          discount: split ? 5000 : 0,
+          details: null,
+          parts: split
+            ? [
+                { category: categories[0] || '', gross: 80000 },
+                { category: categories[1] || '', gross: 20000 }
+              ]
+            : [{ category: categories[0] || '', gross: 12000 }],
+          text: split
+            ? `${date} 예시 마트에서 ${card ? expensePaymentLabel(card) : '카드'}로 10만원 결제하고 5천원 할인. ${categories[0] || '첫 분류'} 8만원, ${categories[1] || '두 번째 분류'} 2만원으로 기록해 줘.`
+            : `${date} 예시 상점에서 ${card ? expensePaymentLabel(card) : '카드'}로 12000원 결제, 할인 없음. 분류는 ${categories[0] || '직접 선택'}로 기록해 줘.`
+        };
+      };
+      const expenseAssistSnapshot = () =>
+        JSON.stringify({
+          editing,
+          month: state.month,
+          fields: [...($('#expense-form')?.querySelectorAll('input,select,textarea') || [])].map((el) => ({ id: el.id, value: el.value, checked: el.checked }))
+        });
+      const expenseAssistChanges = (candidate) => {
+        const installment = $('#expense-payment')?.value === '할부';
+        const fields = [
+          ['name', 'expense-name', '사용처'],
+          ['date', 'expense-date', '거래일'],
+          ['card', 'expense-card', '결제수단'],
+          ['amount', 'expense-amount', '승인금액'],
+          ['discount', 'expense-discount', '카드사 할인'],
+          ['details', 'expense-details', '상세내역']
+        ];
+        const changes = fields
+          .filter(([key, id]) => {
+            const el = document.getElementById(id);
+            return candidate[key] !== null && el && !el.disabled && !el.readOnly && (key !== 'card' || [...el.options].some((o) => o.value === candidate.card));
+          })
+          .map(([key, id, label]) => ({ key, id, label, before: document.getElementById(id).value, after: candidate[key] }));
+        const partsAllowed = !installment && !$('#expense-amount').readOnly;
+        return { changes, partsAllowed };
+      };
+      const expenseAssistDuplicates = (candidate) =>
+        state.transactions.filter(
+          (t) => t.id !== editing && t.date === candidate.date && t.name === candidate.name && t.card === candidate.card && (t.approval ?? t.basis ?? t.amount) === candidate.amount
+        );
+      const reviewExpenseAssist = () => {
+        const candidate = expenseAssistExample(expenseAssist.scenario);
+        const { changes, partsAllowed } = expenseAssistChanges(candidate);
+        expenseAssist.candidate = candidate;
+        expenseAssist.snapshot = expenseAssistSnapshot();
+        const duplicates = expenseAssistDuplicates(candidate);
+        modal(
+          'AI 초안 확인 · 합성 시연',
+          `<p class="notice">아래 값은 합성 예시예요. 입력한 이미지·설명을 실제로 해석한 결과가 아니며 아직 지출로 저장되지 않았어요.</p><p><strong>원문</strong><br />${esc(expenseAssist.text || '첨부 이미지 · 실제 인식 없음')}</p>${table(
+            ['항목', '현재 입력', '제안'],
+            changes.map((change) =>
+              row([
+                esc(change.label),
+                esc(change.key === 'card' ? expensePaymentLabel(change.before) : change.before || '미입력'),
+                esc(change.key === 'card' ? expensePaymentLabel(change.after) : change.after)
+              ])
+            )
+          )}${
+            partsAllowed
+              ? `<p>현재 분류: ${readSplitRows()
+                  .map((part) => `${esc(part.category || '미선택')} ${esc(part.gross || '미입력')}원 · 할인 ${esc(part.discount || '미입력')}원`)
+                  .join(
+                    ' · '
+                  )}</p><p>분류 제안: ${candidate.parts.map((part) => `${esc(part.category || '선택 필요')} ${won(part.gross)}`).join(' · ')}</p><p class="caption">현재 분류·금액이 바뀔 수 있어요. 기존 분류별 할인은 유지하며, 새 분류의 할인은 직접 입력하거나 폼의 할인 자동 배분 버튼을 눌러 주세요.</p>`
+              : '<p class="caption">기존 할부·수정 제한 필드는 유지해요. 회차별 금액·분류는 현재 폼에서 직접 확인해 주세요.</p>'
+          }${changes.some((change) => change.key === 'card' && change.before !== change.after) ? '<p class="caption">결제수단이 바뀌면 실사용자도 새 수단의 소유자로 바뀌어요.</p>' : ''}${duplicates.length ? `<div class="notice warning"><strong>중복 후보 ${duplicates.length}건</strong><p>같은 날짜·사용처·금액·결제수단의 기록이 있어요. 기존 기록을 확인해 주세요.</p><label class="checks"><input id="expense-assist-duplicate-confirm" type="checkbox" /> 기존 거래와 다른 사용 건임을 확인했어요</label></div>` : ''}<p class="caption">문자에 없는 분류·카드를 임의로 확정하지 않아요. 폼 반영 뒤에도 필수값과 합계를 확인하고 지출 저장을 눌러야 해요.</p><div id="expense-assist-review-error" class="form-error" role="alert"></div>`,
+          'expense-assist-apply',
+          '확인한 초안 반영',
+          true
+        );
+      };
+      const applyExpenseAssist = () => {
+        const candidate = expenseAssist.candidate;
+        const error = $('#expense-assist-review-error');
+        if (!candidate || expenseAssist.snapshot !== expenseAssistSnapshot()) {
+          error.textContent = '폼 입력이 바뀌었어요. 현재 입력을 유지하고 초안을 다시 확인해 주세요.';
+          return;
+        }
+        if (expenseAssistDuplicates(candidate).length && !$('#expense-assist-duplicate-confirm')?.checked) {
+          error.textContent = '중복 후보를 확인해 주세요. 거래를 자동으로 합치거나 삭제하지 않아요.';
+          return;
+        }
+        const { changes, partsAllowed } = expenseAssistChanges(candidate);
+        const previousParts = readSplitRows();
+        changes.forEach((change) => {
+          document.getElementById(change.id).value = String(change.after);
+        });
+        if (changes.some((change) => change.key === 'card' && change.before !== change.after)) $('#expense-user').value = expensePaymentOwner(candidate.card);
+        if (partsAllowed) {
+          state.splitDraft = candidate.parts.map((part) => ({
+            category: activeCategories().includes(part.category) ? part.category : '',
+            gross: String(part.gross),
+            discount: candidate.discount === 0 ? '0' : (previousParts.find((previous) => previous.category && previous.category === part.category)?.discount ?? '')
+          }));
+          $('#split-rows').innerHTML = splitRowsHtml(state.splitDraft);
+        }
+        if ($('#expense-payment')?.value === '할부') suggestInstallmentAmount();
+        updateExpensePreview();
+        captureDraft();
+        closeModal();
+        expenseAssist.candidate = null;
+        notify('초안을 폼에 반영했어요. 확인 후 지출 저장을 눌러 주세요.');
+      };
+
       const actions = {
         'close-modal': closeModal,
+        'expense-assist-clear': () => clearExpenseAssist(),
+        'expense-assist-example': (el) => {
+          expenseAssist.scenario = el.dataset.value;
+          expenseAssist.text = expenseAssistExample(el.dataset.value).text;
+          expenseAssist.error = '';
+          expenseAssist.candidate = null;
+          expenseAssist.sequence++;
+          syncExpenseAssist();
+        },
+        'expense-assist-failure': () => {
+          expenseAssist.sequence++;
+          expenseAssist.error = '해석 실패·시간 초과 시 원문·첨부 이미지와 기존 폼을 유지해요. 수동으로 계속 입력하거나 다시 시도할 수 있어요.';
+          syncExpenseAssist();
+        },
+        'expense-assist-review': async () => {
+          expenseAssist.text = $('#expense-assist-text').value;
+          if (!expenseAssist.text.trim() && !expenseAssist.imageUrl) {
+            expenseAssist.error = '지출 설명이나 이미지 한 장을 추가해 주세요.';
+            syncExpenseAssist();
+            return;
+          }
+          expenseAssist.error = '';
+          const sequence = ++expenseAssist.sequence;
+          $('#expense-assist-status').textContent = '초안을 만들고 있어요 · 합성 예시 시연';
+          document.querySelector('[data-action="expense-assist-review"]').disabled = true;
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          if (current !== 'expense-edit' || sequence !== expenseAssist.sequence) return;
+          $('#expense-assist-status').textContent = '';
+          document.querySelector('[data-action="expense-assist-review"]').disabled = false;
+          reviewExpenseAssist();
+        },
+        'expense-assist-apply': applyExpenseAssist,
         'confirm-status-release': () => {
           state.statusReleaseChoice = document.querySelector('input[name="status-release"]:checked')?.value || 'keep';
           closeModal();
@@ -3546,7 +4045,7 @@
           const currentVal = adjustment(defaultAccount);
           modal(
             '조정 금액 수정',
-            `<p class="caption">다음 지급 대기 처리 시 거래 합계에 더하거나 빼는 계좌별 조정 금액이에요.<br />음수(-)는 이미 계좌에 남아 다음 이체에서 차감할 금액, 양수(+)는 추가로 확보할 금액이에요.</p><div class="grid" style="margin-top:12px">${select('adjust-edit-account', '결제계좌', accountOptions, defaultAccount)}${field('adjust-edit-amount', '조정 금액 · 원', currentVal, 'number', 'step="1" required')}</div><p class="error" id="adjust-edit-error" role="alert"></p>`,
+            `<p class="caption">다음 지불 대기 처리 시 거래 합계에 더하거나 빼는 계좌별 조정 금액이에요.<br />음수(-)는 이미 계좌에 남아 다음 이체에서 차감할 금액, 양수(+)는 추가로 확보할 금액이에요.</p><div class="grid" style="margin-top:12px">${select('adjust-edit-account', '결제계좌', accountOptions, defaultAccount)}${field('adjust-edit-amount', '조정 금액 · 원', currentVal, 'number', 'step="1" required')}</div><p class="error" id="adjust-edit-error" role="alert"></p>`,
             'adjust-edit-save',
             '저장'
           );
@@ -3580,7 +4079,7 @@
           render();
         },
         'download-template': () => {
-          notify('표준 템플릿 파일(Moneiet_Template.xlsx) 다운로드를 체험했어요.');
+          notify('표준 템플릿 파일(Miriondon_Template.xlsx) 다운로드를 체험했어요.');
         },
         'import-template-preview': () => {
           state.importStep = 1;
@@ -3964,7 +4463,6 @@
           if (current === 'overview') render();
           else navigate('overview');
         },
-        'overview-assets': () => navigate('assets'),
         'prev-year': () => {
           state.overviewYear -= 1;
           render();
@@ -4132,11 +4630,11 @@
           const newStatus = $('#expense-status').value;
           const oldStatus = old ? paymentStatus(old) : null;
           if (old && oldStatus !== newStatus && (old.card !== $('#expense-card').value || old.amount !== v.net)) {
-            error.textContent = '지급 상태와 결제수단 또는 금액은 각각 따로 변경해 주세요.';
+            error.textContent = '지불 상태와 결제수단 또는 금액은 각각 따로 변경해 주세요.';
             return;
           }
           if (oldStatus === 'done' && (old.card !== $('#expense-card').value || old.amount !== v.net)) {
-            const msg = '지급 완료된 거래는 금액과 결제수단을 수정할 수 없어요. 먼저 지급 상태를 지급 대기 또는 지급 전으로 변경해 저장한 뒤 수정해 주세요.';
+            const msg = '지불 완료된 거래는 금액과 결제수단을 수정할 수 없어요. 먼저 지불 상태를 지불 대기 또는 준비 필요으로 변경해 저장한 뒤 수정해 주세요.';
             error.textContent = msg;
             alertModal('수정할 수 없는 거래예요', `<p>${msg}</p>`);
             return;
@@ -4144,7 +4642,7 @@
           if (oldStatus === 'waiting' && newStatus === 'before' && accountFor(old) && !state.statusReleaseChoice) {
             modal(
               '확보한 돈은 어떻게 처리했나요?',
-              `<p>지급 전으로 변경할 때 기존에 확보한 ${won(old.amount)}의 처리 방법을 선택해 주세요.</p><label class="checks"><input type="radio" name="status-release" value="keep" checked /> 결제계좌에 남겨둠: 다음 결제 준비에 차감</label><label class="checks"><input type="radio" name="status-release" value="return" /> 생활비 계좌로 반환했거나 같은 계좌에서 확보를 해제함</label><p class="caption">실제 이체나 계좌 잔액은 자동으로 바뀌지 않아요.</p>`,
+              `<p>준비 필요으로 변경할 때 기존에 확보한 ${won(old.amount)}의 처리 방법을 선택해 주세요.</p><label class="checks"><input type="radio" name="status-release" value="keep" checked /> 결제계좌에 남겨둠: 다음 결제 준비에 차감</label><label class="checks"><input type="radio" name="status-release" value="return" /> 생활비 계좌로 반환했거나 같은 계좌에서 확보를 해제함</label><p class="caption">실제 이체나 계좌 잔액은 자동으로 바뀌지 않아요.</p>`,
               'confirm-status-release',
               '선택 후 저장'
             );
@@ -4154,8 +4652,8 @@
             const oldCard = old.card;
             const amt = old.amount;
             modal(
-              '지급 대기 거래의 결제수단 변경',
-              `<p class="caption">이미 <strong>${esc(state.cardLabels[oldCard] || oldCard)}</strong>로 지급 대기(${won(amt)}) 상태인 거래예요.<br />기존에 확보한 금액을 어떻게 처리할지 선택해 주세요.</p><div class="stack" style="margin:16px 0"><label class="checks"><input type="radio" name="account-action" value="keep" checked /> <strong>1. 기존 결제계좌에 남겨둠 (소액 권장)</strong><br /><span class="caption">기존 계좌에 ${won(-amt)} 조정금을 만들고, 새 카드는 지급 전 상태로 둬요.</span></label><label class="checks"><input type="radio" name="account-action" value="transfer" /> <strong>2. 계좌 간 직접 송금함 (고액 권장)</strong><br /><span class="caption">은행에서 직접 이체한 사실을 확인하고, 새 카드로 준비금을 바로 옮겨요.</span></label><label class="checks"><input type="radio" name="account-action" value="refund" /> <strong>3. 생활비 계좌로 회수함</strong><br /><span class="caption">기존 계좌의 준비금을 회수 완료 처리하고, 새 카드는 지급 전 상태로 둬요.</span></label></div>`,
+              '지불 대기 거래의 결제수단 변경',
+              `<p class="caption">이미 <strong>${esc(state.cardLabels[oldCard] || oldCard)}</strong>로 지불 대기(${won(amt)}) 상태인 거래예요.<br />기존에 확보한 금액을 어떻게 처리할지 선택해 주세요.</p><div class="stack" style="margin:16px 0"><label class="checks"><input type="radio" name="account-action" value="keep" checked /> <strong>1. 기존 결제계좌에 남겨둠 (소액 권장)</strong><br /><span class="caption">기존 계좌에 ${won(-amt)} 조정금을 만들고, 새 카드는 준비 필요 상태로 둬요.</span></label><label class="checks"><input type="radio" name="account-action" value="transfer" /> <strong>2. 계좌 간 직접 송금함 (고액 권장)</strong><br /><span class="caption">은행에서 직접 이체한 사실을 확인하고, 새 카드로 준비금을 바로 옮겨요.</span></label><label class="checks"><input type="radio" name="account-action" value="refund" /> <strong>3. 생활비 계좌로 회수함</strong><br /><span class="caption">기존 계좌의 준비금을 회수 완료 처리하고, 새 카드는 준비 필요 상태로 둬요.</span></label></div>`,
               'confirm-account-change',
               '선택한 방식으로 변경 적용'
             );
@@ -4166,8 +4664,8 @@
             const accLabel = fundAccountLabel(accountFor(old));
             const isDecrease = delta < 0;
             modal(
-              '지급 대기 거래 금액 변경',
-              `<p class="caption">이미 <strong>${esc(accLabel)}</strong>로 지급 대기(${won(old.amount)}) 상태인 거래예요.<br />순결제금액이 ${won(old.amount)} → ${won(v.net)} (${delta > 0 ? `+${won(delta)}` : won(delta)})로 바뀌었어요.</p><div class="stack" style="margin:16px 0"><label class="checks"><input type="radio" name="amount-adjustment" value="apply" checked /> <strong>조정 금액에 반영 (${delta > 0 ? `+${won(delta)}` : won(delta)})</strong><br /><span class="caption">${isDecrease ? '남은 금액을 결제계좌에 두고 다음 지급 준비에서 차감해요.' : '부족한 금액을 다음 지급 준비 필요액에 합산해요.'}</span></label><label class="checks"><input type="radio" name="amount-adjustment" value="skip" /> <strong>조정 금액에 반영하지 않음</strong><br /><span class="caption">${isDecrease ? '이미 생활비 계좌로 반환했거나 단순 입력 오타를 바로잡는 경우예요.' : '이미 별도로 추가 송금했거나 단순 입력 오타를 바로잡는 경우예요.'}</span></label></div>`,
+              '지불 대기 거래 금액 변경',
+              `<p class="caption">이미 <strong>${esc(accLabel)}</strong>로 지불 대기(${won(old.amount)}) 상태인 거래예요.<br />순결제금액이 ${won(old.amount)} → ${won(v.net)} (${delta > 0 ? `+${won(delta)}` : won(delta)})로 바뀌었어요.</p><div class="stack" style="margin:16px 0"><label class="checks"><input type="radio" name="amount-adjustment" value="apply" checked /> <strong>조정 금액에 반영 (${delta > 0 ? `+${won(delta)}` : won(delta)})</strong><br /><span class="caption">${isDecrease ? '남은 금액을 결제계좌에 두고 다음 지불 준비에서 차감해요.' : '부족한 금액을 다음 지불 준비 필요액에 합산해요.'}</span></label><label class="checks"><input type="radio" name="amount-adjustment" value="skip" /> <strong>조정 금액에 반영하지 않음</strong><br /><span class="caption">${isDecrease ? '이미 생활비 계좌로 반환했거나 단순 입력 오타를 바로잡는 경우예요.' : '이미 별도로 추가 송금했거나 단순 입력 오타를 바로잡는 경우예요.'}</span></label></div>`,
               'confirm-amount-adjustment',
               '선택한 방식으로 저장'
             );
@@ -4185,7 +4683,7 @@
             const planCategory = v.parts[0].category;
             const baseName = $('#expense-name').value.trim();
             const baseDate = $('#expense-date').value;
-            const baseMonth = $('#expense-month').value;
+            const baseMonth = expenseFormMonth();
             const baseDay = Number(baseDate.slice(8, 10)) || 1;
             const cardVal = $('#expense-card').value;
             const actualUser = $('#expense-user').value;
@@ -4201,7 +4699,8 @@
               interestType: instType,
               totalMonths: instCount,
               startDate: baseDate,
-              startMonth: baseMonth,
+              startMonth: installmentRoundMonth(baseMonth, instCurrent, 1),
+              recordedFromRound: instCurrent,
               actualUser,
               status: 'active',
               settledNote: ''
@@ -4209,7 +4708,7 @@
             state.installmentPlans.push(plan);
             for (let k = instCurrent; k <= instCount; k++) {
               const offset = k - instCurrent;
-              const roundMonth = addMonthsYM(baseMonth, offset);
+              const roundMonth = installmentRoundMonth(baseMonth, instCurrent, k);
               const roundDate = offset === 0 ? baseDate : dateForMonthDay(roundMonth, baseDay);
               const roundPrincipal = offset === 0 && isInterestBearing ? instPrincipalInput : baseShare(k);
               const roundAmount = offset === 0 ? v.net : roundPrincipal;
@@ -4234,6 +4733,7 @@
                 category: offset === 0 && v.split ? '분할' : planCategory,
                 card: cardVal,
                 date: roundDate,
+                approvalDate: baseDate,
                 month: roundMonth,
                 paymentStatus: roundStatus,
                 prepared: roundStatus !== 'before',
@@ -4268,7 +4768,7 @@
               category: v.split ? '분할' : v.parts[0].category,
               card: $('#expense-card').value,
               date: $('#expense-date').value,
-              month: $('#expense-month').value,
+              month: expenseFormMonth(),
               paymentStatus: oldStatus === 'waiting' && accountFor(old) && old.card !== $('#expense-card').value ? (state.accountChangeAction === 'transfer' ? 'waiting' : 'before') : newStatus,
               prepared: oldStatus === 'waiting' && accountFor(old) && old.card !== $('#expense-card').value ? state.accountChangeAction === 'transfer' : newStatus !== 'before',
               performanceExcluded: old?.earlyPayoffPlanId ? true : isCardPaymentMethod($('#expense-card').value) ? !$('#expense-performance')?.checked : false,
@@ -4458,13 +4958,13 @@
           if (!plan) return;
           const rounds = installmentRounds(plan.id).filter((r) => paymentStatus(r) !== 'done');
           if (!rounds.length) {
-            notify('수정할 수 있는 미지급 할부 회차가 없어요. 지급 완료 회차는 지급 상태를 먼저 변경해 주세요.');
+            notify('수정할 수 있는 미지불 할부 회차가 없어요. 지불 완료 회차는 지불 상태를 먼저 변경해 주세요.');
             return;
           }
           state.editingInstallmentPlanId = plan.id;
           modal(
             `${esc(plan.name)} · 회차 금액 보정`,
-            `<p class="caption">유이자 할부 수수료나 카드사 실제 청구 금액에 맞춰 회차별 납부액을 수정해요. 지급 완료 회차는 지급 관리에서 상태를 먼저 되돌린 뒤 수정할 수 있어요.</p><div class="stack" style="margin:14px 0">${rounds
+            `<p class="caption">유이자 할부 수수료나 카드사 실제 청구 금액에 맞춰 회차별 납부액을 수정해요. 지불 완료 회차는 지불 관리에서 상태를 먼저 되돌린 뒤 수정할 수 있어요.</p><div class="stack" style="margin:14px 0">${rounds
               .map(
                 (r) =>
                   `<div class="split-line"><div><strong>${r.installmentCurrent}/${r.installmentCount}회차 · ${esc(r.month)}</strong><span class="row-sub">원금 기준 ${won(r.basePrincipal ?? r.basis ?? r.amount)} · ${esc(paymentStatusLabel(r))}</span></div><input type="number" min="1" step="1" data-inst-round-id="${r.id}" value="${r.amount}" style="max-width:150px" aria-label="${r.installmentCurrent}회차 청구 금액" /></div>`
@@ -4516,11 +5016,11 @@
           if (!plan) return;
           const remRounds = installmentRounds(plan.id).filter((r) => paymentStatus(r) !== 'done');
           if (!remRounds.length) {
-            notify('남은 미지급 회차가 없어요.');
+            notify('남은 미지불 회차가 없어요.');
             return;
           }
           if (remRounds.some((r) => paymentStatus(r) === 'waiting')) {
-            modal('조기 완납 불가', '<p>남은 회차 중 <strong>지급 대기</strong> 상태가 있어요. 지급 관리에서 지급 전 또는 지급 완료로 정리한 뒤 다시 시도해 주세요.</p>', 'close-modal', '확인');
+            modal('조기 완납 불가', '<p>남은 회차 중 <strong>지불 대기</strong> 상태가 있어요. 지불 관리에서 준비 필요 또는 지불 완료로 정리한 뒤 다시 시도해 주세요.</p>', 'close-modal', '확인');
             $('#modal .form-footer button')?.setAttribute('hidden', '');
             return;
           }
@@ -4535,11 +5035,11 @@
             `${esc(plan.name)} · 조기 완납 (일시불 선결제)`,
             `<p class="caption">남은 ${remRounds.length}회차(${remRounds.map((r) => `${r.installmentCurrent}회차`).join(', ')}) 합계 ${won(remSum)}을 한 건의 선결제 거래로 합치고 남은 예정 회차를 종료해요.</p><div class="grid" style="margin:14px 0">${field('payoff-amount', '선결제 금액 · 원', remSum, 'number', 'min="1" step="1" required')}${field('payoff-month', '반영할 예산월', state.month, 'month', 'required')}${field('payoff-date', '선결제일', dateForMonthDay(state.month, 4), 'date', 'required')}${select(
               'payoff-status',
-              '선결제 지급 상태',
+              '선결제 지불 상태',
               [
-                ['done', '지급 완료 (선결제 출금 완료)'],
-                ['waiting', '지급 대기 (자금 확보)'],
-                ['before', '지급 전 (예정)']
+                ['done', '지불 완료 (선결제 출금 완료)'],
+                ['waiting', '지불 대기 (자금 확보)'],
+                ['before', '준비 필요 (예정)']
               ],
               'done'
             )}</div><p class="caption">이미 승인월 카드 실적에 전체 원금이 반영된 경우 실적은 중복 계산하지 않아요.</p><div id="inst-modal-error" class="form-error" role="alert"></div>`,
@@ -4598,19 +5098,19 @@
           const rounds = installmentRounds(plan.id);
           const beforeRounds = rounds.filter((r) => paymentStatus(r) === 'before');
           if (!beforeRounds.length) {
-            modal('할부 취소 불가', '<p>지급 전 상태의 남은 예정 회차가 없어요.</p>', 'close-modal', '확인');
+            modal('할부 취소 불가', '<p>준비 필요 상태의 남은 예정 회차가 없어요.</p>', 'close-modal', '확인');
             $('#modal .form-footer button')?.setAttribute('hidden', '');
             return;
           }
           if (beforeRounds.some((r) => receivables().some((rec) => rec.transactionId === r.id))) {
-            modal('할부 취소 불가', '<p>지급 전 회차에 지출금 회수 내역이 연결되어 있어요. 회수 설정을 먼저 해제해 주세요.</p>', 'close-modal', '확인');
+            modal('할부 취소 불가', '<p>준비 필요 회차에 지출금 회수 내역이 연결되어 있어요. 회수 설정을 먼저 해제해 주세요.</p>', 'close-modal', '확인');
             $('#modal .form-footer button')?.setAttribute('hidden', '');
             return;
           }
           state.editingInstallmentPlanId = plan.id;
           modal(
             `${esc(plan.name)} · 할부 취소`,
-            `<p>지급 전 상태인 <strong>${beforeRounds.length}개 회차(${won(beforeRounds.reduce((s, r) => s + r.amount, 0))})</strong>를 취소하여 목록과 월별 예정 합계에서 제외해요.</p><p class="caption">이미 지급 대기·완료된 회차는 기록 보존을 위해 유지돼요.</p>`,
+            `<p>준비 필요 상태인 <strong>${beforeRounds.length}개 회차(${won(beforeRounds.reduce((s, r) => s + r.amount, 0))})</strong>를 취소하여 목록과 월별 예정 합계에서 제외해요.</p><p class="caption">이미 지불 대기·완료된 회차는 기록 보존을 위해 유지돼요.</p>`,
             'installment-cancel-commit',
             '할부 취소 확정'
           );
@@ -4622,11 +5122,11 @@
           const beforeIds = new Set(beforeRounds.map((r) => r.id));
           state.transactions = state.transactions.filter((t) => !beforeIds.has(t.id));
           plan.status = 'cancelled';
-          plan.settledNote = `${beforeRounds.length}개 미지급 회차 취소`;
+          plan.settledNote = `${beforeRounds.length}개 미지불 회차 취소`;
           state.editingInstallmentPlanId = null;
           closeModal();
           render();
-          notify('할부의 남은 미지급 회차를 취소했어요.');
+          notify('할부의 남은 미지불 회차를 취소했어요.');
         },
         'fixed-expense-add': () => actions['fixed-expense-open'](null),
         'fixed-expense-edit': (el) => actions['fixed-expense-open'](Number(el.dataset.id)),
@@ -4725,14 +5225,16 @@
           const rule = id ? (state.fixedIncomes || []).find((r) => r.id === id) : null;
           state.editingFixedIncomeId = rule?.id || null;
           const bankNames = activeBankAccountNames();
-          const incType = rule?.type || '급여';
-          state.fixedIncomeSalaryDraft = structuredClone(rule?.salary?.length ? rule.salary : state.salaryTemplate || defaultSalaryRows());
+          const incType = rule?.type || '근로소득';
+          state.fixedIncomeMoneyDrafts = {};
+          state.fixedIncomeType = incType;
+          state.fixedIncomeSalaryDraft = salaryRecordRows(rule);
           const applyNowHtml = rule
             ? ''
             : `<label class="checks" style="margin:10px 0 4px"><input type="checkbox" id="fixed-inc-apply-now" /> 현재 월(${esc(state.month)}) 이후 수입 내역에도 지금 바로 추가</label>`;
           modal(
             rule ? '고정 수입 수정' : '고정 수입 추가',
-            `<div class="grid" style="margin:14px 0">${select('fixed-inc-type', '구분', ['급여', '비급여'], incType)}${field('fixed-inc-name', '내용', rule?.name || '예시 월 급여', 'text', 'required')}${select('fixed-inc-owner', '귀속자', joinedMemberOptions(), rule?.owner || '나')}${select('fixed-inc-account', '입금 계좌', bankNames.length ? bankNames : ['예시 생활비 계좌'], rule?.account || bankNames[0] || '예시 생활비 계좌')}${field('fixed-inc-day', '입금 예정일 · 일', rule?.day || 25, 'number', 'min="1" max="31" step="1" required')}${select(
+            `<div class="grid" style="margin:14px 0">${select('fixed-inc-type', '수입 종류', incomeTypes, incType)}${incomeSubtypeHtml('fixed-inc', incType, rule)}${field('fixed-inc-payer', '지급처 · 선택', rule?.payer || '')}${field('fixed-inc-name', '내용', rule?.name || '예시 월 급여', 'text', 'required')}${select('fixed-inc-owner', '귀속자', joinedMemberOptions(), rule?.owner || '나')}${select('fixed-inc-account', '입금 계좌', bankNames.length ? bankNames : ['예시 생활비 계좌'], rule?.account || bankNames[0] || '예시 생활비 계좌')}${field('fixed-inc-day', '입금 예정일 · 일', rule?.day || 25, 'number', 'min="1" max="31" step="1" required')}${select(
               'fixed-inc-rule',
               '예산 반영 방식',
               [
@@ -4740,15 +5242,20 @@
                 ['next', '익월(다음 달) 예산에 배정']
               ],
               rule?.budgetRule || 'current'
-            )}${field('fixed-inc-start', '적용 시작월', rule?.startMonth || state.month, 'month', 'required')}</div><div id="fixed-inc-salary-section" ${incType === '급여' ? '' : 'hidden'}>${salaryEditorHtml(state.fixedIncomeSalaryDraft, 'fixed')}<div class="split-line total-line" style="margin:12px 0"><span>예정 실수령액 · 지급 합계 − 공제 합계</span><strong id="fixed-salary-net"></strong></div></div><div id="fixed-inc-simple-section" ${incType === '비급여' ? '' : 'hidden'}>${field('fixed-inc-amount', '수입 금액 · 원', rule?.type === '비급여' ? rule.amount : 100000, 'number', 'min="1" step="1"')}</div>${applyNowHtml}<p class="caption" id="fixed-apply-now-hint">${rule ? '수정한 내용은 앞으로 새로 생성되는 월부터 적용해요. 이미 생성된 월의 수입 내역과 세부 급여 명세는 바뀌지 않아요.' : fixedApplyNowHint('income', false)}</p><div id="fixed-modal-error" class="form-error" role="alert"></div>`,
+            )}${field('fixed-inc-start', '적용 시작월', rule?.startMonth || state.month, 'month', 'required')}</div><div id="fixed-inc-salary-section" ${incType === '근로소득' ? '' : 'hidden'}>${salaryEditorHtml(state.fixedIncomeSalaryDraft, 'fixed')}<div class="split-line total-line" style="margin:12px 0"><span>예정 실수령액 · 지급 합계 − 공제 합계</span><strong id="fixed-salary-net"></strong></div></div><div id="fixed-inc-money-details" ${incType !== '근로소득' ? '' : 'hidden'}>${incType !== '근로소득' ? incomeMoneyDetailsHtml('fixed-inc', incType, incomeRecordDetails(rule)) : ''}</div><div id="fixed-inc-kind-details">${incomeKindDetailsHtml('fixed-inc', incType, rule?.taxDetails)}</div>${applyNowHtml}<p class="caption" id="fixed-apply-now-hint">${rule ? '수정한 내용은 앞으로 새로 생성되는 월부터 적용해요. 이미 생성된 월의 수입 내역과 세부 급여 명세는 바뀌지 않아요.' : fixedApplyNowHint('income', false)}</p><div id="fixed-modal-error" class="form-error" role="alert"></div>`,
             'fixed-income-save',
             rule ? '저장' : '고정 수입 추가',
             true
           );
-          if (incType === '급여') updateSalarySummaryUI('fixed');
+          if (incType === '근로소득') updateSalarySummaryUI('fixed');
+          else updateIncomeMoneySummary('fixed-inc', incType);
         },
         'fixed-income-save': () => {
-          const type = $('#fixed-inc-type')?.value || '급여';
+          const type = $('#fixed-inc-type')?.value || '근로소득';
+          const subtype = $('#fixed-inc-subtype')?.value || '';
+          const payer = $('#fixed-inc-payer')?.value || '';
+          const previous = state.fixedIncomes.find((item) => item.id === state.editingFixedIncomeId);
+          const taxDetails = { ...(previous?.type === type ? previous.taxDetails : {}), ...readIncomeTaxDetails('fixed-inc') };
           const name = $('#fixed-inc-name')?.value?.trim();
           const owner = $('#fixed-inc-owner')?.value || '나';
           const account = $('#fixed-inc-account')?.value;
@@ -4757,9 +5264,10 @@
           const startMonth = $('#fixed-inc-start')?.value;
           const applyNow = !state.editingFixedIncomeId && Boolean($('#fixed-inc-apply-now')?.checked);
           const errEl = $('#fixed-modal-error');
+          const financialDetails = type !== '근로소득' ? readIncomeMoneyDetails('fixed-inc') : null;
           let salary = [];
           let amount = 0;
-          if (type === '급여') {
+          if (type === '근로소득') {
             salary = salaryEditorValues('fixed').map((r) => ({ ...r, name: r.name.trim() }));
             const salErr = salaryValidError(salary);
             if (salErr) {
@@ -4768,7 +5276,12 @@
             }
             amount = salaryEditorSummary(salary).netTotal;
           } else {
-            amount = Number($('#fixed-inc-amount')?.value);
+            const result = incomeMoneySummary(financialDetails, type);
+            if (result.error) {
+              errEl.textContent = result.error;
+              return;
+            }
+            amount = result.net;
           }
           if (!name || !account || !startMonth || !Number.isInteger(day) || day < 1 || day > 31 || !Number.isSafeInteger(amount) || amount <= 0) {
             if (errEl) errEl.textContent = '내용, 입금 계좌, 예정일(1~31), 시작월과 0원보다 큰 예정 금액(실수령액)을 확인해 주세요.';
@@ -4783,9 +5296,9 @@
           let rule = state.editingFixedIncomeId ? state.fixedIncomes.find((r) => r.id === state.editingFixedIncomeId) : null;
           const isEdit = Boolean(rule);
           if (rule) {
-            Object.assign(rule, { type, name, owner, account, day, budgetRule, startMonth, amount, salary });
+            Object.assign(rule, { type, subtype, payer, taxDetails, financialDetails, name, owner, account, day, budgetRule, startMonth, amount, salary });
           } else {
-            rule = { id: nextId(state.fixedIncomes), type, name, owner, account, day, budgetRule, startMonth, amount, active: true, salary };
+            rule = { id: nextId(state.fixedIncomes), type, subtype, payer, taxDetails, financialDetails, name, owner, account, day, budgetRule, startMonth, amount, active: true, salary };
             state.fixedIncomes.push(rule);
           }
           const addedMonths = !isEdit && applyNow ? eligibleMonths.filter((m) => syncFixedIncomeForMonth(rule, m)) : [];
@@ -4831,18 +5344,18 @@
           const items = fundItems().filter((t) => state.selected.has(t.id));
           if (!items.length || target === state.prepareStatus) return;
           state.fundTargetStatus = target;
-          const labels = { before: '지급 전', waiting: '지급 대기', done: '지급 완료' };
+          const labels = { before: '준비 필요', waiting: '지불 대기', done: '지불 완료' };
           const release = state.prepareStatus === 'waiting' && target === 'before';
           const accountOptions = fundGroups(items)
             .filter((group) => group.account !== '현금')
             .map(
               (group, i) =>
-                `<section class="card"><strong>${esc(fundAccountLabel(group.account))} · ${won(group.total)}</strong><p>확보한 금액을 어떻게 처리했나요?</p><label class="checks"><input type="radio" name="bulk-release-${i}" value="keep" checked /> 계좌에 남겨둠: 다음 지급 대기에서 차감</label><label class="checks"><input type="radio" name="bulk-release-${i}" value="return" /> 생활비 계좌로 반환했거나 확보 해제</label></section>`
+                `<section class="card"><strong>${esc(fundAccountLabel(group.account))} · ${won(group.total)}</strong><p>확보한 금액을 어떻게 처리했나요?</p><label class="checks"><input type="radio" name="bulk-release-${i}" value="keep" checked /> 계좌에 남겨둠: 다음 지불 대기에서 차감</label><label class="checks"><input type="radio" name="bulk-release-${i}" value="return" /> 생활비 계좌로 반환했거나 확보 해제</label></section>`
             )
             .join('');
           modal(
             `${labels[state.prepareStatus]} → ${labels[target]}`,
-            `<p>${items.length}건 · ${won(items.reduce((sum, t) => sum + t.amount, 0))}의 상태를 변경해요.</p>${release ? accountOptions : ''}<p class="caption">실제 지급이나 확보 여부를 확인해 주세요. 은행 이체와 실제 잔액은 자동으로 바뀌지 않아요.</p>`,
+            `<p>${items.length}건 · ${won(items.reduce((sum, t) => sum + t.amount, 0))}의 상태를 변경해요.</p>${release ? accountOptions : ''}<p class="caption">실제 지불이나 확보 여부를 확인해 주세요. 은행 이체와 실제 잔액은 자동으로 바뀌지 않아요.</p>`,
             'fund-status-commit',
             '상태 변경'
           );
@@ -4867,7 +5380,7 @@
           state.fundTargetStatus = null;
           closeModal();
           render();
-          notify('선택한 거래의 지급 상태를 바꿨어요.');
+          notify('선택한 거래의 지불 상태를 바꿨어요.');
         },
         'prepare-review': () => {
           const selected = pending().filter((t) => state.selected.has(t.id));
@@ -4880,10 +5393,10 @@
             )
             .join('');
           modal(
-            '지급 대기로 변경',
-            `<p>${selected.length}건 · 계좌별 확보 내역</p>${details}<label class="checks"><input id="prepare-confirm" type="checkbox" /> 계좌별로 필요한 금액을 이체했거나 확보한 내용을 확인했어요.</label><div id="prepare-error" class="form-error" role="alert"></div><p class="caption">실제 계좌 잔액은 자동으로 바뀌지 않으며, 지급 상태를 바꿔도 지출이 다시 늘어나지 않아요.</p>`,
+            '지불 대기로 변경',
+            `<p>${selected.length}건 · 계좌별 확보 내역</p>${details}<label class="checks"><input id="prepare-confirm" type="checkbox" /> 계좌별로 필요한 금액을 이체했거나 확보한 내용을 확인했어요.</label><div id="prepare-error" class="form-error" role="alert"></div><p class="caption">실제 계좌 잔액은 자동으로 바뀌지 않으며, 지불 상태를 바꿔도 지출이 다시 늘어나지 않아요.</p>`,
             'prepare-commit',
-            '지급 대기로 저장'
+            '지불 대기로 저장'
           );
         },
         'prepare-commit': () => {
@@ -4905,13 +5418,13 @@
           state.selected.clear();
           closeModal();
           render();
-          notify('선택한 거래를 지급 대기로 바꿨어요. 실제 잔액은 자산현황에서 확인해 주세요.');
+          notify('선택한 거래를 지불 대기로 바꿨어요. 실제 잔액은 자산현황에서 확인해 주세요.');
         },
         'prepare-undo': () => {
           if (!state.lastPreparation) return;
           modal(
-            '최근 지급 대기 변경을 취소할까요?',
-            '<p>선택했던 거래를 지급 전으로 되돌리고, 당시 적용한 조정 금액만 원상복구해요. 실제 은행 이체는 취소되지 않아요.</p>',
+            '최근 지불 대기 변경을 취소할까요?',
+            '<p>선택했던 거래를 준비 필요으로 되돌리고, 당시 적용한 조정 금액만 원상복구해요. 실제 은행 이체는 취소되지 않아요.</p>',
             'prepare-undo-commit',
             '변경 취소'
           );
@@ -4930,7 +5443,7 @@
           state.lastPreparation = null;
           closeModal();
           render();
-          notify('최근 지급 대기 변경을 취소했어요.');
+          notify('최근 지불 대기 변경을 취소했어요.');
         },
         'adjust-example': () => {
           if (state.adjusted) {
@@ -4939,8 +5452,8 @@
           }
           const t = state.transactions.find((t) => t.id === 7);
           modal(
-            '지급 대기 중인 B계좌 거래 감액 예시',
-            `<p>${esc(t.name)} · ${won(t.amount)} → ${won(t.amount - 10000)}</p><p>식품/외식 원금 80,000원 → 72,000원<br />생활/동물 원금 20,000원 → 18,000원<br />할인 합계 5,000원 유지 · 순액 68,000원 / 17,000원</p><p>결제계좌 B의 다음 지급 조정 -10,000원 (계좌 A에는 영향 없음)</p><p class="caption">이 버튼은 예시 분할 거래의 부분 취소(감액) 사례예요.</p>`,
+            '지불 대기 중인 B계좌 거래 감액 예시',
+            `<p>${esc(t.name)} · ${won(t.amount)} → ${won(t.amount - 10000)}</p><p>식품/외식 원금 80,000원 → 72,000원<br />생활/동물 원금 20,000원 → 18,000원<br />할인 합계 5,000원 유지 · 순액 68,000원 / 17,000원</p><p>결제계좌 B의 다음 지불 조정 -10,000원 (계좌 A에는 영향 없음)</p><p class="caption">이 버튼은 예시 분할 거래의 부분 취소(감액) 사례예요.</p>`,
             'adjust-example-commit',
             '이 예시로 감액'
           );
@@ -4992,7 +5505,7 @@
           if (!difference) return;
           modal(
             '잔액 차이 확인',
-            `<p>생활비 계좌·현금 총액 ${won(accountCashTotal())}<br />+ 수입예정 ${won(assetInflow())}<br />− 지출예정 ${won(obligations())}<br />− 남은 생활비 ${won(remaining())}</p><p><strong>잔액 차이 ${difference > 0 ? '+' : ''}${won(difference)}</strong></p><p class="caption">결제 전용 계좌는 제외되며 지급·입금 완료 거래는 실제 잔액에 이미 반영된 것으로 간주해요. 수입예정에는 입금 예정 수입과 미회수 금액이 포함돼요.</p>`,
+            `<p>생활비 계좌·현금 총액 ${won(accountCashTotal())}<br />+ 수입예정 ${won(assetInflow())}<br />− 지출예정 ${won(obligations())}<br />− 남은 생활비 ${won(remaining())}</p><p><strong>잔액 차이 ${difference > 0 ? '+' : ''}${won(difference)}</strong></p><p class="caption">결제 전용 계좌는 제외되며 지불·입금 완료 거래는 실제 잔액에 이미 반영된 것으로 간주해요. 수입예정에는 입금 예정 수입과 미회수 금액이 포함돼요.</p>`,
             'close-modal',
             '확인'
           );
@@ -5204,22 +5717,32 @@
           state.editingCard = card;
           modal(
             '카드 수정',
-            `${field('card-label-edit', '표시명', state.cardLabels[card], 'text', 'required')}${select('card-account-edit', '결제계좌', destinationOptions(), state.cardAssetAccounts[card])}<p class="caption">결제계좌 변경은 연결된 준비금 처리 확인이 필요해 이 데모에서는 저장할 수 없어요.</p><div id="card-edit-error" class="form-error" role="alert"></div>`,
+            `${field('card-label-edit', '표시명', state.cardLabels[card], 'text', 'required')}${field('card-last4-edit', '카드번호 마지막 4자리 · 필수', state.cardLast4[card], 'text', 'required inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off"')}${select('card-account-edit', '결제계좌', destinationOptions(), state.cardAssetAccounts[card])}<p class="caption">결제계좌 변경은 연결된 준비금 처리 확인이 필요해 이 데모에서는 저장할 수 없어요.</p><div id="card-edit-error" class="form-error" role="alert"></div>`,
             'card-edit-save',
             '변경 내용 저장'
           );
         },
         'card-edit-save': () => {
           const name = $('#card-label-edit').value.trim();
+          const last4 = $('#card-last4-edit').value;
+          if (!/^[0-9]{4}$/.test(last4)) {
+            $('#card-edit-error').textContent = '카드번호 마지막 4자리를 숫자 4자리로 입력해 주세요.';
+            $('#card-last4-edit').focus();
+            return;
+          }
           if (!name || !['A', 'B', 'C'].includes(state.editingCard)) return;
           if ($('#card-account-edit').value !== state.cardAssetAccounts[state.editingCard]) {
             $('#card-edit-error').textContent = '결제계좌 변경은 이 데모에서 저장할 수 없어요. 연결된 준비금 처리 방식을 먼저 확인해야 해요.';
             return;
           }
           state.cardLabels[state.editingCard] = name;
+          state.cardLast4[state.editingCard] = last4;
+          if (state.editingCard === 'C' && state.registeredCard) {
+            Object.assign(state.registeredCard.settings, { label: name, last4 });
+          }
           closeModal();
           render();
-          notify('카드 이름을 저장했어요.');
+          notify('카드 정보를 저장했어요.');
         },
         'card-disable': (el) => {
           state.pendingCard = el.dataset.card;
@@ -5355,6 +5878,7 @@
           if (reg.step === 2) {
             reg.settings = {
               label: $('#card-label').value,
+              last4: $('#card-last4').value,
               account: $('#card-account').value,
               dueDay: $('#card-due-day')?.value || '',
               transit: $('#card-transit').checked,
@@ -5376,13 +5900,20 @@
           const transitAccount = $('#card-transit-account')?.value || '';
           const transitDay = $('#card-transit-day')?.value || '';
           const label = $('#card-label').value.trim();
+          const last4 = $('#card-last4').value;
+          if (!/^[0-9]{4}$/.test(last4)) {
+            $('#card-error').textContent = '카드번호 마지막 4자리를 숫자 4자리로 입력해 주세요.';
+            $('#card-last4').focus();
+            return;
+          }
           if (!label || !account || (product.type === '신용카드' && !dueDay) || (product.type === '체크카드' && transit && (!transitAccount || !transitDay))) {
             $('#card-error').textContent = '표시명과 연결 계좌, 필요한 결제일 또는 후불교통 출금 정보를 확인해 주세요.';
             return;
           }
-          reg.settings = { label, account, dueDay, transit, transitAccount, transitDay, easyChoice: $('#card-easy-choice')?.value || '', issued: $('#card-issued').value };
+          reg.settings = { label, last4, account, dueDay, transit, transitAccount, transitDay, easyChoice: $('#card-easy-choice')?.value || '', issued: $('#card-issued').value };
           state.cardAssetAccounts.C = account;
           state.cardLabels.C = label;
+          state.cardLast4.C = last4;
           const defaults = {
             period: '전월 1일~말일',
             discount: product.source === 'AI' || product.id === 'kb-easy' ? '확인 필요' : '거래 전체 제외',
@@ -5441,26 +5972,61 @@
           if (!item) return;
           state.incomeEditing = item.id;
           state.incomeType = item.type;
-          state.salaryTemplate = item.salary.length ? item.salary : state.salaryTemplate;
+          state.salaryTemplate = salaryRecordRows(item);
           navigate('income-edit');
         },
         'income-type': (el) => {
-          const common = ['income-name', 'income-owner', 'income-account', 'income-date', 'income-month', 'income-status', 'income-memo'].map((id) => ({
-            id,
-            value: document.getElementById(id).value
-          }));
-          if (state.incomeType === '급여') state.salaryTemplate = salaryEditorValues('inc');
+          const commonIds = [
+            'income-name',
+            'income-payer',
+            'income-owner',
+            'income-account',
+            'income-date',
+            'income-month',
+            'income-status',
+            'income-memo',
+            'income-tax-periodStart',
+            'income-tax-periodEnd'
+          ];
+          const common = commonIds.filter((id) => document.getElementById(id)).map((id) => ({ id, value: document.getElementById(id).value }));
+          if (state.incomeType === '근로소득') state.salaryTemplate = salaryEditorValues('inc');
           state.incomeType = el.dataset.value;
           render();
-          common.forEach((x) => {
-            document.getElementById(x.id).value = x.value;
+          common.forEach(({ id, value }) => {
+            const field = document.getElementById(id);
+            if (field) field.value = value;
           });
+          $('#income-type').value = state.incomeType;
           captureDraft();
+        },
+        'income-money-add': (el) => {
+          const prefix = el.dataset.prefix;
+          const type = document.querySelector(`[data-income-money-editor="${prefix}"]`).dataset.incomeMoneyType;
+          const details = readIncomeMoneyDetails(prefix);
+          details.rows.push({ name: '', amount: null, kind: el.dataset.kind, code: null });
+          refreshIncomeMoneyEditor(prefix, type, details);
+        },
+        'income-money-remove': (el) => {
+          const prefix = el.dataset.prefix;
+          const type = document.querySelector(`[data-income-money-editor="${prefix}"]`).dataset.incomeMoneyType;
+          const details = readIncomeMoneyDetails(prefix);
+          details.rows.splice(Number(el.dataset.index), 1);
+          refreshIncomeMoneyEditor(prefix, type, details);
+        },
+        'income-zero-deductions': (el) => {
+          const prefix = el.dataset.prefix;
+          const type = document.querySelector(`[data-income-money-editor="${prefix}"]`).dataset.incomeMoneyType;
+          document.querySelectorAll(`[data-income-money-row="${prefix}"][data-kind="공제"]`).forEach((row) => {
+            const input = row.querySelector('[data-money-amount]');
+            if (input.value === '') input.value = '0';
+          });
+          updateIncomeMoneySummary(prefix, type);
+          if (prefix === 'income') captureDraft();
         },
         'salary-add-pay': (el) => {
           const prefix = el.dataset.prefix || 'inc';
           const rows = salaryEditorValues(prefix);
-          rows.push({ name: '추가 수당', amount: 0, kind: '지급', tax: '과세' });
+          rows.push({ name: '추가 수당', amount: 0, kind: '지급', tax: '확인 필요' });
           refreshSalaryEditor(prefix, rows);
         },
         'salary-add-deduct': (el) => {
@@ -5482,9 +6048,16 @@
         },
         'income-save': () => {
           if (!formValid('income-form')) return;
+          const periodStart = $('#income-tax-periodStart')?.value;
+          const periodEnd = $('#income-tax-periodEnd')?.value;
+          if (periodStart && periodEnd && periodStart > periodEnd) {
+            $('#income-error').textContent = '소득 귀속 기간의 종료일을 확인해 주세요.';
+            return;
+          }
+          const financialDetails = state.incomeType !== '근로소득' ? readIncomeMoneyDetails('income') : null;
           let salary = [];
           let amount = 0;
-          if (state.incomeType === '급여') {
+          if (state.incomeType === '근로소득') {
             salary = salaryEditorValues('inc').map((r) => ({ ...r, name: r.name.trim() }));
             const salErr = salaryValidError(salary);
             if (salErr) {
@@ -5493,10 +6066,20 @@
             }
             amount = salaryEditorSummary(salary).netTotal;
           } else {
-            amount = Number($('#income-simple-amount').value);
+            const result = incomeMoneySummary(financialDetails, state.incomeType);
+            if (result.error) {
+              $('#income-error').textContent = result.error;
+              return;
+            }
+            amount = result.net;
           }
           if (!Number.isSafeInteger(amount) || amount < 0) {
             $('#income-error').textContent = '실수령액은 0 이상 정수로 입력해 주세요.';
+            return;
+          }
+          const budgetAmount = state.incomeType === '자산 처분' ? Number($('#income-budget-amount').value) : amount;
+          if (!Number.isSafeInteger(budgetAmount) || budgetAmount < 0 || budgetAmount > amount) {
+            $('#income-error').textContent = '예산 반영액은 실수령액 이내의 정수로 입력해 주세요.';
             return;
           }
           const existing = state.incomes.find((i) => i.id === state.incomeEditing);
@@ -5508,6 +6091,11 @@
             memo: $('#income-memo').value,
             name: $('#income-name').value,
             type: state.incomeType,
+            subtype: $('#income-subtype').value,
+            payer: $('#income-payer').value,
+            financialDetails: financialDetails ? structuredClone(financialDetails) : null,
+            taxDetails: { ...(existing?.type === state.incomeType ? existing.taxDetails : {}), ...readIncomeTaxDetails('income') },
+            budgetAmount,
             amount,
             attribution: $('#income-attribution')?.value || '해당 없음',
             date: $('#income-date').value,
@@ -5521,7 +6109,7 @@
           const index = state.incomes.findIndex((i) => i.id === state.incomeEditing);
           if (index >= 0) state.incomes[index] = item;
           else state.incomes.push(item);
-          delete state.drafts[draftKey()];
+          clearIncomeMoneyDrafts();
           $('#income-form').remove();
           state.incomeEditing = null;
           if (salary.length) state.salaryTemplate = salary;
@@ -6097,13 +6685,14 @@
           }
           if (goButton.dataset.go === 'income-edit') {
             state.incomeEditing = null;
+            state.incomeType = '근로소득';
           }
           if (current === 'asset-edit' && ['assets', 'cards', 'settings-asset'].includes(goButton.dataset.go)) {
             delete state.drafts['asset-edit'];
             $('#asset-form')?.remove();
           }
           if (current === 'income-edit' && goButton.dataset.go === 'income') {
-            delete state.drafts[draftKey()];
+            clearIncomeMoneyDrafts();
             $('#income-form')?.remove();
           }
           if (goButton.dataset.go === 'asset-edit') {
@@ -6131,7 +6720,9 @@
       });
       document.addEventListener('change', (event) => {
         const el = event.target;
+        if (el.id === 'expense-assist-file') setExpenseAssistImage(el.files?.[0]);
         if (el.id === 'expense-payment') suggestInstallmentAmount();
+        if (el.id === 'expense-card' && $('#expense-user')) $('#expense-user').value = expensePaymentOwner(el.value);
         captureDraft();
         if (el.matches('[data-person]')) {
           actions['manage-person-change']();
@@ -6194,10 +6785,39 @@
           updateManagePreview();
         }
         if (el.closest('#expense-form')) updateExpensePreview();
-        if (el.closest('#income-form') && state.incomeType === '급여') updateSalarySummaryUI('inc');
+        if (el.closest('#income-form') && state.incomeType === '근로소득') updateSalarySummaryUI('inc');
         if (el.closest('[data-salary-editor="fixed"]')) updateSalarySummaryUI('fixed');
+        const moneyEditor = event.target.closest('[data-income-money-editor]');
+        if (moneyEditor) {
+          const prefix = moneyEditor.dataset.incomeMoneyEditor;
+          updateIncomeMoneySummary(prefix, prefix === 'income' ? state.incomeType : $('#fixed-inc-type').value);
+        }
+      });
+      document.addEventListener('paste', (event) => {
+        if (!event.target.closest('#expense-assist')) return;
+        const file = [...(event.clipboardData?.items || [])].find((item) => item.kind === 'file' && item.type.startsWith('image/'))?.getAsFile();
+        if (file) {
+          event.preventDefault();
+          setExpenseAssistImage(file);
+        }
+      });
+      document.addEventListener('dragover', (event) => {
+        if (event.target.closest('#expense-assist')) event.preventDefault();
+      });
+      document.addEventListener('drop', (event) => {
+        if (event.target.closest('#expense-assist')) {
+          event.preventDefault();
+          setExpenseAssistImage(event.dataTransfer?.files?.[0]);
+        }
       });
       document.addEventListener('input', (event) => {
+        if (event.target.id === 'expense-assist-text') {
+          expenseAssist.text = event.target.value;
+          expenseAssist.candidate = null;
+          expenseAssist.sequence++;
+          document.querySelector('[data-action="expense-assist-review"]').disabled = false;
+          $('#expense-assist-status').textContent = '';
+        }
         if (['expense-amount', 'expense-discount', 'installment-count', 'installment-current', 'installment-type'].includes(event.target.id)) suggestInstallmentAmount();
         captureDraft();
         if (event.target.closest('#month-budget-form')) {
@@ -6210,22 +6830,35 @@
           updateManagePreview();
         }
         if (event.target.closest('#expense-form')) updateExpensePreview();
-        if (event.target.closest('#income-form') && state.incomeType === '급여') updateSalarySummaryUI('inc');
+        if (event.target.closest('#income-form') && state.incomeType === '근로소득') updateSalarySummaryUI('inc');
         if (event.target.closest('[data-salary-editor="fixed"]')) updateSalarySummaryUI('fixed');
+        const moneyEditor = event.target.closest('[data-income-money-editor]');
+        if (moneyEditor) {
+          const prefix = moneyEditor.dataset.incomeMoneyEditor;
+          updateIncomeMoneySummary(prefix, prefix === 'income' ? state.incomeType : $('#fixed-inc-type').value);
+        }
         if (event.target.id === 'expense-search' || event.target.id === 'expense-card-filter') filterExpenses();
       });
       document.addEventListener('change', (event) => {
+        if (event.target.id === 'income-type') actions['income-type']({ dataset: { value: event.target.value } });
         if (event.target.id === 'installment-type') {
           suggestInstallmentAmount();
           updateExpensePreview();
         }
         if (event.target.id === 'fixed-inc-type') {
-          const isSalary = event.target.value === '급여';
-          const salSec = $('#fixed-inc-salary-section');
-          const simpleSec = $('#fixed-inc-simple-section');
-          if (salSec) salSec.hidden = !isSalary;
-          if (simpleSec) simpleSec.hidden = isSalary;
+          const type = $('#fixed-inc-type').value;
+          if (state.fixedIncomeType === '근로소득') state.fixedIncomeSalaryDraft = salaryEditorValues('fixed');
+          state.fixedIncomeType = type;
+          const isSalary = type === '근로소득';
+          $('#fixed-inc-salary-section').hidden = !isSalary;
+          $('#fixed-inc-money-details').hidden = isSalary;
+          const rule = state.fixedIncomes.find((i) => i.id === state.editingFixedIncomeId);
+          $('#fixed-inc-money-details').innerHTML = isSalary ? '' : incomeMoneyDetailsHtml('fixed-inc', type, rule?.type === type ? incomeRecordDetails(rule) : null);
+          $('#fixed-inc-kind-details').innerHTML = incomeKindDetailsHtml('fixed-inc', type, rule?.type === type ? rule.taxDetails : {});
+          $('#fixed-inc-subtype').value = rule?.type === type ? rule.subtype || '' : '';
+          $('#fixed-inc-subtypes').innerHTML = (incomeSubtypes[type] || []).map((value) => `<option value="${esc(value)}"></option>`).join('');
           if (isSalary) updateSalarySummaryUI('fixed');
+          else updateIncomeMoneySummary('fixed-inc', type);
         }
         if (event.target.id === 'card-issuer') {
           Object.assign(state.cardRegistration, { issuer: event.target.value, issuerOther: '', query: '', searchDone: false, aiDone: false });
@@ -6298,6 +6931,7 @@
       $('#modal').addEventListener('cancel', () => {
         setTimeout(() => modalFocus?.focus(), 0);
       });
+      window.addEventListener('pagehide', () => clearExpenseAssist(false));
       window.addEventListener('hashchange', () => {
         state.view = 'normal';
         $('#view-state').value = 'normal';
