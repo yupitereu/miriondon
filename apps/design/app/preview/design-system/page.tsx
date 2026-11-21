@@ -1,5 +1,5 @@
-import { DesignSystemShowcase } from '@/components/DesignSystemShowcase';
-import { PreviewEntry, type PreviewSearchParams } from '@/components/PreviewEntry';
+import { DesignSystemShowcase } from '@/previews/design-system/DesignSystemShowcase';
+import { PreviewEntry, type PreviewSearchParams } from '@/workbench/PreviewEntry';
 
 export default function DesignSystemPreviewPage({ searchParams }: { searchParams: PreviewSearchParams }) {
   return (

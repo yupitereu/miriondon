@@ -1,5 +1,5 @@
-import { ExpenseEditPreview } from '@/components/ExpenseFormView';
-import { PreviewEntry, type PreviewSearchParams } from '@/components/PreviewEntry';
+import { ExpenseEditPreview } from '@/shared/expense-form/ExpenseFormView';
+import { PreviewEntry, type PreviewSearchParams } from '@/workbench/PreviewEntry';
 
 export default async function ExpenseEditPreviewPage({ searchParams }: { searchParams: PreviewSearchParams }) {
   const resolved = await searchParams;

@@ -31,14 +31,17 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   cn,
   useIsMobileView
 } from '@repo/ui-core';
 import { ArrowLeft, CircleHelp, Plus, Sparkles, X } from 'lucide-react';
-import * as React from 'react';
+import { useState, type SubmitEvent } from 'react';
 
-import { ExpenseAiAssist } from '@/components/ExpenseAiAssist';
-import { formatWon } from '@/lib/design-format';
+import { formatWon } from '@/shared/design-format';
+import { ExpenseAiAssist } from '@/shared/expense-form/ExpenseAiAssist';
 import {
   ACTUAL_USERS,
   CATEGORIES,
@@ -50,6 +53,8 @@ import {
   createInstallmentPreset,
   createLumpSumSplitPreset,
   createValidationAndLockPreset,
+  getDefaultPaymentStatusForMethod,
+  getDefaultTransferSourceAccountForMethod,
   formatInstallmentTypeLabel,
   getPaymentMethodMeta,
   isCompletedEditLocked,
@@ -63,7 +68,7 @@ import {
   type InstallmentType,
   type PaymentPlan,
   type PaymentStatus
-} from '@/lib/expense-form-model';
+} from '@/shared/expense-form/expense-form-model';
 
 export {
   computeExpensePreview,
@@ -93,8 +98,11 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
   const metrics = computeExpensePreview(draft);
   const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
   const doneLocked = isCompletedEditLocked(draft);
+  const laterRoundLocked = !doneLocked && draft.mode === 'edit' && draft.paymentPlan === 'installment' && (draft.initialInstallmentRound ?? draft.installmentRound ?? 1) >= 2;
+  const siblingRoundsLocked = !doneLocked && draft.mode === 'edit' && draft.paymentPlan === 'installment' && Boolean(draft.hasLockedSiblingRounds);
+  const baseFieldsLocked = doneLocked || laterRoundLocked || siblingRoundsLocked;
+  const recoveryLockedByInstallment = draft.paymentPlan === 'installment' && (draft.initialInstallmentRound ?? draft.installmentRound ?? 1) >= 2;
   const installmentAllowed = isCreditCardMethod(methodMeta);
-  const amountFieldsLocked = doneLocked || (draft.mode === 'edit' && draft.paymentPlan === 'installment');
   const validationErrors = validateExpenseDraft(draft);
 
   const handleAddSplit = () => {
@@ -140,11 +148,15 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
   const handlePaymentMethodChange = (nextMethod: string) => {
     const nextMeta = getPaymentMethodMeta(nextMethod);
     const shouldForceLumpSum = !isCreditCardMethod(nextMeta) && draft.paymentPlan === 'installment';
+    const nextStatus = draft.mode === 'create' ? getDefaultPaymentStatusForMethod(nextMeta, draft.viewedMonth) : draft.paymentStatus;
+    const needsConditionalTransferSource = (nextMeta.kind === 'account' || nextMeta.kind === 'cash') && nextStatus === '준비 필요';
     const nextDraft: ExpenseDraft = {
       ...draft,
       paymentMethod: nextMethod,
       actualUser: nextMeta.owner,
-      paymentPlan: shouldForceLumpSum ? 'lump-sum' : draft.paymentPlan
+      paymentPlan: shouldForceLumpSum ? 'lump-sum' : draft.paymentPlan,
+      paymentStatus: nextStatus,
+      transferSourceAccount: needsConditionalTransferSource ? getDefaultTransferSourceAccountForMethod(nextMeta) : undefined
     };
     onChange(syncSingleSplitDraft(nextDraft));
   };
@@ -198,12 +210,6 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
         </NoticeBox>
       ) : null}
 
-      {draft.isFixedExpenseGenerated ? (
-        <NoticeBox variant="info" className="text-xs">
-          고정 지출에서 자동 생성된 이 달 내역이에요. 여기서 수정한 내용은 이 달 건에만 반영되며 고정 지출 설정은 바뀌지 않아요.
-        </NoticeBox>
-      ) : null}
-
       {aiAppliedNotice ? (
         <NoticeBox variant="info" className="text-xs">
           {aiAppliedNotice}
@@ -250,7 +256,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
             <span className="text-xs font-semibold text-foreground">
               결제 수단 <span className="text-primary">*</span>
             </span>
-            <Select value={draft.paymentMethod} disabled={doneLocked} onValueChange={handlePaymentMethodChange}>
+            <Select value={draft.paymentMethod} disabled={baseFieldsLocked} onValueChange={handlePaymentMethodChange}>
               <SelectTrigger aria-label="결제 수단">
                 <SelectValue />
               </SelectTrigger>
@@ -313,7 +319,18 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                 </PopoverContent>
               </Popover>
             </div>
-            <Select value={draft.paymentStatus} onValueChange={(value) => onChange({ ...draft, paymentStatus: value as PaymentStatus })}>
+            <Select
+              value={draft.paymentStatus}
+              onValueChange={(value) => {
+                const nextStatus = value as PaymentStatus;
+                const needsTransferSource = (methodMeta.kind === 'account' || methodMeta.kind === 'cash') && nextStatus === '준비 필요';
+                onChange({
+                  ...draft,
+                  paymentStatus: nextStatus,
+                  transferSourceAccount: needsTransferSource ? (draft.transferSourceAccount ?? getDefaultTransferSourceAccountForMethod(methodMeta)) : undefined
+                });
+              }}
+            >
               <SelectTrigger aria-label="지불 상태">
                 <SelectValue />
               </SelectTrigger>
@@ -326,6 +343,29 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
           </div>
         </div>
 
+        {(methodMeta.kind === 'account' || methodMeta.kind === 'cash') && draft.paymentStatus === '준비 필요' ? (
+          <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-muted/35 p-3">
+            <label htmlFor={`${idPrefix}-transfer-source`} className="text-xs font-semibold text-foreground">
+              송금 계좌 <span className="font-normal text-muted-foreground">(준비할 돈을 보낼 계좌)</span>
+            </label>
+            <Select value={draft.transferSourceAccount ?? getDefaultTransferSourceAccountForMethod(methodMeta)} onValueChange={(value) => onChange({ ...draft, transferSourceAccount: value })}>
+              <SelectTrigger id={`${idPrefix}-transfer-source`} aria-label="송금 계좌">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPOSIT_ACCOUNTS.map((account) => (
+                  <SelectItem key={account} value={account}>
+                    {account}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground break-keep">
+              준비 필요 금액은 선택한 송금 계좌의 예상 잔액에 출금 예정으로 반영되며, 지불 관리에서 준비 처리 시 기본 송금 계좌로 제안돼요.
+            </p>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`${idPrefix}-approved`} className="text-xs font-semibold text-foreground">
@@ -334,7 +374,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
             <NumberInput
               id={`${idPrefix}-approved`}
               value={draft.approvedAmount}
-              disabled={amountFieldsLocked}
+              disabled={baseFieldsLocked}
               onValueChange={(value) => onChange(withAutoInstallmentPrincipal(draft, { ...draft, approvedAmount: value }))}
               suffix="원"
               placeholder="0"
@@ -349,7 +389,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
             <NumberInput
               id={`${idPrefix}-discount`}
               value={draft.cardDiscount}
-              disabled={amountFieldsLocked}
+              disabled={baseFieldsLocked}
               onValueChange={(value) => onChange(withAutoInstallmentPrincipal(draft, { ...draft, cardDiscount: value }))}
               suffix="원"
               placeholder="0"
@@ -369,7 +409,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
               <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
                 <button
                   type="button"
-                  disabled={draft.mode === 'edit'}
+                  disabled={baseFieldsLocked}
                   onClick={() => handleSelectPlan('lump-sum')}
                   className={cn(
                     'min-h-control-sm rounded-md text-xs font-bold transition-colors disabled:opacity-60',
@@ -380,7 +420,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                 </button>
                 <button
                   type="button"
-                  disabled={draft.mode === 'edit'}
+                  disabled={baseFieldsLocked}
                   onClick={() => handleSelectPlan('installment')}
                   className={cn(
                     'min-h-control-sm rounded-md text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45',
@@ -394,12 +434,20 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
 
             {draft.paymentPlan === 'installment' ? (
               <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/35 p-3">
+                {siblingRoundsLocked || laterRoundLocked ? (
+                  <NoticeBox variant="info" className="text-xs">
+                    {siblingRoundsLocked
+                      ? '지불 대기·지불 완료된 다른 회차가 있어 결제 수단·결제 금액·할인·납부방식·개월 수·회차는 잠겨 있어요. 할부 유형과 남은 회차의 납부원금·수수료는 수정할 수 있어요.'
+                      : '2회차 이후 회차는 원거래 기준(결제 수단·결제 금액·할인·납부방식·개월 수·회차)을 변경할 수 없어요. 할부 유형과 납부원금·수수료는 수정할 수 있어요.'}
+                  </NoticeBox>
+                ) : null}
+
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                   <div className="col-span-2 flex flex-col gap-1 md:col-span-1">
                     <span className="text-xs font-semibold text-foreground">할부 유형</span>
                     <Select
                       value={draft.installmentType}
-                      disabled={draft.mode === 'edit'}
+                      disabled={doneLocked}
                       onValueChange={(value) => {
                         const nextType = value as InstallmentType;
                         onChange(
@@ -428,7 +476,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                     <NumberInput
                       id={`${idPrefix}-inst-months`}
                       value={draft.installmentMonths}
-                      disabled={draft.mode === 'edit'}
+                      disabled={baseFieldsLocked}
                       onValueChange={(value) => onChange(withAutoInstallmentPrincipal(draft, { ...draft, installmentMonths: value }))}
                       suffix="개월"
                       placeholder="3"
@@ -442,7 +490,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                     <NumberInput
                       id={`${idPrefix}-inst-round`}
                       value={draft.installmentRound}
-                      disabled={draft.mode === 'edit'}
+                      disabled={baseFieldsLocked}
                       onValueChange={(value) => onChange(withAutoInstallmentPrincipal(draft, { ...draft, installmentRound: value }))}
                       suffix="회차"
                       placeholder="1"
@@ -456,7 +504,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                       <label htmlFor={`${idPrefix}-inst-principal`} className="text-xs font-semibold text-foreground">
                         이번 회차 납부원금
                       </label>
-                      {metrics.recommendedPrincipal > 0 && (draft.installmentPrincipal ?? null) !== metrics.recommendedPrincipal ? (
+                      {!doneLocked && metrics.recommendedPrincipal > 0 && (draft.installmentPrincipal ?? null) !== metrics.recommendedPrincipal ? (
                         <button
                           type="button"
                           onClick={() => onChange(syncSingleSplitDraft({ ...draft, installmentPrincipal: metrics.recommendedPrincipal }))}
@@ -469,6 +517,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                     <NumberInput
                       id={`${idPrefix}-inst-principal`}
                       value={draft.installmentPrincipal}
+                      disabled={doneLocked}
                       onValueChange={(value) => onChange(syncSingleSplitDraft({ ...draft, installmentPrincipal: value }))}
                       suffix="원"
                       placeholder="0"
@@ -482,7 +531,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                     <NumberInput
                       id={`${idPrefix}-inst-fee`}
                       value={draft.installmentType === 'interest-free' ? 0 : draft.installmentFee}
-                      disabled={draft.installmentType === 'interest-free'}
+                      disabled={doneLocked || draft.installmentType === 'interest-free'}
                       onValueChange={(value) => onChange(syncSingleSplitDraft({ ...draft, installmentFee: value }))}
                       suffix="원"
                       placeholder="0"
@@ -498,124 +547,154 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
                 <p className="text-[11px] leading-relaxed text-muted-foreground break-keep tabular-nums">
                   총 승인 {formatWon(metrics.approved)} 중 {formatInstallmentTypeLabel(draft.installmentType)} {metrics.round}/{metrics.months}회차(
                   {formatWon(metrics.installmentRoundTotal)})가 이번 달 생활비에 반영돼요.
-                  {draft.installmentType === 'interest-free' && metrics.round === 1 && metrics.interestFreeRemainder > 0 && draft.installmentPrincipal === metrics.recommendedPrincipal
+                  {draft.installmentType === 'interest-free' && metrics.round === 1 && metrics.interestFreeRemainder > 0 && metrics.principal === metrics.recommendedPrincipal
                     ? ` (원 단위 나머지 ${formatWon(metrics.interestFreeRemainder)} 첫 회차 포함)`
                     : ''}
                 </p>
+
+                {metrics.principal > metrics.availablePrincipalBalance ? (
+                  <p className="text-[11px] font-semibold text-destructive break-keep tabular-nums">
+                    이번 회차 납부원금이 남은 원금 잔액({formatWon(metrics.availablePrincipalBalance)})을 초과했어요.
+                  </p>
+                ) : metrics.remainingAfterCurrentCount > 0 && metrics.principal > 0 ? (
+                  <p className="text-[11px] text-primary break-keep tabular-nums">
+                    저장 시 남은 {metrics.remainingAfterCurrentCount}개 회차 납부원금이 월 {formatWon(metrics.nextRemainingPrincipalPerMonth)}
+                    {metrics.nextRemainingRemainder > 0 ? ` (다음 회차 +${formatWon(metrics.nextRemainingRemainder)})` : ''} · 잔여 원금 {formatWon(metrics.remainingAfterCurrentBalance)}으로
+                    재계산돼요.
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </>
         ) : null}
 
         {/* 지출 분류 */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-foreground">
-              지출 분류 <span className="text-primary">*</span>
-            </span>
-            {draft.splits.length > 1 && splitExpected > 0 ? (
-              <span className={cn('text-[11px] font-medium tabular-nums', splitDiff === 0 ? 'text-muted-foreground' : 'text-destructive')}>
-                {splitDiff === 0 ? '합계 일치' : `기준 대비 ${formatWon(Math.abs(splitDiff))} 차이`}
-              </span>
-            ) : null}
-          </div>
+        {(() => {
+          const hasMultiSplits = draft.splits.length > 1;
+          const splitGridColsClass = hasMultiSplits
+            ? 'min-[360px]:grid-cols-[minmax(64px,0.8fr)_minmax(0,1.2fr)_minmax(0,1.05fr)_22px] md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_28px]'
+            : 'min-[360px]:grid-cols-[minmax(64px,0.8fr)_minmax(0,1.2fr)_minmax(0,1.05fr)] md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]';
 
-          <div className="hidden grid-cols-[minmax(64px,0.8fr)_minmax(0,1.2fr)_minmax(0,1.05fr)_22px] gap-1 px-0.5 text-[11px] font-medium text-muted-foreground min-[360px]:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_28px] md:gap-1.5">
-            <span>분류</span>
-            <span className="md:hidden">금액</span>
-            <span className="hidden md:inline">금액 (할인 전)</span>
-            <span className="md:hidden">할인</span>
-            <span className="hidden md:inline">할인 금액</span>
-            <span className="sr-only">삭제</span>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            {draft.splits.map((split, index) => (
-              <div
-                key={split.id}
-                className="grid grid-cols-2 items-center gap-1 rounded-lg border border-border/70 p-2 min-[360px]:grid-cols-[minmax(64px,0.8fr)_minmax(0,1.2fr)_minmax(0,1.05fr)_22px] min-[360px]:rounded-none min-[360px]:border-0 min-[360px]:p-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_28px] md:gap-1.5"
-              >
-                <div className="col-span-2 flex items-center gap-1.5 min-[360px]:contents">
-                  <Select
-                    value={split.category || undefined}
-                    onValueChange={(val) =>
-                      onChange({
-                        ...draft,
-                        splits: draft.splits.map((row) => (row.id === split.id ? { ...row, category: val } : row))
-                      })
-                    }
-                  >
-                    <SelectTrigger size="md" wrapperClassName="min-w-0 flex-1" aria-label={`분류 ${index + 1}`} className="px-2 text-xs md:px-3 md:text-sm">
-                      <SelectValue placeholder="분류 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <button
-                    type="button"
-                    aria-label="분류 행 삭제"
-                    disabled={draft.splits.length <= 1 || doneLocked}
-                    onClick={() => {
-                      const remaining = draft.splits.filter((row) => row.id !== split.id);
-                      onChange(syncSingleSplitDraft({ ...draft, splits: remaining }));
-                    }}
-                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30 min-[360px]:order-last"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-
-                <NumberInput
-                  aria-label={`분류 금액 ${index + 1}`}
-                  value={split.amount}
-                  disabled={doneLocked}
-                  onValueChange={(value) =>
-                    onChange({
-                      ...draft,
-                      splits: draft.splits.map((row) => (row.id === split.id ? { ...row, amount: value } : row))
-                    })
-                  }
-                  suffix="원"
-                  placeholder="0"
-                  className="px-2 text-xs md:px-3 md:text-sm"
-                />
-
-                <NumberInput
-                  aria-label={`분류 할인 ${index + 1}`}
-                  value={draft.paymentPlan === 'installment' ? 0 : split.discount}
-                  disabled={doneLocked || draft.paymentPlan === 'installment'}
-                  onValueChange={(value) =>
-                    onChange({
-                      ...draft,
-                      splits: draft.splits.map((row) => (row.id === split.id ? { ...row, discount: value } : row))
-                    })
-                  }
-                  suffix="원"
-                  placeholder="0"
-                  className="px-2 text-xs md:px-3 md:text-sm"
-                />
+          return (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-foreground">
+                  지출 분류 <span className="text-primary">*</span>
+                </span>
+                <Button type="button" variant="outline" size="sm" disabled={doneLocked} onClick={handleAddSplit} className="gap-1">
+                  <Plus className="size-3.5" />
+                  <span>분류 추가</span>
+                </Button>
               </div>
-            ))}
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-0.5">
-            <Button type="button" variant="outline" size="sm" disabled={doneLocked} onClick={handleAddSplit} className="gap-1">
-              <Plus className="size-3.5" />
-              <span>분류 추가</span>
-            </Button>
-            {draft.paymentPlan !== 'installment' && draft.splits.length > 1 ? (
-              <Button type="button" variant="secondary" size="sm" disabled={doneLocked || metrics.discount <= 0} onClick={handleDistributeDiscount}>
-                할인 자동 배분
-              </Button>
-            ) : null}
-          </div>
-        </div>
+              <div className={cn('hidden gap-1 px-0.5 text-[11px] font-medium text-muted-foreground min-[360px]:grid md:gap-1.5', splitGridColsClass)}>
+                <span>분류</span>
+                <span className="md:hidden">금액</span>
+                <span className="hidden md:inline">금액 (할인 전)</span>
+                <span className="md:hidden">할인</span>
+                <span className="hidden md:inline">할인 금액</span>
+                {hasMultiSplits ? <span className="sr-only">삭제</span> : null}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {draft.splits.map((split, index) => (
+                  <div
+                    key={split.id}
+                    className={cn(
+                      'grid grid-cols-2 items-center gap-1 rounded-lg border border-border/70 p-2 min-[360px]:rounded-none min-[360px]:border-0 min-[360px]:p-0 md:gap-1.5',
+                      splitGridColsClass
+                    )}
+                  >
+                    <div className="col-span-2 flex items-center gap-1.5 min-[360px]:contents">
+                      <Select
+                        value={split.category || undefined}
+                        onValueChange={(val) =>
+                          onChange({
+                            ...draft,
+                            splits: draft.splits.map((row) => (row.id === split.id ? { ...row, category: val } : row))
+                          })
+                        }
+                      >
+                        <SelectTrigger size="md" wrapperClassName="min-w-0 flex-1" aria-label={`분류 ${index + 1}`} className="px-2 text-xs md:px-3 md:text-sm">
+                          <SelectValue placeholder="분류 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {hasMultiSplits ? (
+                        <button
+                          type="button"
+                          aria-label="분류 행 삭제"
+                          disabled={doneLocked}
+                          onClick={() => {
+                            const remaining = draft.splits.filter((row) => row.id !== split.id);
+                            onChange(syncSingleSplitDraft({ ...draft, splits: remaining }));
+                          }}
+                          className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30 min-[360px]:order-last"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <NumberInput
+                      aria-label={`분류 금액 ${index + 1}`}
+                      value={split.amount}
+                      disabled={doneLocked}
+                      onValueChange={(value) =>
+                        onChange({
+                          ...draft,
+                          splits: draft.splits.map((row) => (row.id === split.id ? { ...row, amount: value } : row))
+                        })
+                      }
+                      suffix="원"
+                      placeholder="0"
+                      className="px-2 text-xs md:px-3 md:text-sm"
+                    />
+
+                    <NumberInput
+                      aria-label={`분류 할인 ${index + 1}`}
+                      value={draft.paymentPlan === 'installment' ? 0 : split.discount}
+                      disabled={doneLocked || draft.paymentPlan === 'installment'}
+                      onValueChange={(value) =>
+                        onChange({
+                          ...draft,
+                          splits: draft.splits.map((row) => (row.id === split.id ? { ...row, discount: value } : row))
+                        })
+                      }
+                      suffix="원"
+                      placeholder="0"
+                      className="px-2 text-xs md:px-3 md:text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {hasMultiSplits && (splitExpected > 0 || draft.paymentPlan !== 'installment') ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                  {splitExpected > 0 ? (
+                    <span className={cn('text-[11px] font-medium tabular-nums', splitDiff === 0 ? 'text-muted-foreground' : 'text-destructive')}>
+                      {splitDiff === 0 ? '합계 일치' : `기준 대비 ${formatWon(Math.abs(splitDiff))} 차이`}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  {draft.paymentPlan !== 'installment' ? (
+                    <Button type="button" variant="secondary" size="sm" disabled={doneLocked || metrics.discount <= 0} onClick={handleDistributeDiscount}>
+                      할인 자동 배분
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          );
+        })()}
 
         {methodMeta.kind === 'card' ? (
           <div className="pt-0.5">
@@ -634,14 +713,32 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
       <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 md:p-4">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-foreground">회수 금액 (받을 돈)</h3>
-          <Button type="button" variant="outline" size="sm" onClick={handleAddRecovery} className="gap-1">
-            <Plus className="size-3.5" />
-            <span>회수 상대 추가</span>
-          </Button>
+          {recoveryLockedByInstallment ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0} className="inline-flex shrink-0 cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
+                  <Button type="button" variant="outline" size="sm" disabled className="gap-1">
+                    <Plus className="size-3.5" />
+                    <span>회수 상대 추가</span>
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end">
+                할부 거래의 회수 금액은 1회차(승인월)에서만 연결할 수 있어요.
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={handleAddRecovery} className="gap-1">
+              <Plus className="size-3.5" />
+              <span>회수 상대 추가</span>
+            </Button>
+          )}
         </div>
 
         {draft.recoveries.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground">함께 결제하고 나눠 받을 금액이 있으면 `+ 회수 상대 추가`로 기록할 수 있어요.</p>
+          <p className="rounded-lg border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground">
+            {recoveryLockedByInstallment ? '할부 회수 금액은 1회차(승인월) 거래에서만 기록할 수 있어요.' : '함께 결제하고 나눠 받을 금액이 있으면 `+ 회수 상대 추가`로 기록할 수 있어요.'}
+          </p>
         ) : (
           <div className="flex flex-col gap-2.5">
             {draft.recoveries.map((rec, index) => {
@@ -840,6 +937,12 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
         </div>
       </section>
 
+      {draft.isFixedExpenseGenerated ? (
+        <NoticeBox variant="info" className="text-xs">
+          고정 지출에서 자동 생성된 이 달 내역이에요. 여기서 수정한 내용은 이 달 건에만 반영되며 고정 지출 설정은 바뀌지 않아요.
+        </NoticeBox>
+      ) : null}
+
       {showValidationErrors && validationErrors.length > 0 ? (
         <NoticeBox variant="error" className="text-xs">
           <ul className="list-disc space-y-0.5 pl-4">
@@ -859,14 +962,60 @@ type ExpenseFormOverlayProps = {
   draft: ExpenseDraft;
   onDraftChange: (next: ExpenseDraft) => void;
   onSave: (draft: ExpenseDraft) => void;
+  onDelete?: (draft: ExpenseDraft) => void;
 };
 
-export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, onSave }: ExpenseFormOverlayProps) => {
+export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, onSave, onDelete }: ExpenseFormOverlayProps) => {
   const isMobile = useIsMobileView();
-  const [showValidationErrors, setShowValidationErrors] = React.useState(false);
-  const [aiOpen, setAiOpen] = React.useState(false);
-  const [aiNotice, setAiNotice] = React.useState<string | null>(null);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
   const title = aiOpen ? 'AI로 초안 작성' : draft.mode === 'edit' ? '지출 수정' : '지출 입력';
+  const showDeleteButton = draft.mode === 'edit' && Boolean(onDelete);
+  const currentInitialStatus = draft.initialPaymentStatus ?? draft.paymentStatus;
+  const deleteDisabledReason =
+    currentInitialStatus !== '준비 필요'
+      ? `${currentInitialStatus} 상태의 거래는 삭제할 수 없어요. 지불 상태를 '준비 필요'로 먼저 변경해 저장해 주세요.`
+      : draft.paymentPlan === 'installment' && (draft.initialInstallmentRound ?? draft.installmentRound ?? 1) >= 2
+        ? '2회차 이후 할부 거래는 삭제할 수 없어요.'
+        : draft.recoveries.some((rec) => (rec.receivedAmount ?? 0) > 0)
+          ? '이미 회수한 금액이 기록된 지출은 삭제할 수 없어요. 회수한 금액을 0원으로 먼저 정정해 주세요.'
+          : null;
+
+  const renderDeleteButton = (size: 'lg' | 'md') => {
+    if (!showDeleteButton) {
+      return null;
+    }
+
+    const buttonClassName = cn('border-destructive/40 text-destructive hover:bg-destructive-tint hover:text-destructive', size === 'lg' && 'px-3.5');
+
+    if (!deleteDisabledReason) {
+      return (
+        <Button type="button" variant="outline" size={size} className={cn('shrink-0', buttonClassName)} onClick={() => onDelete?.(draft)}>
+          삭제
+        </Button>
+      );
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            aria-label={`삭제 불가: ${deleteDisabledReason}`}
+            className="inline-flex shrink-0 cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          >
+            <Button type="button" variant="outline" size={size} disabled className={buttonClassName}>
+              삭제
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start">
+          {deleteDisabledReason}
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -877,7 +1026,7 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
     onOpenChange(nextOpen);
   };
 
-  const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const errors = validateExpenseDraft(draft);
     if (errors.length > 0) {
@@ -935,6 +1084,7 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
                 />
               </SheetBody>
               <SheetFooter className="flex-row gap-2">
+                {renderDeleteButton('lg')}
                 <Button type="button" variant="outline" size="lg" className="flex-1" onClick={() => handleOpenChange(false)}>
                   취소
                 </Button>
@@ -986,13 +1136,16 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
                 showValidationErrors={showValidationErrors}
               />
             </DialogBody>
-            <DialogFooter>
-              <Button type="button" variant="outline" size="md" onClick={() => handleOpenChange(false)}>
-                취소
-              </Button>
-              <Button type="submit" variant="primary" size="md">
-                지출 저장
-              </Button>
+            <DialogFooter className={showDeleteButton ? 'sm:justify-between' : undefined}>
+              {renderDeleteButton('md')}
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="md" onClick={() => handleOpenChange(false)}>
+                  취소
+                </Button>
+                <Button type="submit" variant="primary" size="md">
+                  지출 저장
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         )}
@@ -1017,11 +1170,11 @@ const normalizePreviewPreset = (value?: string): ExpensePreviewPreset => {
 
 export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }) => {
   const resolvedInitial = normalizePreviewPreset(initialPreset);
-  const [preset, setPreset] = React.useState<ExpensePreviewPreset>(resolvedInitial);
-  const [draft, setDraft] = React.useState<ExpenseDraft>(() => PRESET_MAP[resolvedInitial].createDraft());
-  const [showValidationErrors, setShowValidationErrors] = React.useState<boolean>(() => PRESET_MAP[resolvedInitial].showErrors);
-  const [aiOpen, setAiOpen] = React.useState<boolean>(() => resolvedInitial === 'ai-review');
-  const [aiNotice, setAiNotice] = React.useState<string | null>(null);
+  const [preset, setPreset] = useState<ExpensePreviewPreset>(resolvedInitial);
+  const [draft, setDraft] = useState<ExpenseDraft>(() => PRESET_MAP[resolvedInitial].createDraft());
+  const [showValidationErrors, setShowValidationErrors] = useState<boolean>(() => PRESET_MAP[resolvedInitial].showErrors);
+  const [aiOpen, setAiOpen] = useState<boolean>(() => resolvedInitial === 'ai-review');
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
 
   const handleSelectPreset = (nextPreset: ExpensePreviewPreset) => {
     setPreset(nextPreset);
@@ -1031,7 +1184,7 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
     setAiNotice(null);
   };
 
-  const handleSave = async (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSave = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const errors = validateExpenseDraft(draft);
     if (errors.length > 0) {

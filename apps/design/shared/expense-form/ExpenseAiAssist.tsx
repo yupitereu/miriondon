@@ -2,10 +2,10 @@
 
 import { Badge, Button, Checkbox, NoticeBox, cn } from '@repo/ui-core';
 import { ImagePlus, Loader2, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
-import * as React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { formatWon } from '@/lib/design-format';
-import { DEFAULT_VIEWED_MONTH, getPaymentMethodMeta, isCompletedEditLocked, type ExpenseCategorySplit, type ExpenseDraft } from '@/lib/expense-form-model';
+import { formatWon } from '@/shared/design-format';
+import { DEFAULT_VIEWED_MONTH, getPaymentMethodMeta, isCompletedEditLocked, type ExpenseCategorySplit, type ExpenseDraft } from '@/shared/expense-form/expense-form-model';
 
 type AssistScenarioId = 'simple' | 'split' | 'duplicate';
 type AssistStage = 'input' | 'loading' | 'review' | 'error';
@@ -134,29 +134,29 @@ type ProposalItem = {
 };
 
 export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenReview = false }: ExpenseAiAssistProps) => {
-  const [stage, setStage] = React.useState<AssistStage>(defaultOpenReview ? 'review' : 'input');
-  const [scenario, setScenario] = React.useState<AssistScenarioId>(defaultOpenReview ? 'split' : 'simple');
-  const [text, setText] = React.useState(defaultOpenReview ? '11/04 예시 마트에서 현대카드로 100,000원 결제(할인 5,000원), 식비 80,000원 · 생활 20,000원' : '');
-  const [imageFile, setImageFile] = React.useState<{ name: string; url: string; size: number } | null>(null);
-  const [errorKind, setErrorKind] = React.useState<AssistErrorKind>(null);
-  const [errorMessage, setErrorMessage] = React.useState('');
-  const [candidate, setCandidate] = React.useState<AiDraftCandidate | null>(() => (defaultOpenReview ? buildSyntheticCandidate('split', draft) : null));
-  const [reviewSnapshot, setReviewSnapshot] = React.useState<string | null>(() => (defaultOpenReview ? createFormSnapshot(draft) : null));
-  const [duplicateConfirmed, setDuplicateConfirmed] = React.useState(false);
-  const [isDragging, setIsDragging] = React.useState(false);
+  const [stage, setStage] = useState<AssistStage>(defaultOpenReview ? 'review' : 'input');
+  const [scenario, setScenario] = useState<AssistScenarioId>(defaultOpenReview ? 'split' : 'simple');
+  const [text, setText] = useState(defaultOpenReview ? '11/04 예시 마트에서 현대카드로 100,000원 결제(할인 5,000원), 식비 80,000원 · 생활 20,000원' : '');
+  const [imageFile, setImageFile] = useState<{ name: string; url: string; size: number } | null>(null);
+  const [errorKind, setErrorKind] = useState<AssistErrorKind>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [candidate, setCandidate] = useState<AiDraftCandidate | null>(() => (defaultOpenReview ? buildSyntheticCandidate('split', draft) : null));
+  const [reviewSnapshot, setReviewSnapshot] = useState<string | null>(() => (defaultOpenReview ? createFormSnapshot(draft) : null));
+  const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const timerRef = React.useRef<number | null>(null);
-  const imageUrlRef = React.useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<number | null>(null);
+  const imageUrlRef = useRef<string | null>(null);
 
-  const revokeImage = React.useCallback(() => {
+  const revokeImage = useCallback(() => {
     if (imageUrlRef.current) {
       URL.revokeObjectURL(imageUrlRef.current);
       imageUrlRef.current = null;
     }
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (timerRef.current !== null) {
         window.clearTimeout(timerRef.current);

@@ -51,17 +51,20 @@ import {
   Tabs,
   TabsContent,
   TabsList,
-  TabsTrigger
+  TabsTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from '@repo/ui-core';
 import { ChevronRight, SearchX } from 'lucide-react';
-import * as React from 'react';
+import { useState } from 'react';
 
-import { CardPerformanceCard, type CardPerformanceItem } from '@/components/CardPerformanceCard';
+import { CardPerformanceCard, type CardPerformanceItem } from '@/shared/CardPerformanceCard';
 
 const STANDARD_CARD_TIERS = [
-  { step: 1, threshold: 300000, benefit: '생활 영역 할인', monthlyLimitText: '월 한도 10,000원' },
-  { step: 2, threshold: 600000, benefit: '생활 영역 할인', monthlyLimitText: '월 한도 20,000원' },
-  { step: 3, threshold: 1000000, benefit: '생활 영역 할인', monthlyLimitText: '월 한도 30,000원' }
+  { step: 1, threshold: 300000, benefits: [{ name: '생활 영역 할인', limit: '월 한도 10,000원' }] },
+  { step: 2, threshold: 600000, benefits: [{ name: '생활 영역 할인', limit: '월 한도 20,000원' }] },
+  { step: 3, threshold: 1000000, benefits: [{ name: '생활 영역 할인', limit: '월 한도 30,000원' }] }
 ];
 
 const CARD_PERFORMANCE_STATES: Array<{ stateLabel: string; card: CardPerformanceItem }> = [
@@ -148,22 +151,22 @@ const getSampleMonthStatus = ({ year, month }: { year: number; month?: number })
 type CatalogTab = 'all' | 'tokens' | 'ui-core' | 'ui-composition' | 'patterns';
 
 export const DesignSystemShowcase = () => {
-  const [catalogTab, setCatalogTab] = React.useState<CatalogTab>('all');
-  const [textValue, setTextValue] = React.useState('식비 · 점심 회식');
-  const [amountValue, setAmountValue] = React.useState<number | null>(48000);
-  const [selectValue, setSelectValue] = React.useState('shinhan');
-  const [checked, setChecked] = React.useState(true);
-  const [switched, setSwitched] = React.useState(true);
-  const [segmentTab, setSegmentTab] = React.useState('monthly');
-  const [underlineTab, setUnderlineTab] = React.useState('pending');
-  const [pickedDate, setPickedDate] = React.useState<Date | null>(() => new Date(2026, 10, 15));
-  const [calendarDate, setCalendarDate] = React.useState<Date | undefined>(() => new Date(2026, 10, 15));
-  const [periodMonth, setPeriodMonth] = React.useState<PeriodMonthValue>({ year: 2026, month: 11 });
-  const [periodYear, setPeriodYear] = React.useState(2026);
-  const [dialogResult, setDialogResult] = React.useState<string>('대기 중');
-  const [searchValue, setSearchValue] = React.useState('점심');
-  const [periodScope, setPeriodScope] = React.useState<'all' | 'current' | 'past'>('all');
-  const [selectedCategories, setSelectedCategories] = React.useState<Set<string>>(() => new Set(['식비']));
+  const [catalogTab, setCatalogTab] = useState<CatalogTab>('all');
+  const [textValue, setTextValue] = useState('식비 · 점심 회식');
+  const [amountValue, setAmountValue] = useState<number | null>(48000);
+  const [selectValue, setSelectValue] = useState('shinhan');
+  const [checked, setChecked] = useState(true);
+  const [switched, setSwitched] = useState(true);
+  const [segmentTab, setSegmentTab] = useState('monthly');
+  const [underlineTab, setUnderlineTab] = useState('pending');
+  const [pickedDate, setPickedDate] = useState<Date | null>(() => new Date(2026, 10, 15));
+  const [calendarDate, setCalendarDate] = useState<Date | undefined>(() => new Date(2026, 10, 15));
+  const [periodMonth, setPeriodMonth] = useState<PeriodMonthValue>({ year: 2026, month: 11 });
+  const [periodYear, setPeriodYear] = useState(2026);
+  const [dialogResult, setDialogResult] = useState<string>('대기 중');
+  const [searchValue, setSearchValue] = useState('점심');
+  const [periodScope, setPeriodScope] = useState<'all' | 'current' | 'past'>('all');
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set(['식비']));
 
   const sampleFilterOptions = ['식비', '카페·간식', '생활용품', '고정지출'] as const;
   const samplePeriodOptions = [
@@ -421,6 +424,26 @@ export const DesignSystemShowcase = () => {
                   </PopoverTrigger>
                   <PopoverContent className="w-60 text-xs text-muted-foreground">상승 표면(--surface-elevated) 기반 팝오버입니다.</PopoverContent>
                 </Popover>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="md">
+                      Tooltip
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>마우스 호버 또는 포커스 시 짧은 안내를 표시합니다.</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span tabIndex={0} className="inline-flex cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
+                      <Button variant="outline" size="md" disabled className="border-destructive/40 text-destructive">
+                        비활성 삭제
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>비활성 버튼도 래퍼를 통해 사유를 안내할 수 있어요.</TooltipContent>
+                </Tooltip>
               </CardFooter>
             </Card>
 

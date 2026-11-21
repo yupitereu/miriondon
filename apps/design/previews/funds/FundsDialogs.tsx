@@ -20,11 +20,11 @@ import {
   SelectValue,
   cn
 } from '@repo/ui-core';
-import * as React from 'react';
+import { useMemo, useState, type SubmitEvent } from 'react';
 
-import type { AccountBalanceDelta, AccountBalanceTransfer } from '@/lib/design-assets-store';
-import { formatSignedWon, formatWon } from '@/lib/design-format';
-import { getFundAccountMeta, type FundAccountGroupSummary, type FundAccountId } from '@/lib/funds-model';
+import { getFundAccountMeta, type FundAccountGroupSummary, type FundAccountId } from '@/previews/funds/funds-model';
+import type { AccountBalanceDelta, AccountBalanceTransfer } from '@/shared/design-assets-store';
+import { formatSignedWon, formatWon } from '@/shared/design-format';
 
 type AdjustmentEditDialogProps = {
   open: boolean;
@@ -37,14 +37,14 @@ type AdjustmentEditDialogProps = {
 
 export const AdjustmentEditDialog = ({ open, onOpenChange, initialAccountId, adjustments, groupTotals, onSave }: AdjustmentEditDialogProps) => {
   const account = getFundAccountMeta(initialAccountId);
-  const [amount, setAmount] = React.useState<number | null>(() => adjustments[initialAccountId] ?? 0);
-  const [memo, setMemo] = React.useState('');
+  const [amount, setAmount] = useState<number | null>(() => adjustments[initialAccountId] ?? 0);
+  const [memo, setMemo] = useState('');
 
   const signedAdjustment = Math.trunc(amount ?? 0);
   const baseTotal = groupTotals[initialAccountId] ?? 0;
   const previewNeeded = Math.max(0, baseTotal + signedAdjustment);
 
-  const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSave(initialAccountId, signedAdjustment);
     onOpenChange(false);
@@ -188,7 +188,7 @@ type BalanceChangeEntry = {
 };
 
 const CombinedBalanceSummary = ({ changes }: { changes: BalanceChangeEntry[] }) => {
-  const summaries = React.useMemo(() => {
+  const summaries = useMemo(() => {
     const map = new Map<string, { accountId: string; name: string; before: number; netDelta: number; count: number }>();
     for (const entry of changes) {
       const existing = map.get(entry.accountId);
@@ -251,16 +251,21 @@ type PrepareConfirmDialogProps = {
 };
 
 export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups, accountBalances, sourceAccounts, onConfirm }: PrepareConfirmDialogProps) => {
-  const [syncMap, setSyncMap] = React.useState<AccountSyncState>({});
+  const [syncMap, setSyncMap] = useState<AccountSyncState>({});
 
   const canGroupTransfer = (group: FundAccountGroupSummary) => (group.account.isCash || !group.account.sameAsLivingBudget) && group.needed > 0;
   const hasAnyBalanceSync = groups.some((group) => canGroupTransfer(group) && syncMap[group.account.id]?.enabled);
 
-  const handleToggleSync = (accountId: FundAccountId, enabled: boolean) => {
+  const handleToggleSync = (group: FundAccountGroupSummary, enabled: boolean) => {
+    const accountId = group.account.id;
     const toAssetId = getAssetIdForFundAccount(accountId);
     setSyncMap((prev) => {
       const existing = prev[accountId];
-      const fallbackSource = sourceAccounts.find((acc) => acc.id !== toAssetId)?.id ?? 'account-living';
+      const preferredSource =
+        group.defaultTransferSourceId && group.defaultTransferSourceId !== toAssetId && sourceAccounts.some((acc) => acc.id === group.defaultTransferSourceId)
+          ? group.defaultTransferSourceId
+          : undefined;
+      const fallbackSource = preferredSource ?? sourceAccounts.find((acc) => acc.id !== toAssetId)?.id ?? 'account-living';
       return {
         ...prev,
         [accountId]: {
@@ -281,7 +286,7 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
     }));
   };
 
-  const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const transfers: AccountBalanceTransfer[] = [];
     for (const group of groups) {
@@ -358,10 +363,10 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
 
                   {canTransfer ? (
                     <AccountBalanceSyncSection
-                      selectAriaLabel={`${group.account.name} 출금 계좌`}
-                      selectLabel="출금 계좌"
+                      selectAriaLabel={`${group.account.name} 송금 계좌`}
+                      selectLabel={group.defaultTransferSourceId ? '송금 계좌 (카드 연결 자동 선택)' : group.hasMixedTransferSources ? '송금 계좌 (카드별 송금 계좌 상이 · 직접 선택)' : '송금 계좌'}
                       isEnabled={isEnabled}
-                      onToggle={(checked) => handleToggleSync(group.account.id, checked)}
+                      onToggle={(checked) => handleToggleSync(group, checked)}
                       selectedAccount={selectedSource}
                       eligibleAccounts={eligibleSources}
                       onChangeAccount={(value) => handleChangeSource(group.account.id, value)}
@@ -383,7 +388,7 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
             <CombinedBalanceSummary changes={prepareChanges} />
 
             <NoticeBox variant="info" className="text-xs">
-              {hasAnyBalanceSync ? '잔액 반영을 선택하면 출금 계좌에서 차감해 결제 계좌·현금 잔액에 더해요.' : '지불 상태만 바뀌며 계좌·현금 잔액은 변경되지 않아요.'}
+              {hasAnyBalanceSync ? '잔액 반영을 선택하면 송금 계좌에서 차감해 결제 계좌·현금 잔액에 더해요.' : '지불 상태만 바뀌며 계좌·현금 잔액은 변경되지 않아요.'}
             </NoticeBox>
           </DialogBody>
 
@@ -412,7 +417,7 @@ type CompleteConfirmDialogProps = {
 };
 
 export const CompleteConfirmDialog = ({ open, onOpenChange, selectedCount, groups, accountBalances, sourceAccounts, onConfirm }: CompleteConfirmDialogProps) => {
-  const [syncMap, setSyncMap] = React.useState<AccountSyncState>({});
+  const [syncMap, setSyncMap] = useState<AccountSyncState>({});
 
   const getDefaultSourceId = (accountId: FundAccountId): string => {
     const mappedAssetId = getAssetIdForFundAccount(accountId);
@@ -444,7 +449,7 @@ export const CompleteConfirmDialog = ({ open, onOpenChange, selectedCount, group
     }));
   };
 
-  const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const deductions: AccountBalanceDelta[] = [];
     for (const group of groups) {
@@ -573,7 +578,7 @@ export const ReleaseToPrepareDialog = ({
   sourceAccounts,
   onConfirm
 }: ReleaseToPrepareDialogProps) => {
-  const [syncMap, setSyncMap] = React.useState<AccountSyncState>({});
+  const [syncMap, setSyncMap] = useState<AccountSyncState>({});
 
   const isFromCompleted = fromStatus === '지불 완료';
 
@@ -625,7 +630,7 @@ export const ReleaseToPrepareDialog = ({
     }));
   };
 
-  const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const transfers: AccountBalanceTransfer[] = [];
     const credits: AccountBalanceDelta[] = [];

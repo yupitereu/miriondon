@@ -1,5 +1,5 @@
-import { ExpensesPreview } from '@/components/ExpensesPreview';
-import { PreviewEntry, type PreviewSearchParams } from '@/components/PreviewEntry';
+import { ExpensesPreview } from '@/previews/expenses/ExpensesPreview';
+import { PreviewEntry, type PreviewSearchParams } from '@/workbench/PreviewEntry';
 
 export default function ExpensesPreviewPage({ searchParams }: { searchParams: PreviewSearchParams }) {
   return (

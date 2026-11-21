@@ -16,8 +16,9 @@ description: Create, update, and verify Miriondon screen previews, responsive la
    - 기본 UI는 `@repo/ui-core`, 복합 UI는 `@repo/ui-composition`의 공개 export를 우선 사용합니다.
    - `apps/design` 내부에서 여러 시안이 공유하는 레이아웃 셸·필터·폼·포맷터(`DesignAppShell`, `FilterMultiSelect`/`FilterSingleSelect` 등)를 우선 재사용하고, 시안 범위 밖의 월별·서버급 분기 과구현은 피합니다.
 2. **시안 페이지 등록**:
-   - `apps/design/app/preview/<name>/page.tsx`를 생성하고 [`PreviewEntry`](../../../apps/design/components/PreviewEntry.tsx)로 감싸 `iframe` 임베딩(`?embed=1`), 단독 탭(`?standalone=1`), 직접 접속(워크벤치 래핑)을 모두 지원합니다.
-   - `apps/design/lib/preview-routes.ts`의 `PREVIEW_ROUTES`에 시안 메타데이터를 추가합니다.
+   - 시안 UI·다이얼로그·목 모델은 `apps/design/previews/<name>/`에 co-location하고, 여러 시안이 공유하는 모듈만 `apps/design/shared/`에 배치합니다.
+   - `apps/design/app/preview/<name>/page.tsx`를 생성하고 [`PreviewEntry`](../../../apps/design/workbench/PreviewEntry.tsx)로 감싸 `iframe` 임베딩(`?embed=1`), 단독 탭(`?standalone=1`), 직접 접속(워크벤치 래핑)을 모두 지원합니다.
+   - `apps/design/workbench/preview-routes.ts`의 `PREVIEW_ROUTES`에 시안 메타데이터를 추가합니다.
 3. **공통 제작 기준 검증**:
    - `4단 비교`(`320·375·768·1280px`)에서 가로 오버플로우·텍스트 잘림 여부를 확인합니다(`320px` 카드·칩 말줄임 없음, `768px` 이상 검색·필터 1줄 가로 배치, 세로 복수 표 `table-fixed` 수직 열 일치).
    - `단독 보기`에서 브라우저 창 크기 변화에 따른 `md:` / `lg:` 전환과 인터랙티브 요소 `cursor-pointer` 적용을 확인합니다.

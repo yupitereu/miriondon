@@ -1,4 +1,4 @@
-import type { PaymentStatus } from '@/lib/expense-form-model';
+import type { PaymentStatus } from '@/shared/expense-form/expense-form-model';
 
 export type FundAccountId = 'account-shinhan-card' | 'account-kb-card' | 'account-living' | 'cash';
 
@@ -28,6 +28,17 @@ export type FundAccountGroupSummary = {
   total: number;
   adjustment: number;
   needed: number;
+  /** 거래 카드에 연결된 공통 송금 계좌 ID (서로 다른 송금 계좌가 섞인 경우 undefined) */
+  defaultTransferSourceId?: string;
+  /** 동일 결제 계좌에 서로 다른 송금 계좌를 가진 카드 거래가 섞여 있는지 여부 */
+  hasMixedTransferSources?: boolean;
+};
+
+/** 카드별 필수 송금 계좌 설정 (카드 등록 시 결제 계좌로 채워 보낼 출발 계좌를 필수 지정) */
+export const CARD_DEFAULT_TRANSFER_SOURCE: Record<string, string> = {
+  '국민카드 탄탄대로': 'account-living',
+  '신한카드 Deep Dream': 'account-living',
+  '현대카드 ZERO': 'account-living'
 };
 
 export const FUND_ACCOUNTS: readonly FundAccountMeta[] = [
@@ -213,23 +224,34 @@ export const getFundAccountMeta = (id: FundAccountId): FundAccountMeta => {
 };
 
 export const computeFundAccountGroups = (items: FundTransactionItem[], adjustments: Record<FundAccountId, number>): FundAccountGroupSummary[] => {
-  const byAccount = new Map<FundAccountId, { count: number; total: number }>();
+  const byAccount = new Map<FundAccountId, { count: number; total: number; sourceIds: Set<string> }>();
 
   for (const item of items) {
-    const prev = byAccount.get(item.accountId) ?? { count: 0, total: 0 };
-    byAccount.set(item.accountId, { count: prev.count + 1, total: prev.total + item.amount });
+    const prev = byAccount.get(item.accountId) ?? { count: 0, total: 0, sourceIds: new Set<string>() };
+    const mappedSource = CARD_DEFAULT_TRANSFER_SOURCE[item.paymentMethod];
+    if (mappedSource) {
+      prev.sourceIds.add(mappedSource);
+    }
+    byAccount.set(item.accountId, {
+      count: prev.count + 1,
+      total: prev.total + item.amount,
+      sourceIds: prev.sourceIds
+    });
   }
 
   return FUND_ACCOUNTS.filter((account) => byAccount.has(account.id)).map((account) => {
-    const bucket = byAccount.get(account.id) ?? { count: 0, total: 0 };
+    const bucket = byAccount.get(account.id) ?? { count: 0, total: 0, sourceIds: new Set<string>() };
     const adj = adjustments[account.id] ?? 0;
     const needed = Math.max(0, bucket.total + adj);
+    const defaultTransferSourceId = bucket.sourceIds.size === 1 ? Array.from(bucket.sourceIds)[0] : undefined;
     return {
       account,
       count: bucket.count,
       total: bucket.total,
       adjustment: adj,
-      needed
+      needed,
+      defaultTransferSourceId,
+      hasMixedTransferSources: bucket.sourceIds.size > 1
     };
   });
 };

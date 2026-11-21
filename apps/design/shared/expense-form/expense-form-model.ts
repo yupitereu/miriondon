@@ -1,6 +1,6 @@
 import type { PeriodMonthValue } from '@repo/ui-composition';
 
-import { formatWon } from '@/lib/design-format';
+import { formatWon } from '@/shared/design-format';
 
 export type PaymentPlan = 'lump-sum' | 'installment';
 export type InstallmentType = 'interest-free' | 'interest';
@@ -16,6 +16,8 @@ export type PaymentMethodMeta = {
   kind: PaymentMethodKind;
   cardType?: CardType;
   owner: string;
+  paymentAccountId?: string;
+  transferSourceAccountId?: string;
   discountRule?: CardDiscountPerformanceRule;
   installmentRule?: CardInstallmentPerformanceRule;
   performanceRuleConfirmed?: boolean;
@@ -27,6 +29,8 @@ export const PAYMENT_METHOD_ITEMS: readonly PaymentMethodMeta[] = [
     kind: 'card',
     cardType: 'credit',
     owner: '민지 (나)',
+    paymentAccountId: 'account-shinhan-card',
+    transferSourceAccountId: 'account-living',
     discountRule: 'exclude-discount',
     installmentRule: 'first-month-total',
     performanceRuleConfirmed: true
@@ -36,6 +40,8 @@ export const PAYMENT_METHOD_ITEMS: readonly PaymentMethodMeta[] = [
     kind: 'card',
     cardType: 'credit',
     owner: '민지 (나)',
+    paymentAccountId: 'account-kb-card',
+    transferSourceAccountId: 'account-living',
     discountRule: 'include-discount',
     installmentRule: 'first-month-total',
     performanceRuleConfirmed: true
@@ -45,6 +51,8 @@ export const PAYMENT_METHOD_ITEMS: readonly PaymentMethodMeta[] = [
     kind: 'card',
     cardType: 'credit',
     owner: '지은',
+    paymentAccountId: 'account-shinhan-card',
+    transferSourceAccountId: 'account-living',
     discountRule: 'exclude-discount',
     installmentRule: 'monthly-payment',
     performanceRuleConfirmed: true
@@ -95,8 +103,14 @@ export type ExpenseDraft = {
   installmentRound: number | null;
   installmentPrincipal: number | null;
   installmentFee: number | null;
+  initialInstallmentRound?: number;
+  hasLockedSiblingRounds?: boolean;
+  installmentFixedPrincipalSum?: number;
+  installmentRemainingEditableCount?: number;
   actualUser: string;
   paymentStatus: PaymentStatus;
+  /** 현금·직접 계좌이체에서 '준비 필요'를 선택했을 때 조건부로 지정하는 송금 계좌 */
+  transferSourceAccount?: string;
   includeInCardPerformance: boolean;
   recoveries: ExpenseRecoveryItem[];
 };
@@ -236,8 +250,32 @@ export const createValidationAndLockPreset = (): ExpenseDraft => ({
   recoveries: []
 });
 
+export const getDefaultTransferSourceAccountForMethod = (meta: PaymentMethodMeta): string => {
+  if (meta.kind === 'cash') {
+    return '민지 현금';
+  }
+  if (meta.kind === 'account') {
+    return formatPaymentMethodName(meta.label);
+  }
+  return '신한 쏠편한 입출금';
+};
+
+export const getDefaultPaymentStatusForMethod = (meta: PaymentMethodMeta, viewedMonth: PeriodMonthValue = DEFAULT_VIEWED_MONTH): PaymentStatus => {
+  if (isPastPeriodMonth(viewedMonth)) {
+    return '지불 완료';
+  }
+  if (meta.kind === 'account' || meta.kind === 'cash') {
+    return '지불 대기';
+  }
+  if (meta.kind === 'card' && meta.paymentAccountId && meta.transferSourceAccountId && meta.paymentAccountId === meta.transferSourceAccountId) {
+    return '지불 대기';
+  }
+  return '준비 필요';
+};
+
 export const createEmptyExpensePreset = (viewedMonth: PeriodMonthValue = DEFAULT_VIEWED_MONTH): ExpenseDraft => {
-  const defaultStatus: PaymentStatus = isPastPeriodMonth(viewedMonth) ? '지불 완료' : '준비 필요';
+  const defaultPaymentMethod = '신한카드 Deep Dream (민지)';
+  const defaultStatus = getDefaultPaymentStatusForMethod(getPaymentMethodMeta(defaultPaymentMethod), viewedMonth);
   const defaultDate = new Date(viewedMonth.year, viewedMonth.month - 1, Math.min(17, new Date(viewedMonth.year, viewedMonth.month, 0).getDate()));
   return {
     mode: 'create',
@@ -247,7 +285,7 @@ export const createEmptyExpensePreset = (viewedMonth: PeriodMonthValue = DEFAULT
     splits: [{ id: 'split-1', category: '식비', amount: null, discount: 0 }],
     merchant: '',
     memo: '',
-    paymentMethod: '신한카드 Deep Dream (민지)',
+    paymentMethod: defaultPaymentMethod,
     transactionDate: defaultDate,
     paymentPlan: 'lump-sum',
     installmentType: 'interest-free',
@@ -282,6 +320,16 @@ export const computeAutoBudgetMonth = (draft: ExpenseDraft) => {
   };
 };
 
+export const distributeInstallmentRemainingPrincipal = (totalBalance: number, count: number): number[] => {
+  if (count <= 0) {
+    return [];
+  }
+  const safeTotal = Math.max(0, Math.trunc(totalBalance));
+  const base = Math.floor(safeTotal / count);
+  const remainder = safeTotal % count;
+  return Array.from({ length: count }, (_, index) => (index === 0 ? base + remainder : base));
+};
+
 export const computeRecommendedInstallmentPrincipal = (actualPaid: number, months: number, round: number): number => {
   const safeMonths = Math.max(2, Math.min(36, Math.trunc(months)));
   const safeRound = Math.max(1, Math.min(safeMonths, Math.trunc(round)));
@@ -290,23 +338,48 @@ export const computeRecommendedInstallmentPrincipal = (actualPaid: number, month
   return safeRound === 1 ? base + remainder : base;
 };
 
+const computeInstallmentBalanceMetrics = (draft: ExpenseDraft, actualPaid: number, months: number, round: number) => {
+  if (draft.installmentFixedPrincipalSum !== undefined) {
+    const availablePrincipalBalance = Math.max(0, actualPaid - Math.max(0, Math.trunc(draft.installmentFixedPrincipalSum)));
+    const remainingEditableCount = Math.max(1, draft.installmentRemainingEditableCount ?? months - round + 1);
+    const shares = distributeInstallmentRemainingPrincipal(availablePrincipalBalance, remainingEditableCount);
+    return {
+      availablePrincipalBalance,
+      remainingEditableCount,
+      recommendedPrincipal: shares[0] ?? 0
+    };
+  }
+
+  let impliedPrior = 0;
+  for (let i = 1; i < round; i += 1) {
+    impliedPrior += computeRecommendedInstallmentPrincipal(actualPaid, months, i);
+  }
+  const availablePrincipalBalance = Math.max(0, actualPaid - impliedPrior);
+  const remainingEditableCount = Math.max(1, months - round + 1);
+  return {
+    availablePrincipalBalance,
+    remainingEditableCount,
+    recommendedPrincipal: computeRecommendedInstallmentPrincipal(actualPaid, months, round)
+  };
+};
+
 export const withAutoInstallmentPrincipal = (prevDraft: ExpenseDraft, nextDraft: ExpenseDraft): ExpenseDraft => {
   if (nextDraft.paymentPlan !== 'installment') {
     return syncSingleSplitDraft(nextDraft);
   }
 
-  const prevActualPaid = Math.max(0, Math.trunc(prevDraft.approvedAmount ?? 0) - Math.trunc(prevDraft.cardDiscount ?? 0));
-  const prevRecommended = computeRecommendedInstallmentPrincipal(prevActualPaid, prevDraft.installmentMonths ?? 3, prevDraft.installmentRound ?? 1);
-
-  const nextActualPaid = Math.max(0, Math.trunc(nextDraft.approvedAmount ?? 0) - Math.trunc(nextDraft.cardDiscount ?? 0));
-  const nextRecommended = computeRecommendedInstallmentPrincipal(nextActualPaid, nextDraft.installmentMonths ?? 3, nextDraft.installmentRound ?? 1);
+  const prevPreview = computeExpensePreview(prevDraft);
+  const nextPreview = computeExpensePreview(nextDraft);
 
   const shouldAutoFill =
-    prevDraft.paymentPlan !== 'installment' || nextDraft.installmentPrincipal === null || prevDraft.installmentPrincipal === null || prevDraft.installmentPrincipal === prevRecommended;
+    prevDraft.paymentPlan !== 'installment' ||
+    nextDraft.installmentPrincipal === null ||
+    prevDraft.installmentPrincipal === null ||
+    prevDraft.installmentPrincipal === prevPreview.recommendedPrincipal;
 
   return syncSingleSplitDraft({
     ...nextDraft,
-    installmentPrincipal: shouldAutoFill ? (nextRecommended > 0 ? nextRecommended : null) : nextDraft.installmentPrincipal
+    installmentPrincipal: shouldAutoFill ? (nextPreview.recommendedPrincipal > 0 ? nextPreview.recommendedPrincipal : null) : nextDraft.installmentPrincipal
   });
 };
 
@@ -319,11 +392,17 @@ export const computeExpensePreview = (draft: ExpenseDraft) => {
   const round = Math.max(1, Math.min(months, Math.trunc(draft.installmentRound ?? 1)));
 
   const interestFreeRemainder = actualPaid % months;
-  const recommendedPrincipal = computeRecommendedInstallmentPrincipal(actualPaid, months, round);
+  const { availablePrincipalBalance, remainingEditableCount, recommendedPrincipal } = computeInstallmentBalanceMetrics(draft, actualPaid, months, round);
 
   const principal = Math.max(0, Math.trunc(draft.installmentPrincipal ?? 0));
   const fee = draft.installmentType === 'interest-free' ? 0 : Math.max(0, Math.trunc(draft.installmentFee ?? 0));
   const installmentRoundTotal = principal + fee;
+
+  const remainingAfterCurrentCount = Math.max(0, remainingEditableCount - 1);
+  const remainingAfterCurrentBalance = Math.max(0, availablePrincipalBalance - principal);
+  const nextShares = distributeInstallmentRemainingPrincipal(remainingAfterCurrentBalance, remainingAfterCurrentCount);
+  const nextRemainingPrincipalPerMonth = remainingAfterCurrentCount > 0 ? Math.floor(remainingAfterCurrentBalance / remainingAfterCurrentCount) : 0;
+  const nextRemainingRemainder = remainingAfterCurrentCount > 0 ? remainingAfterCurrentBalance % remainingAfterCurrentCount : 0;
 
   const extractRecoveryNames = (list: ExpenseRecoveryItem[]) =>
     list
@@ -366,6 +445,12 @@ export const computeExpensePreview = (draft: ExpenseDraft) => {
     round,
     interestFreeRemainder,
     recommendedPrincipal,
+    availablePrincipalBalance,
+    remainingAfterCurrentCount,
+    remainingAfterCurrentBalance,
+    nextRemainingPrincipalPerMonth,
+    nextRemainingRemainder,
+    nextShares,
     principal,
     fee,
     installmentRoundTotal,
@@ -451,6 +536,13 @@ export const validateExpenseDraft = (draft: ExpenseDraft): string[] => {
     errors.push('거래일을 선택해 주세요.');
   }
 
+  if (metrics.approved <= 0) {
+    errors.push('결제 금액을 0원보다 크게 입력해 주세요.');
+  }
+  if (metrics.discount > metrics.approved) {
+    errors.push(`할인 금액(${formatWon(metrics.discount)})이 결제 금액(${formatWon(metrics.approved)})보다 클 수 없어요.`);
+  }
+
   if (draft.paymentPlan === 'installment') {
     if (!isCreditCardMethod(methodMeta)) {
       errors.push('신용카드만 할부를 선택할 수 있어요.');
@@ -466,15 +558,14 @@ export const validateExpenseDraft = (draft: ExpenseDraft): string[] => {
     if ((draft.installmentPrincipal ?? 0) <= 0) {
       errors.push('이번 회차 납부원금을 0원보다 크게 입력해 주세요.');
     }
+    if ((draft.installmentPrincipal ?? 0) > metrics.availablePrincipalBalance) {
+      errors.push(`이번 회차 납부원금은 남은 원금 잔액(${formatWon(metrics.availablePrincipalBalance)})을 초과할 수 없어요.`);
+    }
     if (metrics.installmentRoundTotal <= 0) {
       errors.push('이번 회차 총 납부액이 0원보다 커야 해요.');
     }
-  } else {
-    if (metrics.approved <= 0) {
-      errors.push('결제 금액을 0원보다 크게 입력해 주세요.');
-    }
-    if (metrics.discount > metrics.approved) {
-      errors.push(`할인 금액(${formatWon(metrics.discount)})이 결제 금액(${formatWon(metrics.approved)})보다 클 수 없어요.`);
+    if (rawRound >= 2 && draft.recoveries.length > 0) {
+      errors.push('할부 거래의 회수 금액은 1회차(승인월)에서만 연결할 수 있어요.');
     }
   }
 

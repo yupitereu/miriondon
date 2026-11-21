@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 
-import { DesignWorkbench } from '@/components/DesignWorkbench';
+import { DesignWorkbench } from '@/workbench/DesignWorkbench';
 
 export type PreviewSearchParams = Promise<{
   embed?: string;

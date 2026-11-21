@@ -3,9 +3,9 @@
 import { Button, cn, Icon, MoonIcon, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SunIcon } from '@repo/ui-core';
 import { Columns4, ExternalLink, Maximize2, Minimize2, Monitor, RotateCw, Smartphone, Square, Tablet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import * as React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { COMPARE_VIEWPORT_IDS, DEFAULT_PREVIEW_ROUTE, PREVIEW_ROUTES, VIEWPORT_PRESETS, type ViewportPreset } from '@/lib/preview-routes';
+import { COMPARE_VIEWPORT_IDS, DEFAULT_PREVIEW_ROUTE, PREVIEW_ROUTES, VIEWPORT_PRESETS, type ViewportPreset } from '@/workbench/preview-routes';
 
 type Theme = 'light' | 'dark';
 type ViewMode = 'compare' | 'single';
@@ -50,19 +50,19 @@ export const DesignWorkbench = ({ initialTheme, initialRouteId, initialViewportM
   const resolvedInitialRouteId = PREVIEW_ROUTES.some((route) => route.id === initialRouteId) ? (initialRouteId as string) : DEFAULT_PREVIEW_ROUTE.id;
   const initialVp = parseInitialViewport(initialViewportMode);
 
-  const [theme, setTheme] = React.useState<Theme>(initialTheme);
-  const [routeId, setRouteId] = React.useState<string>(resolvedInitialRouteId);
-  const [viewMode, setViewMode] = React.useState<ViewMode>(initialVp.viewMode);
-  const [fixedWidth, setFixedWidth] = React.useState<number | null>(initialVp.fixedWidth);
-  const [compareFit, setCompareFit] = React.useState<boolean>(true);
-  const [reloadKey, setReloadKey] = React.useState(0);
-  const [mainSize, setMainSize] = React.useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const mainRef = React.useRef<HTMLElement | null>(null);
-  const iframeRefs = React.useRef<Record<string, HTMLIFrameElement | null>>({});
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [routeId, setRouteId] = useState<string>(resolvedInitialRouteId);
+  const [viewMode, setViewMode] = useState<ViewMode>(initialVp.viewMode);
+  const [fixedWidth, setFixedWidth] = useState<number | null>(initialVp.fixedWidth);
+  const [compareFit, setCompareFit] = useState<boolean>(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [mainSize, setMainSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const mainRef = useRef<HTMLElement | null>(null);
+  const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
 
   const activeRoute = PREVIEW_ROUTES.find((route) => route.id === routeId) ?? DEFAULT_PREVIEW_ROUTE;
 
-  React.useEffect(() => {
+  useEffect(() => {
     const element = mainRef.current;
     if (!element) {
       return;
@@ -81,7 +81,7 @@ export const DesignWorkbench = ({ initialTheme, initialRouteId, initialViewportM
     return () => observer.disconnect();
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const url = new URL(window.location.href);
     const vpParam = viewMode === 'compare' ? 'compare' : fixedWidth === null ? 'single' : String(fixedWidth);
     if (url.searchParams.get('vp') === vpParam) {
@@ -91,7 +91,7 @@ export const DesignWorkbench = ({ initialTheme, initialRouteId, initialViewportM
     window.history.replaceState(null, '', `${url.pathname}${url.search}`);
   }, [fixedWidth, viewMode]);
 
-  const syncIframeTheme = React.useCallback((targetTheme: Theme) => {
+  const syncIframeTheme = useCallback((targetTheme: Theme) => {
     Object.values(iframeRefs.current).forEach((frame) => {
       try {
         if (frame?.contentDocument) {

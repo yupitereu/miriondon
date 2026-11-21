@@ -1,5 +1,5 @@
-import { FundsPreview } from '@/components/FundsPreview';
-import { PreviewEntry, type PreviewSearchParams } from '@/components/PreviewEntry';
+import { FundsPreview } from '@/previews/funds/FundsPreview';
+import { PreviewEntry, type PreviewSearchParams } from '@/workbench/PreviewEntry';
 
 export default function FundsPreviewPage({ searchParams }: { searchParams: PreviewSearchParams }) {
   return (

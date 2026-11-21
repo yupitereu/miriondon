@@ -4,7 +4,7 @@ import { dialog } from '@repo/ui-composition';
 import { Popover, PopoverContent, PopoverTrigger, Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
 import { BookOpen, Check, ChevronDown, ChevronRight, ChevronsUpDown, Landmark, LayoutGrid, List, Menu, Plus, Settings, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import * as React from 'react';
+import { useState, type ReactNode } from 'react';
 
 export type AppNavKey = 'settlement' | 'expenses' | 'income' | 'assets' | 'settings';
 
@@ -38,13 +38,13 @@ type DesignAppShellProps = {
   onAddExpense: () => void;
   ledgerId?: string;
   onLedgerChange?: (ledgerId: string) => void;
-  mobileHeaderLeft?: React.ReactNode;
-  mobileHeaderRight?: React.ReactNode;
-  mobileHeaderBottom?: React.ReactNode;
-  desktopHeaderLeft?: React.ReactNode;
-  desktopHeaderRight?: React.ReactNode;
+  mobileHeaderLeft?: ReactNode;
+  mobileHeaderRight?: ReactNode;
+  mobileHeaderBottom?: ReactNode;
+  desktopHeaderLeft?: ReactNode;
+  desktopHeaderRight?: ReactNode;
   mainClassName?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export const DesignAppShell = ({
@@ -61,11 +61,11 @@ export const DesignAppShell = ({
   children
 }: DesignAppShellProps) => {
   const router = useRouter();
-  const [internalLedgerId, setInternalLedgerId] = React.useState<string>('home');
-  const [railLedgerMenuOpen, setRailLedgerMenuOpen] = React.useState(false);
-  const [sidebarLedgerMenuOpen, setSidebarLedgerMenuOpen] = React.useState(false);
-  const [sheetLedgerMenuOpen, setSheetLedgerMenuOpen] = React.useState(false);
-  const [mobileMoreOpen, setMobileMoreOpen] = React.useState(false);
+  const [internalLedgerId, setInternalLedgerId] = useState<string>('home');
+  const [railLedgerMenuOpen, setRailLedgerMenuOpen] = useState(false);
+  const [sidebarLedgerMenuOpen, setSidebarLedgerMenuOpen] = useState(false);
+  const [sheetLedgerMenuOpen, setSheetLedgerMenuOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   const ledgerId = controlledLedgerId ?? internalLedgerId;
   const currentLedger = DESIGN_LEDGERS.find((item) => item.id === ledgerId) ?? DESIGN_LEDGERS[0];

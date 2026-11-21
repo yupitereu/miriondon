@@ -1,5 +1,5 @@
 export type DesignAssetCategory = 'account' | 'cash' | 'savings-invest' | 'debt';
-export type DesignAssetOwner = '민지(나)' | '공동';
+export type DesignAssetOwner = '민지(나)' | '지은';
 
 export type DesignAssetItem = {
   id: string;
@@ -46,7 +46,7 @@ export const INITIAL_DESIGN_ASSETS: readonly DesignAssetItem[] = [
     institution: '국민은행',
     kindLabel: '결제 전용',
     category: 'account',
-    owner: '공동',
+    owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 1100000,
     expectedInflow: 0,
@@ -59,7 +59,7 @@ export const INITIAL_DESIGN_ASSETS: readonly DesignAssetItem[] = [
     institution: '신한은행',
     kindLabel: '결제 전용',
     category: 'account',
-    owner: '공동',
+    owner: '지은',
     includeInLivingBudget: false,
     currentBalance: 620000,
     expectedInflow: 0,
@@ -84,7 +84,7 @@ export const INITIAL_DESIGN_ASSETS: readonly DesignAssetItem[] = [
     institution: '우리은행',
     kindLabel: '예·적금',
     category: 'savings-invest',
-    owner: '공동',
+    owner: '지은',
     includeInLivingBudget: false,
     currentBalance: 12650000,
     expectedInflow: 0,
@@ -110,7 +110,7 @@ export const INITIAL_DESIGN_ASSETS: readonly DesignAssetItem[] = [
     institution: '카카오뱅크',
     kindLabel: '부채 · 남은 원금',
     category: 'debt',
-    owner: '공동',
+    owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 15000000,
     expectedInflow: 0,

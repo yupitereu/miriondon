@@ -24,14 +24,9 @@ import {
 } from '@repo/ui-core';
 import { ArrowLeft, HelpCircle, Landmark, Pencil, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import * as React from 'react';
+import { useMemo, useState } from 'react';
 
-import { DesignAppShell } from '@/components/DesignAppShell';
-import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/components/ExpenseFormView';
-import { AdjustmentEditDialog, CompleteConfirmDialog, PrepareConfirmDialog, ReleaseToPrepareDialog } from '@/components/FundsDialogs';
-import { INITIAL_DESIGN_ASSETS, getInitialAssetBalancesMap } from '@/lib/design-assets-store';
-import { formatSignedWon, formatWon } from '@/lib/design-format';
-import { DEFAULT_VIEWED_MONTH, PAYMENT_METHOD_ITEMS, formatPaymentMethodName, formatYearMonth, getPaymentMethodMeta } from '@/lib/expense-form-model';
+import { AdjustmentEditDialog, CompleteConfirmDialog, PrepareConfirmDialog, ReleaseToPrepareDialog } from '@/previews/funds/FundsDialogs';
 import {
   DECEMBER_FUND_TRANSACTIONS,
   FUND_ACCOUNTS,
@@ -41,7 +36,12 @@ import {
   getFundAccountMeta,
   type FundAccountId,
   type FundTransactionItem
-} from '@/lib/funds-model';
+} from '@/previews/funds/funds-model';
+import { DesignAppShell } from '@/shared/DesignAppShell';
+import { INITIAL_DESIGN_ASSETS, getInitialAssetBalancesMap } from '@/shared/design-assets-store';
+import { formatSignedWon, formatWon } from '@/shared/design-format';
+import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/shared/expense-form/ExpenseFormView';
+import { DEFAULT_VIEWED_MONTH, PAYMENT_METHOD_ITEMS, formatPaymentMethodName, formatYearMonth, getPaymentMethodMeta } from '@/shared/expense-form/expense-form-model';
 
 const STATUS_ORDER: readonly PaymentStatus[] = ['준비 필요', '지불 대기', '지불 완료'] as const;
 
@@ -99,49 +99,49 @@ const mapMethodToAccountId = (methodLabel: string): FundAccountId => {
 
 export const FundsPreview = () => {
   const router = useRouter();
-  const [periodMonth, setPeriodMonth] = React.useState<PeriodMonthValue>(DEFAULT_VIEWED_MONTH);
-  const [decemberCreated, setDecemberCreated] = React.useState(false);
-  const [periodScope, setPeriodScope] = React.useState<FundPeriodScope>('all-unpaid');
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedAccountNames, setSelectedAccountNames] = React.useState<Set<string>>(() => new Set());
-  const [selectedMethods, setSelectedMethods] = React.useState<Set<string>>(() => new Set());
-  const [mobileFilterOpen, setMobileFilterOpen] = React.useState(false);
+  const [periodMonth, setPeriodMonth] = useState<PeriodMonthValue>(DEFAULT_VIEWED_MONTH);
+  const [decemberCreated, setDecemberCreated] = useState(false);
+  const [periodScope, setPeriodScope] = useState<FundPeriodScope>('all-unpaid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAccountNames, setSelectedAccountNames] = useState<Set<string>>(() => new Set());
+  const [selectedMethods, setSelectedMethods] = useState<Set<string>>(() => new Set());
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  const [activeStatus, setActiveStatus] = React.useState<PaymentStatus>('준비 필요');
-  const [transactions, setTransactions] = React.useState<FundTransactionItem[]>(INITIAL_FUND_TRANSACTIONS);
-  const [adjustments, setAdjustments] = React.useState<Record<FundAccountId, number>>(INITIAL_FUND_ADJUSTMENTS);
-  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set());
-  const assetBalances = React.useMemo(() => getInitialAssetBalancesMap(), []);
+  const [activeStatus, setActiveStatus] = useState<PaymentStatus>('준비 필요');
+  const [transactions, setTransactions] = useState<FundTransactionItem[]>(INITIAL_FUND_TRANSACTIONS);
+  const [adjustments, setAdjustments] = useState<Record<FundAccountId, number>>(INITIAL_FUND_ADJUSTMENTS);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const assetBalances = useMemo(() => getInitialAssetBalancesMap(), []);
 
-  const sourceAccounts = React.useMemo(
+  const sourceAccounts = useMemo(
     () => INITIAL_DESIGN_ASSETS.filter((asset) => asset.category === 'account' || asset.category === 'savings-invest').map((asset) => ({ id: asset.id, name: asset.name })),
     []
   );
-  const completeSourceAccounts = React.useMemo(
+  const completeSourceAccounts = useMemo(
     () =>
       INITIAL_DESIGN_ASSETS.filter((asset) => asset.category === 'account' || asset.category === 'cash' || asset.category === 'savings-invest').map((asset) => ({ id: asset.id, name: asset.name })),
     []
   );
 
   // Dialog states
-  const [adjustDialogState, setAdjustDialogState] = React.useState<{ open: boolean; accountId: FundAccountId }>({
+  const [adjustDialogState, setAdjustDialogState] = useState<{ open: boolean; accountId: FundAccountId }>({
     open: false,
     accountId: 'account-kb-card'
   });
-  const [prepareConfirmOpen, setPrepareConfirmOpen] = React.useState(false);
-  const [completeConfirmOpen, setCompleteConfirmOpen] = React.useState(false);
-  const [releaseDialogOpen, setReleaseDialogOpen] = React.useState(false);
-  const [releaseTargetStatus, setReleaseTargetStatus] = React.useState<'준비 필요' | '지불 대기'>('준비 필요');
+  const [prepareConfirmOpen, setPrepareConfirmOpen] = useState(false);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
+  const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
+  const [releaseTargetStatus, setReleaseTargetStatus] = useState<'준비 필요' | '지불 대기'>('준비 필요');
 
   // Add-expense sheet integration
-  const [expenseSheetOpen, setExpenseSheetOpen] = React.useState(false);
-  const [expenseDraft, setExpenseDraft] = React.useState<ExpenseDraft>(() => createEmptyExpensePreset(DEFAULT_VIEWED_MONTH));
+  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
+  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(() => createEmptyExpensePreset(DEFAULT_VIEWED_MONTH));
 
   const viewedYmString = formatYearMonth(periodMonth);
   const defaultPeriodScope: FundPeriodScope = periodMonth.year * 12 + periodMonth.month <= DEFAULT_VIEWED_MONTH.year * 12 + DEFAULT_VIEWED_MONTH.month ? 'all-unpaid' : 'current-only';
 
-  const accountOptions = React.useMemo(() => FUND_ACCOUNTS.map((acc) => acc.name), []);
-  const methodOptions = React.useMemo(
+  const accountOptions = useMemo(() => FUND_ACCOUNTS.map((acc) => acc.name), []);
+  const methodOptions = useMemo(
     () =>
       mergeFilterOptions(
         PAYMENT_METHOD_ITEMS.map((item) => formatPaymentMethodName(item.label)),
@@ -190,9 +190,9 @@ export const FundsPreview = () => {
     setSelectedIds(new Set());
   };
 
-  const monthCellStatus = React.useMemo(() => createMonthCellStatus(decemberCreated), [decemberCreated]);
+  const monthCellStatus = useMemo(() => createMonthCellStatus(decemberCreated), [decemberCreated]);
 
-  const scopedTransactions = React.useMemo(() => {
+  const scopedTransactions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return transactions.filter((item) => {
       const account = getFundAccountMeta(item.accountId);
@@ -218,7 +218,7 @@ export const FundsPreview = () => {
     });
   }, [transactions, selectedAccountNames, selectedMethods, searchQuery, viewedYmString, periodScope]);
 
-  const countByStatus = React.useMemo(() => {
+  const countByStatus = useMemo(() => {
     const counts: Record<PaymentStatus, number> = {
       '준비 필요': 0,
       '지불 대기': 0,
@@ -230,15 +230,15 @@ export const FundsPreview = () => {
     return counts;
   }, [scopedTransactions]);
 
-  const visibleItems = React.useMemo(() => scopedTransactions.filter((item) => item.status === activeStatus), [scopedTransactions, activeStatus]);
-  const selectedItems = React.useMemo(() => visibleItems.filter((item) => selectedIds.has(item.id)), [visibleItems, selectedIds]);
-  const selectedTotal = React.useMemo(() => selectedItems.reduce((sum, item) => sum + item.amount, 0), [selectedItems]);
+  const visibleItems = useMemo(() => scopedTransactions.filter((item) => item.status === activeStatus), [scopedTransactions, activeStatus]);
+  const selectedItems = useMemo(() => visibleItems.filter((item) => selectedIds.has(item.id)), [visibleItems, selectedIds]);
+  const selectedTotal = useMemo(() => selectedItems.reduce((sum, item) => sum + item.amount, 0), [selectedItems]);
 
   const summarySourceItems = selectedItems.length > 0 ? selectedItems : visibleItems;
-  const summaryGroups = React.useMemo(() => (activeStatus === '준비 필요' ? computeFundAccountGroups(summarySourceItems, adjustments) : []), [activeStatus, summarySourceItems, adjustments]);
-  const selectedGroups = React.useMemo(() => computeFundAccountGroups(selectedItems, adjustments), [selectedItems, adjustments]);
+  const summaryGroups = useMemo(() => (activeStatus === '준비 필요' ? computeFundAccountGroups(summarySourceItems, adjustments) : []), [activeStatus, summarySourceItems, adjustments]);
+  const selectedGroups = useMemo(() => computeFundAccountGroups(selectedItems, adjustments), [selectedItems, adjustments]);
 
-  const groupTotalsMap = React.useMemo(() => {
+  const groupTotalsMap = useMemo(() => {
     const map: Partial<Record<FundAccountId, number>> = {};
     for (const g of summaryGroups) {
       map[g.account.id] = g.total;
@@ -246,7 +246,7 @@ export const FundsPreview = () => {
     return map;
   }, [summaryGroups]);
 
-  const selectedNeededTotal = React.useMemo(() => selectedGroups.reduce((sum, g) => sum + g.needed, 0), [selectedGroups]);
+  const selectedNeededTotal = useMemo(() => selectedGroups.reduce((sum, g) => sum + g.needed, 0), [selectedGroups]);
 
   const filterGroups = [
     { key: 'account', label: '결제 계좌', options: accountOptions, selected: selectedAccountNames, onChange: setSelectedAccountNames },

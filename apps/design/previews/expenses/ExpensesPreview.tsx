@@ -2,15 +2,16 @@
 
 import { EmptyState, FilterChipGroup, FilterMultiSelect, PeriodPicker, dialog, mergeFilterOptions, type PeriodCellStatus, type PeriodMonthValue } from '@repo/ui-composition';
 import { Badge, Button, Card, CardHeader, CardTitle, SearchInput, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
-import { CalendarRange, ChevronRight, HandCoins, MoreHorizontal, Plus, Repeat, Settings, SlidersHorizontal, Upload, WalletCards } from 'lucide-react';
+import { CalendarRange, ChevronRight, HandCoins, MoreHorizontal, Plus, Repeat, SlidersHorizontal, Upload, WalletCards } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import * as React from 'react';
+import { useMemo, useState } from 'react';
 
-import { DesignAppShell } from '@/components/DesignAppShell';
-import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/components/ExpenseFormView';
-import { INITIAL_DESIGN_ASSETS, findDesignAssetByName, getInitialAssetBalancesMap, type AccountBalanceDelta } from '@/lib/design-assets-store';
-import { formatSignedWon, formatWon } from '@/lib/design-format';
-import { ACTUAL_USERS, CATEGORIES, PAYMENT_METHOD_ITEMS, formatPaymentMethodName, type ExpenseRecoveryItem } from '@/lib/expense-form-model';
+import { INITIAL_INSTALLMENT_PLANS } from '@/previews/installments/installments-model';
+import { DesignAppShell } from '@/shared/DesignAppShell';
+import { INITIAL_DESIGN_ASSETS, findDesignAssetByName, getInitialAssetBalancesMap, type AccountBalanceDelta } from '@/shared/design-assets-store';
+import { formatSignedWon, formatWon } from '@/shared/design-format';
+import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/shared/expense-form/ExpenseFormView';
+import { ACTUAL_USERS, CATEGORIES, PAYMENT_METHOD_ITEMS, formatPaymentMethodName, type ExpenseRecoveryItem } from '@/shared/expense-form/expense-form-model';
 
 type ExpenseKind = 'regular' | 'fixed' | 'installment';
 
@@ -298,18 +299,18 @@ const computeRecoveryBalanceDeltas = (prevRecoveries: ExpenseRecoveryItem[], nex
 
 export const ExpensesPreview = () => {
   const router = useRouter();
-  const [periodMonth, setPeriodMonth] = React.useState<PeriodMonthValue>({ year: 2026, month: 11 });
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedCategories, setSelectedCategories] = React.useState<Set<string>>(() => new Set());
-  const [selectedMethods, setSelectedMethods] = React.useState<Set<string>>(() => new Set());
-  const [selectedUsers, setSelectedUsers] = React.useState<Set<string>>(() => new Set());
-  const [selectedStatuses, setSelectedStatuses] = React.useState<Set<string>>(() => new Set());
-  const [expenses, setExpenses] = React.useState<ExpenseRecord[]>(INITIAL_EXPENSES);
-  const [balances, setBalances] = React.useState<Record<string, number>>(getInitialAssetBalancesMap);
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const [mobileFilterOpen, setMobileFilterOpen] = React.useState(false);
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [formDraft, setFormDraft] = React.useState<ExpenseDraft>(createEmptyExpensePreset);
+  const [periodMonth, setPeriodMonth] = useState<PeriodMonthValue>({ year: 2026, month: 11 });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set());
+  const [selectedMethods, setSelectedMethods] = useState<Set<string>>(() => new Set());
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(() => new Set());
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(() => new Set());
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(INITIAL_EXPENSES);
+  const [balances, setBalances] = useState<Record<string, number>>(getInitialAssetBalancesMap);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formDraft, setFormDraft] = useState<ExpenseDraft>(createEmptyExpensePreset);
 
   const handleOpenFixedExpenses = () => {
     setMobileMenuOpen(false);
@@ -323,6 +324,18 @@ export const ExpensesPreview = () => {
     setMobileMenuOpen(false);
     const query = new URLSearchParams(window.location.search).toString();
     router.push(query ? `/preview/funds?${query}` : '/preview/funds');
+  };
+
+  const handleGoInstallments = () => {
+    setMobileMenuOpen(false);
+    const query = new URLSearchParams(window.location.search).toString();
+    router.push(query ? `/preview/installments?${query}` : '/preview/installments');
+  };
+
+  const handleGoReceivables = () => {
+    setMobileMenuOpen(false);
+    const query = new URLSearchParams(window.location.search).toString();
+    router.push(query ? `/preview/receivables?${query}` : '/preview/receivables');
   };
 
   const handleOpenImport = () => {
@@ -348,6 +361,7 @@ export const ExpensesPreview = () => {
   };
 
   const handleOpenCreate = () => {
+    setMobileMenuOpen(false);
     setFormDraft(createEmptyExpensePreset(periodMonth));
     setFormOpen(true);
   };
@@ -402,11 +416,77 @@ export const ExpensesPreview = () => {
     setFormOpen(false);
   };
 
+  const handleDeleteExpense = async (targetDraft: ExpenseDraft) => {
+    if (!targetDraft.id) {
+      return;
+    }
+
+    const currentInitialStatus = targetDraft.initialPaymentStatus ?? targetDraft.paymentStatus;
+    if (currentInitialStatus !== '준비 필요') {
+      await dialog.alert({
+        title: '지출 삭제 불가',
+        description: `${currentInitialStatus} 상태의 거래는 삭제할 수 없어요. 지불 상태를 준비 필요로 먼저 변경해 저장한 뒤 삭제해 주세요.`
+      });
+      return;
+    }
+
+    if (targetDraft.paymentPlan === 'installment') {
+      if ((targetDraft.initialInstallmentRound ?? targetDraft.installmentRound ?? 1) >= 2) {
+        await dialog.alert({
+          title: '지출 삭제 불가',
+          description: '2회차 이후 할부 거래는 삭제할 수 없어요.'
+        });
+        return;
+      }
+
+      const goInstallments = await dialog.confirm({
+        title: '할부 거래 삭제 안내',
+        description: '할부 회차는 한 건만 따로 삭제할 수 없어요. 할부 관리에서 할부 삭제 또는 조기 완납으로 정리해 주세요.',
+        cancelText: '닫기',
+        confirmText: '이동'
+      });
+      if (goInstallments) {
+        setFormOpen(false);
+        handleGoInstallments();
+      }
+      return;
+    }
+
+    if (targetDraft.recoveries.some((rec) => (rec.receivedAmount ?? 0) > 0)) {
+      await dialog.alert({
+        title: '지출 삭제 불가',
+        description: '이미 회수한 금액이 기록된 지출은 삭제할 수 없어요. 회수한 금액을 0원으로 먼저 정정한 뒤 삭제해 주세요.'
+      });
+      return;
+    }
+
+    const label = targetDraft.merchant.trim() || '이 지출';
+    const notice = targetDraft.isFixedExpenseGenerated ? '이 달의 고정 지출 1건만 삭제되며 가계부 설정의 고정 지출 설정은 유지돼요.' : undefined;
+
+    const ok = await dialog.confirm({
+      title: `${label} 내역을 삭제할까요?`,
+      description: '삭제한 지출 내역은 목록과 이 달 생활비·카드 실적 합계에서 제외돼요.',
+      notice,
+      cancelText: '취소',
+      confirmText: '삭제',
+      variant: 'destructive'
+    });
+
+    if (!ok) {
+      return;
+    }
+
+    setExpenses((prev) => prev.filter((item) => item.id !== targetDraft.id));
+    setFormOpen(false);
+  };
+
   const prepareCount = expenses.filter((item) => item.status === '준비 필요').length;
-  const installmentCount = expenses.filter((item) => item.draft.paymentPlan === 'installment').length;
+  const installmentCount =
+    INITIAL_INSTALLMENT_PLANS.filter((plan) => plan.status === 'active').length +
+    expenses.filter((item) => item.draft.paymentPlan === 'installment' && !INITIAL_EXPENSES.some((seed) => seed.id === item.id)).length;
   const totalUncollected = expenses.reduce((sum, item) => sum + item.uncollectedAmount, 0);
 
-  const categoryOptions = React.useMemo(
+  const categoryOptions = useMemo(
     () =>
       mergeFilterOptions(
         CATEGORIES,
@@ -414,7 +494,7 @@ export const ExpensesPreview = () => {
       ),
     [expenses]
   );
-  const methodOptions = React.useMemo(
+  const methodOptions = useMemo(
     () =>
       mergeFilterOptions(
         PAYMENT_METHOD_ITEMS.map((item) => formatPaymentMethodName(item.label)),
@@ -422,7 +502,7 @@ export const ExpensesPreview = () => {
       ),
     [expenses]
   );
-  const userOptions = React.useMemo(
+  const userOptions = useMemo(
     () =>
       mergeFilterOptions(
         ACTUAL_USERS.map(normalizeActualUser),
@@ -488,31 +568,24 @@ export const ExpensesPreview = () => {
         </>
       }
       desktopHeaderLeft={
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold tracking-tight text-foreground">지출 내역</h1>
+        <div className="flex items-center gap-2 lg:gap-3">
+          <h1 className="shrink-0 whitespace-nowrap text-lg font-bold tracking-tight text-foreground">지출 내역</h1>
           <PeriodPicker mode="month" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />
         </div>
       }
       desktopHeaderRight={
         <>
-          <Button variant="ghost" size="sm" className="lg:hidden" onClick={handleOpenFixedExpenses}>
-            <Settings className="size-4" />
-            <span>고정 지출</span>
-          </Button>
-          <Button variant="outline" size="md" className="hidden lg:inline-flex" onClick={handleOpenFixedExpenses}>
-            고정 지출 설정
+          <Button variant="outline" size="md" className="px-2.5 lg:px-3" onClick={handleOpenFixedExpenses}>
+            <Repeat className="size-4" />
+            <span>고정 지출 설정</span>
           </Button>
 
-          <Button variant="outline" size="sm" className="lg:hidden" onClick={handleOpenImport}>
+          <Button variant="outline" size="md" className="px-2.5 lg:px-3" onClick={handleOpenImport}>
             <Upload className="size-4" />
-            <span>가져오기</span>
+            <span>카드 내역 가져오기</span>
           </Button>
 
-          <Button variant="outline" size="md" className="hidden lg:inline-flex" onClick={handleOpenImport}>
-            카드 내역 가져오기
-          </Button>
-
-          <Button variant="primary" size="md" onClick={handleOpenCreate}>
+          <Button variant="primary" size="md" className="px-2.5 lg:px-3" onClick={handleOpenCreate}>
             <Plus className="size-4" />
             <span>지출 추가</span>
           </Button>
@@ -533,16 +606,12 @@ export const ExpensesPreview = () => {
           },
           {
             label: '할부 관리',
-            mobileValue: `진행 ${installmentCount}건`,
-            desktopValue: `진행 ${installmentCount}건`,
+            mobileValue: `진행중 ${installmentCount}건`,
+            desktopValue: `진행중 ${installmentCount}건`,
             icon: CalendarRange,
             iconClass: 'bg-muted text-foreground',
             valueClass: 'text-muted-foreground',
-            onClick: () =>
-              void dialog.alert({
-                title: '할부거래 관리',
-                description: '진행 중인 할부 회차 현황, 월별 청구 예정표, 조기 완납·취소를 관리하는 화면 시안으로 연결됩니다.'
-              })
+            onClick: handleGoInstallments
           },
           {
             label: '회수금 관리',
@@ -551,11 +620,7 @@ export const ExpensesPreview = () => {
             icon: HandCoins,
             iconClass: 'bg-positive-tint text-positive',
             valueClass: 'text-positive',
-            onClick: () =>
-              void dialog.alert({
-                title: '회수금 관리',
-                description: '상대별 미회수 금액을 확인하고 일괄 회수 처리하는 화면 시안으로 연결됩니다.'
-              })
+            onClick: handleGoReceivables
           }
         ].map((item) => {
           const NavIcon = item.icon;
@@ -804,42 +869,55 @@ export const ExpensesPreview = () => {
         <SheetContent side="bottom">
           <SheetHeader>
             <SheetTitle>지출 관리</SheetTitle>
-            <SheetDescription>가져오기와 고정 지출 설정을 빠르게 실행할 수 있어요.</SheetDescription>
+            <SheetDescription>지출 추가, 내역 가져오기, 고정 지출을 바로 실행해요.</SheetDescription>
           </SheetHeader>
           <SheetBody className="gap-2 pb-1">
-            <button
-              type="button"
-              onClick={handleOpenImport}
-              className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-accent/40"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-tint text-primary">
-                  <Upload className="size-4" />
-                </span>
-                <div className="min-w-0 flex flex-col gap-0.5">
-                  <span className="text-sm font-bold text-foreground">카드 내역 가져오기</span>
-                  <span className="text-xs text-muted-foreground break-keep">명세서·엑셀 파일로 한 번에 등록</span>
-                </div>
-              </div>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleOpenFixedExpenses}
-              className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-accent/40"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
-                  <Repeat className="size-4" />
-                </span>
-                <div className="min-w-0 flex flex-col gap-0.5">
-                  <span className="text-sm font-bold text-foreground">고정 지출 설정</span>
-                  <span className="text-xs text-muted-foreground break-keep">매달 반복되는 월세·구독·공과금 관리</span>
-                </div>
-              </div>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </button>
+            {(
+              [
+                {
+                  label: '지출 추가',
+                  description: '일시불·할부·분류 분할 지출 등록',
+                  icon: Plus,
+                  iconClass: 'bg-primary text-primary-foreground',
+                  onClick: handleOpenCreate
+                },
+                {
+                  label: '카드 내역 가져오기',
+                  description: '명세서·엑셀 파일로 한 번에 등록',
+                  icon: Upload,
+                  iconClass: 'bg-primary-tint text-primary',
+                  onClick: handleOpenImport
+                },
+                {
+                  label: '고정 지출 설정',
+                  description: '매달 반복되는 월세·구독·공과금 관리',
+                  icon: Repeat,
+                  iconClass: 'bg-muted text-foreground',
+                  onClick: handleOpenFixedExpenses
+                }
+              ] as const
+            ).map((action) => {
+              const ActionIcon = action.icon;
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={action.onClick}
+                  className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-accent/40"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-lg', action.iconClass)}>
+                      <ActionIcon className="size-4" />
+                    </span>
+                    <div className="min-w-0 flex flex-col gap-0.5">
+                      <span className="text-sm font-bold text-foreground">{action.label}</span>
+                      <span className="text-xs text-muted-foreground break-keep">{action.description}</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              );
+            })}
           </SheetBody>
         </SheetContent>
       </Sheet>
@@ -867,7 +945,14 @@ export const ExpensesPreview = () => {
         </SheetContent>
       </Sheet>
 
-      <ExpenseFormOverlay open={formOpen} onOpenChange={setFormOpen} draft={formDraft} onDraftChange={setFormDraft} onSave={(draft) => void handleSaveExpense(draft)} />
+      <ExpenseFormOverlay
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        draft={formDraft}
+        onDraftChange={setFormDraft}
+        onSave={(draft) => void handleSaveExpense(draft)}
+        onDelete={(draft) => void handleDeleteExpense(draft)}
+      />
     </DesignAppShell>
   );
 };
