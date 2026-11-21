@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, NoticeBox } from '@repo/ui-core';
-import * as React from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type SubmitEvent } from 'react';
 
 import { commonDialogStore, type CommonDialogRequest } from './common-dialog-store';
 
@@ -10,16 +10,16 @@ type CommonDialogViewProps = {
 };
 
 const CommonDialogView = ({ request }: CommonDialogViewProps) => {
-  const inputId = React.useId();
-  const descriptionId = React.useId();
-  const inputRef = React.useRef<HTMLInputElement>(null);
-  const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
-  const confirmButtonRef = React.useRef<HTMLButtonElement>(null);
+  const inputId = useId();
+  const descriptionId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [inputValue, setInputValue] = React.useState(() => (request.kind === 'prompt' ? request.defaultValue : ''));
-  const [error, setError] = React.useState<string | null>(null);
+  const [inputValue, setInputValue] = useState(() => (request.kind === 'prompt' ? request.defaultValue : ''));
+  const [error, setError] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (commonDialogStore.getSnapshot() !== null) {
         return;
@@ -48,7 +48,7 @@ const CommonDialogView = ({ request }: CommonDialogViewProps) => {
     finish(null);
   };
 
-  const handlePromptSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handlePromptSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (request.kind !== 'prompt') {
       return;
@@ -178,9 +178,9 @@ const CommonDialogView = ({ request }: CommonDialogViewProps) => {
 };
 
 export const CommonDialogHost = () => {
-  const request = React.useSyncExternalStore(commonDialogStore.subscribe, commonDialogStore.getSnapshot, commonDialogStore.getServerSnapshot);
+  const request = useSyncExternalStore(commonDialogStore.subscribe, commonDialogStore.getSnapshot, commonDialogStore.getServerSnapshot);
 
-  React.useEffect(() => commonDialogStore.attachHost(), []);
+  useEffect(() => commonDialogStore.attachHost(), []);
 
   return request ? <CommonDialogView key={request.id} request={request} /> : null;
 };

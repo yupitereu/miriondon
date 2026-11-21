@@ -3,7 +3,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { X } from 'lucide-react';
-import * as React from 'react';
+import { ComponentProps } from 'react';
 
 import { cn } from '../../lib/utils';
 import { Icon } from '../icon/Icon';
@@ -13,7 +13,7 @@ const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
 
-const DialogOverlay = ({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) => {
+const DialogOverlay = ({ className, ...props }: ComponentProps<typeof DialogPrimitive.Overlay>) => {
   return <DialogPrimitive.Overlay className={cn('fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] transition-opacity data-[state=closed]:opacity-0', className)} {...props} />;
 };
 
@@ -32,7 +32,7 @@ const dialogContentVariants = cva(
   }
 );
 
-export interface DialogContentProps extends React.ComponentProps<typeof DialogPrimitive.Content>, VariantProps<typeof dialogContentVariants> {
+export interface DialogContentProps extends ComponentProps<typeof DialogPrimitive.Content>, VariantProps<typeof dialogContentVariants> {
   showCloseButton?: boolean;
 }
 
@@ -55,23 +55,23 @@ const DialogContent = ({ className, size = 'default', children, showCloseButton 
   );
 };
 
-const DialogHeader = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const DialogHeader = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex flex-col gap-1.5 pr-6 text-left', className)} {...props} />;
 };
 
-const DialogTitle = ({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) => {
+const DialogTitle = ({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>) => {
   return <DialogPrimitive.Title className={cn('text-base font-bold leading-snug tracking-tight text-foreground', className)} {...props} />;
 };
 
-const DialogDescription = ({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) => {
+const DialogDescription = ({ className, ...props }: ComponentProps<typeof DialogPrimitive.Description>) => {
   return <DialogPrimitive.Description className={cn('text-[13px] leading-relaxed text-muted-foreground break-keep', className)} {...props} />;
 };
 
-const DialogBody = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const DialogBody = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex max-h-[min(30rem,calc(100dvh-10rem))] flex-col gap-3 overflow-y-auto', className)} {...props} />;
 };
 
-const DialogFooter = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const DialogFooter = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex items-center justify-end gap-2 pt-1', className)} {...props} />;
 };
 

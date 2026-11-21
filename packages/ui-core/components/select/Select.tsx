@@ -2,7 +2,7 @@
 
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react';
-import * as React from 'react';
+import { ComponentProps } from 'react';
 
 import { cn } from '../../lib/utils';
 import { Icon } from '../icon/Icon';
@@ -11,7 +11,7 @@ const Select = SelectPrimitive.Root;
 const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
 
-export interface SelectTriggerProps extends React.ComponentProps<typeof SelectPrimitive.Trigger> {
+export interface SelectTriggerProps extends ComponentProps<typeof SelectPrimitive.Trigger> {
   size?: 'md' | 'lg';
   error?: string;
   wrapperClassName?: string;
@@ -47,7 +47,7 @@ const SelectTrigger = ({ className, wrapperClassName, size = 'lg', children, err
   );
 };
 
-const SelectScrollUpButton = ({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.ScrollUpButton>) => {
+const SelectScrollUpButton = ({ className, ...props }: ComponentProps<typeof SelectPrimitive.ScrollUpButton>) => {
   return (
     <SelectPrimitive.ScrollUpButton className={cn('flex cursor-default items-center justify-center py-1', className)} {...props}>
       <Icon icon={ChevronUp} size="md" />
@@ -55,7 +55,7 @@ const SelectScrollUpButton = ({ className, ...props }: React.ComponentProps<type
   );
 };
 
-const SelectScrollDownButton = ({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.ScrollDownButton>) => {
+const SelectScrollDownButton = ({ className, ...props }: ComponentProps<typeof SelectPrimitive.ScrollDownButton>) => {
   return (
     <SelectPrimitive.ScrollDownButton className={cn('flex cursor-default items-center justify-center py-1', className)} {...props}>
       <Icon icon={ChevronDown} size="md" />
@@ -63,7 +63,7 @@ const SelectScrollDownButton = ({ className, ...props }: React.ComponentProps<ty
   );
 };
 
-const SelectContent = ({ className, children, position = 'popper', ...props }: React.ComponentProps<typeof SelectPrimitive.Content>) => {
+const SelectContent = ({ className, children, position = 'popper', ...props }: ComponentProps<typeof SelectPrimitive.Content>) => {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
@@ -85,11 +85,11 @@ const SelectContent = ({ className, children, position = 'popper', ...props }: R
   );
 };
 
-const SelectLabel = ({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Label>) => {
+const SelectLabel = ({ className, ...props }: ComponentProps<typeof SelectPrimitive.Label>) => {
   return <SelectPrimitive.Label className={cn('px-2 py-1.5 text-xs font-semibold text-muted-foreground', className)} {...props} />;
 };
 
-const SelectItem = ({ className, children, ...props }: React.ComponentProps<typeof SelectPrimitive.Item>) => {
+const SelectItem = ({ className, children, ...props }: ComponentProps<typeof SelectPrimitive.Item>) => {
   return (
     <SelectPrimitive.Item
       className={cn(
@@ -109,7 +109,7 @@ const SelectItem = ({ className, children, ...props }: React.ComponentProps<type
   );
 };
 
-const SelectSeparator = ({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Separator>) => {
+const SelectSeparator = ({ className, ...props }: ComponentProps<typeof SelectPrimitive.Separator>) => {
   return <SelectPrimitive.Separator className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />;
 };
 

@@ -2,7 +2,7 @@
 
 import * as ProgressPrimitive from '@radix-ui/react-progress';
 import { cva, type VariantProps } from 'class-variance-authority';
-import * as React from 'react';
+import type { ComponentProps } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -18,7 +18,7 @@ const progressIndicatorVariants = cva('h-full w-full flex-1 rounded-full transit
   }
 });
 
-export interface ProgressBarProps extends Omit<React.ComponentProps<typeof ProgressPrimitive.Root>, 'value'>, VariantProps<typeof progressIndicatorVariants> {
+export interface ProgressBarProps extends Omit<ComponentProps<typeof ProgressPrimitive.Root>, 'value'>, VariantProps<typeof progressIndicatorVariants> {
   value: number;
 }
 

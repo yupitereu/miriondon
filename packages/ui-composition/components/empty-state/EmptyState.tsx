@@ -1,16 +1,21 @@
 import { cn } from '@repo/ui-core';
-import * as React from 'react';
+import type { ReactNode } from 'react';
 
-export interface EmptyStateProps {
-  icon?: React.ReactNode;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  actions?: React.ReactNode;
+export const EmptyState = ({
+  icon,
+  title,
+  description,
+  actions,
+  className,
+  children
+}: {
+  icon?: ReactNode;
+  title?: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
   className?: string;
-  children?: React.ReactNode;
-}
-
-export const EmptyState = ({ icon, title, description, actions, className, children }: EmptyStateProps) => {
+  children?: ReactNode;
+}) => {
   return (
     <div className={cn('flex flex-col items-center justify-center gap-2.5 px-4 py-8 text-center', className)}>
       {icon ? <div className="text-muted-foreground">{icon}</div> : null}

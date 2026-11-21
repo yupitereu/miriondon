@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import * as React from 'react';
+import type { SVGProps } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -13,7 +13,7 @@ const iconSizes = {
 
 type IconSize = keyof typeof iconSizes;
 
-type IconProps = React.SVGProps<SVGSVGElement> & {
+type IconProps = SVGProps<SVGSVGElement> & {
   icon: LucideIcon;
   size?: IconSize;
 };

@@ -1,18 +1,18 @@
 'use client';
 
 import * as SwitchPrimitive from '@radix-ui/react-switch';
-import * as React from 'react';
+import { ComponentProps, useId, type ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
 
-export interface SwitchProps extends React.ComponentProps<typeof SwitchPrimitive.Root> {
-  label?: React.ReactNode;
+export interface SwitchProps extends ComponentProps<typeof SwitchPrimitive.Root> {
+  label?: ReactNode;
   description?: string;
   wrapperClassName?: string;
 }
 
 const Switch = ({ className, wrapperClassName, label, description, id, disabled, ...props }: SwitchProps) => {
-  const generatedId = React.useId();
+  const generatedId = useId();
   const controlId = id ?? generatedId;
 
   const control = (

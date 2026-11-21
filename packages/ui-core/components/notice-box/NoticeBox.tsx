@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { AlertCircle, AlertTriangle, Info, type LucideIcon } from 'lucide-react';
-import * as React from 'react';
+import { ComponentProps } from 'react';
 
 import { cn } from '../../lib/utils';
 import { Icon } from '../icon/Icon';
@@ -24,7 +24,7 @@ const defaultIcons: Record<NonNullable<VariantProps<typeof noticeBoxVariants>['v
   error: AlertCircle
 };
 
-export interface NoticeBoxProps extends React.ComponentProps<'div'>, VariantProps<typeof noticeBoxVariants> {
+export interface NoticeBoxProps extends ComponentProps<'div'>, VariantProps<typeof noticeBoxVariants> {
   icon?: LucideIcon | null;
 }
 

@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import * as React from 'react';
+import { ComponentProps } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -21,29 +21,29 @@ const cardVariants = cva('flex flex-col gap-2 text-card-foreground', {
   }
 });
 
-export interface CardProps extends React.ComponentProps<'div'>, VariantProps<typeof cardVariants> {}
+export interface CardProps extends ComponentProps<'div'>, VariantProps<typeof cardVariants> {}
 
 const Card = ({ className, variant, padding, ...props }: CardProps) => {
   return <div className={cn(cardVariants({ variant, padding }), className)} {...props} />;
 };
 
-const CardHeader = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const CardHeader = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex flex-col gap-1', className)} {...props} />;
 };
 
-const CardTitle = ({ className, ...props }: React.ComponentProps<'h3'>) => {
+const CardTitle = ({ className, ...props }: ComponentProps<'h3'>) => {
   return <h3 className={cn('text-[15px] font-bold leading-snug tracking-tight', className)} {...props} />;
 };
 
-const CardDescription = ({ className, ...props }: React.ComponentProps<'p'>) => {
+const CardDescription = ({ className, ...props }: ComponentProps<'p'>) => {
   return <p className={cn('text-xs leading-relaxed text-muted-foreground', className)} {...props} />;
 };
 
-const CardContent = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const CardContent = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex flex-col gap-2', className)} {...props} />;
 };
 
-const CardFooter = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const CardFooter = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex items-center justify-between gap-2 pt-1', className)} {...props} />;
 };
 

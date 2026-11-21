@@ -2,7 +2,7 @@
 
 import { Checkbox, Popover, PopoverContent, PopoverTrigger, cn } from '@repo/ui-core';
 import { Check, ChevronDown } from 'lucide-react';
-import * as React from 'react';
+import { Fragment, useState } from 'react';
 
 export const mergeFilterOptions = (base: readonly string[], extras: string[]): string[] => {
   const seen = new Set(base);
@@ -28,7 +28,15 @@ export type FilterSingleOption<T extends string = string> = {
   label: string;
 };
 
-export interface FilterSingleSelectProps<T extends string = string> {
+export const FilterSingleSelect = <T extends string = string>({
+  label,
+  options,
+  value,
+  defaultValue,
+  allValue,
+  onChange,
+  className
+}: {
   label: string;
   options: readonly FilterSingleOption<T>[];
   value: T;
@@ -36,10 +44,8 @@ export interface FilterSingleSelectProps<T extends string = string> {
   allValue?: T;
   onChange: (value: T) => void;
   className?: string;
-}
-
-export const FilterSingleSelect = <T extends string = string>({ label, options, value, defaultValue, allValue, onChange, className }: FilterSingleSelectProps<T>) => {
-  const [open, setOpen] = React.useState(false);
+}) => {
+  const [open, setOpen] = useState(false);
 
   const baseline = defaultValue ?? options[0]?.id;
   const allKey = allValue ?? baseline;
@@ -65,7 +71,7 @@ export const FilterSingleSelect = <T extends string = string>({ label, options, 
           {options.map((opt) => {
             const active = value === opt.id;
             return (
-              <React.Fragment key={opt.id}>
+              <Fragment key={opt.id}>
                 <button
                   type="button"
                   role="menuitemradio"
@@ -83,7 +89,7 @@ export const FilterSingleSelect = <T extends string = string>({ label, options, 
                   {active ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
                 </button>
                 {opt.id === allKey ? <div className="my-1 border-t border-border/70" /> : null}
-              </React.Fragment>
+              </Fragment>
             );
           })}
         </div>
@@ -92,21 +98,29 @@ export const FilterSingleSelect = <T extends string = string>({ label, options, 
   );
 };
 
-export interface FilterMultiSelectProps {
+export const FilterMultiSelect = ({
+  label,
+  options,
+  selected,
+  onChange,
+  allLabel = '전체',
+  className,
+  selectionMode = 'filter'
+}: {
   label: string;
   options: readonly string[];
   selected: Set<string>;
   onChange: (nextSelected: Set<string>) => void;
   allLabel?: string;
   className?: string;
-}
-
-export const FilterMultiSelect = ({ label, options, selected, onChange, allLabel = '전체', className }: FilterMultiSelectProps) => {
-  const [open, setOpen] = React.useState(false);
+  selectionMode?: 'filter' | 'explicit';
+}) => {
+  const [open, setOpen] = useState(false);
 
   const selectedCount = options.filter((opt) => selected.has(opt)).length;
   const hasSelection = selectedCount > 0;
-  const summaryText = hasSelection ? `${label} ${selectedCount}` : label;
+  const allSelected = selectionMode === 'explicit' && options.length > 0 && selectedCount === options.length;
+  const summaryText = selectionMode === 'explicit' ? `${label} ${allSelected ? '전체' : selectedCount ? selectedCount : '선택 없음'}` : hasSelection ? `${label} ${selectedCount}` : label;
 
   const handleToggleOption = (option: string, checked: boolean) => {
     const next = new Set(selected);
@@ -134,11 +148,10 @@ export const FilterMultiSelect = ({ label, options, selected, onChange, allLabel
 
         <div className="mt-1 flex max-h-56 flex-col overflow-y-auto">
           <Checkbox
-            checked={!hasSelection}
+            checked={selectionMode === 'explicit' ? (allSelected ? true : hasSelection ? 'indeterminate' : false) : !hasSelection}
             onCheckedChange={(checked) => {
-              if (checked === true) {
-                onChange(new Set());
-              }
+              if (selectionMode === 'explicit') onChange(checked === true ? new Set(options) : new Set());
+              else if (checked === true) onChange(new Set());
             }}
             wrapperClassName="min-h-8 w-full rounded-md px-1.5 hover:bg-accent/50"
             label={<span className="truncate text-xs font-medium text-foreground">{allLabel}</span>}
@@ -159,35 +172,33 @@ export const FilterMultiSelect = ({ label, options, selected, onChange, allLabel
   );
 };
 
-type MultiChipGroupProps = {
-  mode?: 'multi';
-  label?: string;
-  options: readonly string[];
-  selected: Set<string>;
-  onChange: (nextSelected: Set<string>) => void;
-  allLabel?: string;
-  showAllOption?: boolean;
-  className?: string;
-};
-
-type SingleChipGroupProps<T extends string = string> = {
-  mode: 'single';
-  label?: string;
-  options: readonly FilterSingleOption<T>[];
-  value: T;
-  onChange: (value: T) => void;
-  className?: string;
-};
-
-export type FilterChipGroupProps<T extends string = string> = MultiChipGroupProps | SingleChipGroupProps<T>;
-
 const getChipClassName = (active: boolean) =>
   cn(
     'min-h-8 rounded-full border px-3 text-xs transition-colors',
     active ? 'border-primary bg-primary-tint font-bold text-primary' : 'border-border bg-card font-medium text-foreground hover:border-border-strong'
   );
 
-export const FilterChipGroup = <T extends string = string>(props: FilterChipGroupProps<T>) => {
+export const FilterChipGroup = <T extends string = string>(
+  props:
+    | {
+        mode?: 'multi';
+        label?: string;
+        options: readonly string[];
+        selected: Set<string>;
+        onChange: (nextSelected: Set<string>) => void;
+        allLabel?: string;
+        showAllOption?: boolean;
+        className?: string;
+      }
+    | {
+        mode: 'single';
+        label?: string;
+        options: readonly FilterSingleOption<T>[];
+        value: T;
+        onChange: (value: T) => void;
+        className?: string;
+      }
+) => {
   if (props.mode === 'single') {
     return (
       <div className={cn('flex flex-col gap-2', props.className)}>

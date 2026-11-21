@@ -4,30 +4,12 @@ import { Button, cn, Icon, Popover, PopoverContent, PopoverTrigger, Sheet, Sheet
 import { format, isAfter, isBefore, isSameDay, startOfDay, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
-import * as React from 'react';
+import { useId, useState } from 'react';
 import type { Matcher } from 'react-day-picker';
 
 import { Calendar } from '../calendar/Calendar';
 
 export type DatePreset = 'today' | 'yesterday';
-
-export interface DatePickerProps {
-  id?: string;
-  value?: Date | null;
-  defaultValue?: Date | null;
-  onChange?: (date: Date | null) => void;
-  presets?: DatePreset[];
-  placeholder?: string;
-  disabled?: boolean;
-  minDate?: Date;
-  maxDate?: Date;
-  disabledDates?: Matcher | Matcher[];
-  error?: string;
-  clearable?: boolean;
-  className?: string;
-  sheetTitle?: string;
-  'aria-label'?: string;
-}
 
 const PRESET_LABEL: Record<DatePreset, string> = {
   today: '오늘',
@@ -37,6 +19,17 @@ const PRESET_LABEL: Record<DatePreset, string> = {
 const getPresetDate = (preset: DatePreset): Date => {
   const today = startOfDay(new Date());
   return preset === 'yesterday' ? subDays(today, 1) : today;
+};
+
+const getInitialDisplayMonth = (selectedDate: Date | null, minDate?: Date, maxDate?: Date): Date => {
+  const base = selectedDate ?? new Date();
+  if (minDate && isBefore(startOfDay(base), startOfDay(minDate))) {
+    return minDate;
+  }
+  if (maxDate && isAfter(startOfDay(base), startOfDay(maxDate))) {
+    return maxDate;
+  }
+  return base;
 };
 
 const isDateDisabled = (date: Date, minDate?: Date, maxDate?: Date): boolean => {
@@ -84,25 +77,41 @@ const DatePicker = ({
   className,
   sheetTitle = '날짜 선택',
   'aria-label': ariaLabel
-}: DatePickerProps) => {
-  const generatedId = React.useId();
+}: {
+  id?: string;
+  value?: Date | null;
+  defaultValue?: Date | null;
+  onChange?: (date: Date | null) => void;
+  presets?: DatePreset[];
+  placeholder?: string;
+  disabled?: boolean;
+  minDate?: Date;
+  maxDate?: Date;
+  disabledDates?: Matcher | Matcher[];
+  error?: string;
+  clearable?: boolean;
+  className?: string;
+  sheetTitle?: string;
+  'aria-label'?: string;
+}) => {
+  const generatedId = useId();
   const triggerId = id ?? generatedId;
   const errorId = `${triggerId}-error`;
   const isMobile = useIsMobileView();
 
   const isControlled = value !== undefined;
-  const [uncontrolledValue, setUncontrolledValue] = React.useState<Date | null>(defaultValue);
+  const [uncontrolledValue, setUncontrolledValue] = useState<Date | null>(defaultValue);
   const selectedDate = isControlled ? (value ?? null) : uncontrolledValue;
 
-  const [open, setOpen] = React.useState(false);
-  const [displayMonth, setDisplayMonth] = React.useState<Date>(() => selectedDate ?? new Date());
+  const [open, setOpen] = useState(false);
+  const [displayMonth, setDisplayMonth] = useState<Date>(() => getInitialDisplayMonth(selectedDate, minDate, maxDate));
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (disabled && nextOpen) {
       return;
     }
     if (nextOpen) {
-      setDisplayMonth(selectedDate ?? new Date());
+      setDisplayMonth(getInitialDisplayMonth(selectedDate, minDate, maxDate));
     }
     setOpen(nextOpen);
   };
@@ -138,7 +147,16 @@ const DatePicker = ({
           })}
         </div>
       ) : null}
-      <Calendar mode="single" selected={selectedDate ?? undefined} onSelect={(date) => commitDate(date ?? null)} month={displayMonth} onMonthChange={setDisplayMonth} disabled={disabledMatchers} />
+      <Calendar
+        mode="single"
+        selected={selectedDate ?? undefined}
+        onSelect={(date) => commitDate(date ?? null)}
+        month={displayMonth}
+        onMonthChange={setDisplayMonth}
+        startMonth={minDate ? new Date(minDate.getFullYear(), minDate.getMonth(), 1) : undefined}
+        endMonth={maxDate ? new Date(maxDate.getFullYear(), maxDate.getMonth(), 1) : undefined}
+        disabled={disabledMatchers}
+      />
     </div>
   );
 

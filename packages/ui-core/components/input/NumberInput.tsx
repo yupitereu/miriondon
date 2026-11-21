@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import { useState, type ChangeEvent, type FocusEvent } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -43,13 +43,13 @@ const parseNumericInput = (raw: string, allowNegative: boolean): { displayDigits
 
 const NumberInput = ({ value, defaultValue, onValueChange, allowNegative = false, formatThousands = true, className, onBlur, ...props }: NumberInputProps) => {
   const isControlled = value !== undefined;
-  const [uncontrolledValue, setUncontrolledValue] = React.useState<number | null>(defaultValue ?? null);
-  const [pendingMinus, setPendingMinus] = React.useState(false);
+  const [uncontrolledValue, setUncontrolledValue] = useState<number | null>(defaultValue ?? null);
+  const [pendingMinus, setPendingMinus] = useState(false);
 
   const currentNumber = isControlled ? (value ?? null) : uncontrolledValue;
   const displayValue = pendingMinus && currentNumber === null ? '-' : formatNumericDisplay(currentNumber, formatThousands);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { displayDigits, parsed } = parseNumericInput(e.target.value, allowNegative);
     setPendingMinus(displayDigits === '-');
 
@@ -59,7 +59,7 @@ const NumberInput = ({ value, defaultValue, onValueChange, allowNegative = false
     onValueChange?.(parsed);
   };
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlur = (e: FocusEvent<HTMLInputElement>) => {
     if (pendingMinus) {
       setPendingMinus(false);
     }

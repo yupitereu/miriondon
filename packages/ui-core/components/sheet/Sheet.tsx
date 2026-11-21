@@ -3,7 +3,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { X } from 'lucide-react';
-import * as React from 'react';
+import { ComponentProps } from 'react';
 
 import { cn } from '../../lib/utils';
 import { Icon } from '../icon/Icon';
@@ -13,7 +13,7 @@ const SheetTrigger = DialogPrimitive.Trigger;
 const SheetClose = DialogPrimitive.Close;
 const SheetPortal = DialogPrimitive.Portal;
 
-const SheetOverlay = ({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) => {
+const SheetOverlay = ({ className, ...props }: ComponentProps<typeof DialogPrimitive.Overlay>) => {
   return <DialogPrimitive.Overlay className={cn('fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] transition-opacity data-[state=closed]:opacity-0', className)} {...props} />;
 };
 
@@ -30,7 +30,7 @@ const sheetContentVariants = cva('fixed z-50 flex flex-col gap-3 border-border-s
   }
 });
 
-export interface SheetContentProps extends React.ComponentProps<typeof DialogPrimitive.Content>, VariantProps<typeof sheetContentVariants> {
+export interface SheetContentProps extends ComponentProps<typeof DialogPrimitive.Content>, VariantProps<typeof sheetContentVariants> {
   showCloseButton?: boolean;
 }
 
@@ -53,23 +53,23 @@ const SheetContent = ({ side = 'bottom', className, children, showCloseButton = 
   );
 };
 
-const SheetHeader = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const SheetHeader = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex shrink-0 flex-col gap-1 pr-7 text-left', className)} {...props} />;
 };
 
-const SheetTitle = ({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) => {
+const SheetTitle = ({ className, ...props }: ComponentProps<typeof DialogPrimitive.Title>) => {
   return <DialogPrimitive.Title className={cn('text-base font-bold leading-snug tracking-tight text-foreground', className)} {...props} />;
 };
 
-const SheetDescription = ({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) => {
+const SheetDescription = ({ className, ...props }: ComponentProps<typeof DialogPrimitive.Description>) => {
   return <DialogPrimitive.Description className={cn('text-xs leading-relaxed text-muted-foreground break-keep', className)} {...props} />;
 };
 
-const SheetBody = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const SheetBody = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto', className)} {...props} />;
 };
 
-const SheetFooter = ({ className, ...props }: React.ComponentProps<'div'>) => {
+const SheetFooter = ({ className, ...props }: ComponentProps<'div'>) => {
   return <div className={cn('flex shrink-0 items-center justify-end gap-2 border-t border-border pt-3', className)} {...props} />;
 };
 

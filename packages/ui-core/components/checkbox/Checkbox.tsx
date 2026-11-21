@@ -2,19 +2,19 @@
 
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { Check } from 'lucide-react';
-import * as React from 'react';
+import { ComponentProps, useId, type ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
 import { Icon } from '../icon/Icon';
 
-export interface CheckboxProps extends React.ComponentProps<typeof CheckboxPrimitive.Root> {
-  label?: React.ReactNode;
+export interface CheckboxProps extends ComponentProps<typeof CheckboxPrimitive.Root> {
+  label?: ReactNode;
   description?: string;
   wrapperClassName?: string;
 }
 
 const Checkbox = ({ className, wrapperClassName, label, description, id, disabled, ...props }: CheckboxProps) => {
-  const generatedId = React.useId();
+  const generatedId = useId();
   const controlId = id ?? generatedId;
 
   const control = (

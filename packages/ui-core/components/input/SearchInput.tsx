@@ -1,7 +1,7 @@
 'use client';
 
 import { Search, X } from 'lucide-react';
-import * as React from 'react';
+import { useState, type ChangeEvent } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -18,10 +18,10 @@ export interface SearchInputProps extends Omit<InputProps, 'prefix' | 'suffix' |
 
 const SearchInput = ({ value, defaultValue, onChange, onValueChange, onClear, clearable = true, clearLabel = '검색어 지우기', className, disabled, ...props }: SearchInputProps) => {
   const isControlled = value !== undefined;
-  const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue ?? '');
+  const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue ?? '');
   const currentValue = isControlled ? value : uncontrolledValue;
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (!isControlled) {
       setUncontrolledValue(event.target.value);
     }

@@ -1,12 +1,12 @@
-import * as React from 'react';
+import { useId, type ComponentProps, type ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
 
-export interface InputProps extends Omit<React.ComponentProps<'input'>, 'prefix' | 'size'> {
+export interface InputProps extends Omit<ComponentProps<'input'>, 'prefix' | 'size'> {
   size?: 'md' | 'lg';
   error?: string;
-  prefix?: React.ReactNode;
-  suffix?: React.ReactNode;
+  prefix?: ReactNode;
+  suffix?: ReactNode;
   wrapperClassName?: string;
 }
 
@@ -16,7 +16,7 @@ const INPUT_SIZE_CLASS = {
 } as const;
 
 const Input = ({ className, wrapperClassName, size = 'lg', type = 'text', error, prefix, suffix, id, disabled, 'aria-describedby': ariaDescribedBy, ...props }: InputProps) => {
-  const generatedId = React.useId();
+  const generatedId = useId();
   const inputId = id ?? generatedId;
   const errorId = `${inputId}-error`;
   const describedBy = error ? [ariaDescribedBy, errorId].filter(Boolean).join(' ') : ariaDescribedBy;

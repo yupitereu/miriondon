@@ -55,5 +55,6 @@ export {
 export { Switch, type SwitchProps } from './components/switch/Switch';
 export { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow, type TableProps } from './components/table/Table';
 export { Tabs, TabsContent, TabsList, TabsTrigger, type TabsListProps, type TabsProps, type TabsTriggerProps, type TabsVariant } from './components/tabs/Tabs';
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/tooltip/Tooltip';
 export { useIsMobileView } from './hooks/use-mobile';
 export { cn } from './lib/utils';

@@ -1,15 +1,15 @@
 'use client';
 
 import * as TabsPrimitive from '@radix-ui/react-tabs';
-import * as React from 'react';
+import { ComponentProps, createContext, useContext } from 'react';
 
 import { cn } from '../../lib/utils';
 
 type TabsVariant = 'segment' | 'underline';
 
-const TabsVariantContext = React.createContext<TabsVariant>('segment');
+const TabsVariantContext = createContext<TabsVariant>('segment');
 
-export interface TabsProps extends React.ComponentProps<typeof TabsPrimitive.Root> {
+export interface TabsProps extends ComponentProps<typeof TabsPrimitive.Root> {
   variant?: TabsVariant;
 }
 
@@ -19,12 +19,12 @@ const Tabs = ({ variant = 'segment', className, ...props }: TabsProps) => (
   </TabsVariantContext>
 );
 
-export interface TabsListProps extends React.ComponentProps<typeof TabsPrimitive.List> {
+export interface TabsListProps extends ComponentProps<typeof TabsPrimitive.List> {
   variant?: TabsVariant;
 }
 
 const TabsList = ({ className, variant, ...props }: TabsListProps) => {
-  const contextVariant = React.useContext(TabsVariantContext);
+  const contextVariant = useContext(TabsVariantContext);
   const resolvedVariant = variant ?? contextVariant;
 
   return (
@@ -40,12 +40,12 @@ const TabsList = ({ className, variant, ...props }: TabsListProps) => {
   );
 };
 
-export interface TabsTriggerProps extends React.ComponentProps<typeof TabsPrimitive.Trigger> {
+export interface TabsTriggerProps extends ComponentProps<typeof TabsPrimitive.Trigger> {
   variant?: TabsVariant;
 }
 
 const TabsTrigger = ({ className, variant, ...props }: TabsTriggerProps) => {
-  const contextVariant = React.useContext(TabsVariantContext);
+  const contextVariant = useContext(TabsVariantContext);
   const resolvedVariant = variant ?? contextVariant;
 
   return (
@@ -63,7 +63,7 @@ const TabsTrigger = ({ className, variant, ...props }: TabsTriggerProps) => {
   );
 };
 
-const TabsContent = ({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Content>) => {
+const TabsContent = ({ className, ...props }: ComponentProps<typeof TabsPrimitive.Content>) => {
   return <TabsPrimitive.Content className={cn('mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30', className)} {...props} />;
 };
 
