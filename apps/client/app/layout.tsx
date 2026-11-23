@@ -2,10 +2,11 @@ import { CommonDialogHost } from '@repo/ui-composition';
 import type { Metadata } from 'next';
 import { Noto_Sans_KR } from 'next/font/google';
 import { cookies } from 'next/headers';
+import type { ReactNode } from 'react';
 
 import '@repo/ui-core/globals.css';
 
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/features/theme-toggle';
 
 const notoSansKr = Noto_Sans_KR({
   subsets: ['latin'],
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   const theme = (await cookies()).get('theme')?.value === 'dark' ? 'dark' : 'light';
   const htmlClassName = [notoSansKr.variable, theme === 'dark' ? 'dark' : ''].filter(Boolean).join(' ');
