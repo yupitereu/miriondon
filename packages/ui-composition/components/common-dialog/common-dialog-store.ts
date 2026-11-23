@@ -26,6 +26,7 @@ export type PromptDialogOptions = {
   validate?: (value: string) => string | null | undefined | void;
   confirmText?: string;
   cancelText?: string;
+  variant?: 'default' | 'destructive';
 };
 
 export type CommonDialogRequest =
@@ -65,6 +66,7 @@ export type CommonDialogRequest =
       validate?: (value: string) => string | null | undefined | void;
       confirmText: string;
       cancelText: string;
+      variant: 'default' | 'destructive';
       returnFocus: HTMLElement | null;
       resolve: (value: string | null) => void;
     };
@@ -169,6 +171,7 @@ export const promptDialog = (options: PromptDialogOptions): Promise<string | nul
       validate: options.validate,
       confirmText: options.confirmText?.trim() || '확인',
       cancelText: options.cancelText?.trim() || '취소',
+      variant: options.variant ?? 'default',
       returnFocus,
       resolve
     });

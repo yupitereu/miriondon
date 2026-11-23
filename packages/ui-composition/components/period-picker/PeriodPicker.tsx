@@ -17,6 +17,7 @@ type PeriodPickerBaseProps = {
   id?: string;
   size?: 'compact' | 'default';
   disabled?: boolean;
+  invalid?: boolean;
   minYear?: number;
   maxYear?: number;
   getCellStatus?: (target: { year: number; month?: number }) => PeriodCellStatus | undefined;
@@ -62,7 +63,7 @@ const PeriodPicker = (
         onNext?: () => void;
       })
 ) => {
-  const { id, size = 'compact', disabled = false, minYear = 1970, maxYear = 2100, getCellStatus, footer, className, sheetTitle, 'aria-label': ariaLabel } = props;
+  const { id, size = 'compact', disabled = false, invalid = false, minYear = 1970, maxYear = 2100, getCellStatus, footer, className, sheetTitle, 'aria-label': ariaLabel } = props;
 
   const isMobile = useIsMobileView();
   const now = useMemo(() => new Date(), []);
@@ -235,9 +236,11 @@ const PeriodPicker = (
   return (
     <div
       id={id}
+      aria-invalid={invalid ? true : undefined}
       className={cn(
         'inline-flex items-center justify-between rounded-md border border-border-strong bg-card px-1.5 text-foreground',
         size === 'compact' ? 'min-h-[34px] min-w-[144px]' : 'min-h-tab w-full',
+        invalid && 'border-destructive ring-1 ring-destructive/25',
         disabled && 'bg-muted opacity-60',
         className
       )}

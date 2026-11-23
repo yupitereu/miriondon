@@ -127,7 +127,7 @@ const CommonDialogView = ({ request }: CommonDialogViewProps) => {
             <Button ref={cancelButtonRef} type="button" variant="outline" size="lg" className="flex-1" onClick={() => finish(null)}>
               {request.cancelText}
             </Button>
-            <Button ref={confirmButtonRef} type="submit" variant="primary" size="lg" className="flex-1">
+            <Button ref={confirmButtonRef} type="submit" variant={request.variant === 'destructive' ? 'destructive' : 'primary'} size="lg" className="flex-1">
               {request.confirmText}
             </Button>
           </>

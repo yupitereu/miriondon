@@ -25,11 +25,23 @@
   --color-positive: hsl(var(--positive));
   --color-positive-foreground: hsl(var(--positive-foreground));
   --color-positive-tint: hsl(var(--positive-tint));
+  --color-expense: hsl(var(--expense));
+  --color-expense-foreground: hsl(var(--expense-foreground));
+  --color-expense-tint: hsl(var(--expense-tint));
+  --color-income: hsl(var(--income));
+  --color-income-foreground: hsl(var(--income-foreground));
+  --color-income-tint: hsl(var(--income-tint));
   --color-warning: hsl(var(--warning));
   --color-warning-foreground: hsl(var(--warning-foreground));
   --color-warning-tint: hsl(var(--warning-tint));
   --color-hero-from: hsl(var(--hero-from));
   --color-hero-to: hsl(var(--hero-to));
+  --color-hero-positive-from: hsl(var(--hero-positive-from));
+  --color-hero-positive-to: hsl(var(--hero-positive-to));
+  --color-hero-expense-from: hsl(var(--hero-expense-from));
+  --color-hero-expense-to: hsl(var(--hero-expense-to));
+  --color-hero-income-from: hsl(var(--hero-income-from));
+  --color-hero-income-to: hsl(var(--hero-income-to));
   --color-hero-foreground: hsl(var(--hero-foreground));
   --color-surface-elevated: hsl(var(--surface-elevated));
   --color-border: hsl(var(--border));
@@ -52,6 +64,14 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
+  --animate-sheet-overlay-in: sheet-overlay-in 220ms ease-out forwards;
+  --animate-sheet-overlay-out: sheet-overlay-out 200ms ease-in forwards;
+  --animate-sheet-in-bottom: sheet-in-bottom 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  --animate-sheet-out-bottom: sheet-out-bottom 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  --animate-sheet-in-right: sheet-in-right 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  --animate-sheet-out-right: sheet-out-right 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  --animate-sheet-in-left: sheet-in-left 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  --animate-sheet-out-left: sheet-out-left 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* Layout values use a 16px root size; breakpoints stay in rem for Tailwind. */
@@ -118,11 +138,23 @@
     --positive: 175 77% 26%;
     --positive-foreground: 0 0% 98%;
     --positive-tint: 167 85% 91%;
+    --expense: 348 54% 41%;
+    --expense-foreground: 0 0% 98%;
+    --expense-tint: 348 48% 96%;
+    --income: 222 52% 30%;
+    --income-foreground: 0 0% 98%;
+    --income-tint: 222 44% 95%;
     --warning: 32 95% 44%;
     --warning-foreground: 0 0% 98%;
     --warning-tint: 48 96% 89%;
     --hero-from: 306 46% 29%;
     --hero-to: 306 48% 20%;
+    --hero-positive-from: 175 77% 28%;
+    --hero-positive-to: 176 82% 16%;
+    --hero-expense-from: 348 52% 35%;
+    --hero-expense-to: 348 56% 23%;
+    --hero-income-from: 223 54% 26%;
+    --hero-income-to: 225 58% 16%;
     --hero-foreground: 0 0% 100%;
     --surface-elevated: 0 0% 100%;
     --border: 350 12% 91%;
@@ -167,11 +199,23 @@
     --positive: 171 77% 64%;
     --positive-foreground: 345 20% 10%;
     --positive-tint: 173 48% 14%;
+    --expense: 348 68% 72%;
+    --expense-foreground: 348 22% 10%;
+    --expense-tint: 348 34% 16%;
+    --income: 220 74% 72%;
+    --income-foreground: 222 32% 10%;
+    --income-tint: 222 36% 17%;
     --warning: 43 96% 56%;
     --warning-foreground: 345 20% 10%;
     --warning-tint: 35 55% 15%;
     --hero-from: 284 46% 22%;
     --hero-to: 284 48% 14%;
+    --hero-positive-from: 175 62% 21%;
+    --hero-positive-to: 175 68% 12%;
+    --hero-expense-from: 348 48% 24%;
+    --hero-expense-to: 348 54% 15%;
+    --hero-income-from: 224 50% 20%;
+    --hero-income-to: 226 56% 12%;
     --hero-foreground: 0 10% 98%;
     --border: 345 12% 18%;
     --border-strong: 345 12% 24%;
@@ -190,5 +234,77 @@
     --sidebar-accent-foreground: 0 10% 96%;
     --sidebar-border: 345 12% 18%;
     --sidebar-ring: 284 54% 72%;
+  }
+}
+
+@keyframes sheet-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-out-bottom {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sheet-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes sheet-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sheet-out-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
   }
 }

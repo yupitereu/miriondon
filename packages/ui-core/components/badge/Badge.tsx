@@ -9,6 +9,8 @@ const badgeVariants = cva(
     variants: {
       variant: {
         wine: 'bg-primary-tint text-primary',
+        expense: 'bg-expense-tint text-expense',
+        income: 'bg-income-tint text-income',
         positive: 'bg-positive-tint text-positive',
         destructive: 'bg-destructive-tint text-destructive',
         warning: 'bg-warning-tint text-warning',

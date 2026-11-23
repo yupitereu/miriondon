@@ -14,15 +14,25 @@ const SheetClose = DialogPrimitive.Close;
 const SheetPortal = DialogPrimitive.Portal;
 
 const SheetOverlay = ({ className, ...props }: ComponentProps<typeof DialogPrimitive.Overlay>) => {
-  return <DialogPrimitive.Overlay className={cn('fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] transition-opacity data-[state=closed]:opacity-0', className)} {...props} />;
+  return (
+    <DialogPrimitive.Overlay
+      className={cn(
+        'fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] data-[state=open]:animate-sheet-overlay-in data-[state=closed]:animate-sheet-overlay-out motion-reduce:animate-none',
+        className
+      )}
+      {...props}
+    />
+  );
 };
 
 const sheetContentVariants = cva('fixed z-50 flex flex-col gap-3 border-border-strong bg-surface-elevated text-popover-foreground shadow-lg focus:outline-none', {
   variants: {
     side: {
-      bottom: 'inset-x-0 bottom-0 mx-auto max-h-[90dvh] w-full rounded-t-xl border-t p-card-mobile md:p-card-desktop',
-      right: 'inset-y-0 right-0 h-full w-[min(26rem,100vw)] border-l p-card-mobile md:p-card-desktop',
-      left: 'inset-y-0 left-0 h-full w-[min(26rem,100vw)] border-r p-card-mobile md:p-card-desktop'
+      bottom:
+        'inset-x-0 bottom-0 mx-auto max-h-[90dvh] w-full rounded-t-xl border-t p-card-mobile md:p-card-desktop data-[state=open]:animate-sheet-in-bottom data-[state=closed]:animate-sheet-out-bottom motion-reduce:animate-none',
+      right:
+        'inset-y-0 right-0 h-full w-[min(26rem,100vw)] border-l p-card-mobile md:p-card-desktop data-[state=open]:animate-sheet-in-right data-[state=closed]:animate-sheet-out-right motion-reduce:animate-none',
+      left: 'inset-y-0 left-0 h-full w-[min(26rem,100vw)] border-r p-card-mobile md:p-card-desktop data-[state=open]:animate-sheet-in-left data-[state=closed]:animate-sheet-out-left motion-reduce:animate-none'
     }
   },
   defaultVariants: {

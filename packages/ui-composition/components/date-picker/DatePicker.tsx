@@ -73,6 +73,7 @@ const DatePicker = ({
   maxDate,
   disabledDates,
   error,
+  invalid = false,
   clearable = false,
   className,
   sheetTitle = '날짜 선택',
@@ -89,6 +90,7 @@ const DatePicker = ({
   maxDate?: Date;
   disabledDates?: Matcher | Matcher[];
   error?: string;
+  invalid?: boolean;
   clearable?: boolean;
   className?: string;
   sheetTitle?: string;
@@ -160,13 +162,15 @@ const DatePicker = ({
     </div>
   );
 
+  const isInvalid = Boolean(error || invalid);
+
   const triggerButton = (
     <button
       id={triggerId}
       type="button"
       disabled={disabled}
       aria-label={ariaLabel}
-      aria-invalid={error ? true : undefined}
+      aria-invalid={isInvalid ? true : undefined}
       aria-describedby={error ? errorId : undefined}
       onClick={() => {
         if (isMobile) {
@@ -178,7 +182,7 @@ const DatePicker = ({
         showClear ? 'pr-16' : 'pr-3',
         'focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25',
         'disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60',
-        error && 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/25',
+        isInvalid && 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive/25',
         className
       )}
     >

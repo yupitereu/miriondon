@@ -14,6 +14,7 @@ const SelectValue = SelectPrimitive.Value;
 export interface SelectTriggerProps extends ComponentProps<typeof SelectPrimitive.Trigger> {
   size?: 'md' | 'lg';
   error?: string;
+  invalid?: boolean;
   wrapperClassName?: string;
 }
 
@@ -22,17 +23,18 @@ const SELECT_TRIGGER_SIZE_CLASS = {
   lg: 'min-h-control-lg px-3 py-2.5 text-sm'
 } as const;
 
-const SelectTrigger = ({ className, wrapperClassName, size = 'lg', children, error, ...props }: SelectTriggerProps) => {
+const SelectTrigger = ({ className, wrapperClassName, size = 'lg', children, error, invalid = false, ...props }: SelectTriggerProps) => {
+  const isInvalid = Boolean(error || invalid);
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-1', wrapperClassName)}>
       <SelectPrimitive.Trigger
-        aria-invalid={error ? true : undefined}
+        aria-invalid={isInvalid ? true : undefined}
         className={cn(
           'flex w-full items-center justify-between gap-2 rounded-md border border-border-strong bg-card text-left text-foreground transition-colors',
           SELECT_TRIGGER_SIZE_CLASS[size],
           'placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25',
           'disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60 [&>span]:line-clamp-1',
-          error && 'border-destructive focus:border-destructive focus:ring-destructive/25',
+          isInvalid && 'border-destructive focus:border-destructive focus:ring-destructive/25',
           className
         )}
         {...props}

@@ -2,7 +2,7 @@
 
 import { Checkbox, Popover, PopoverContent, PopoverTrigger, cn } from '@repo/ui-core';
 import { Check, ChevronDown } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 
 export const mergeFilterOptions = (base: readonly string[], extras: string[]): string[] => {
   const seen = new Set(base);
@@ -104,55 +104,95 @@ export const FilterMultiSelect = ({
   selected,
   onChange,
   allLabel = '전체',
-  className,
-  selectionMode = 'filter'
+  align = 'start',
+  renderOption,
+  className
 }: {
   label: string;
   options: readonly string[];
   selected: Set<string>;
   onChange: (nextSelected: Set<string>) => void;
   allLabel?: string;
+  align?: 'start' | 'end';
+  renderOption?: (option: string) => ReactNode;
   className?: string;
-  selectionMode?: 'filter' | 'explicit';
 }) => {
   const [open, setOpen] = useState(false);
+  const [clearedInPopover, setClearedInPopover] = useState(false);
 
   const selectedCount = options.filter((opt) => selected.has(opt)).length;
-  const hasSelection = selectedCount > 0;
-  const allSelected = selectionMode === 'explicit' && options.length > 0 && selectedCount === options.length;
-  const summaryText = selectionMode === 'explicit' ? `${label} ${allSelected ? '전체' : selectedCount ? selectedCount : '선택 없음'}` : hasSelection ? `${label} ${selectedCount}` : label;
+  const allSelected = selectedCount === 0 || (options.length > 0 && selectedCount === options.length);
+  const isFiltered = !allSelected;
+  const summaryText = isFiltered ? `${label} ${selectedCount}` : label;
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setClearedInPopover(false);
+    }
+  };
+
+  const handleToggleAll = (checked: boolean) => {
+    if (clearedInPopover) {
+      if (checked) {
+        setClearedInPopover(false);
+        onChange(new Set());
+      }
+      return;
+    }
+    if (allSelected) {
+      setClearedInPopover(true);
+      return;
+    }
+    if (checked) {
+      onChange(new Set());
+    }
+  };
 
   const handleToggleOption = (option: string, checked: boolean) => {
-    const next = new Set(selected);
+    if (clearedInPopover) {
+      if (!checked) {
+        return;
+      }
+      setClearedInPopover(false);
+      const next = new Set([option]);
+      onChange(next.size === options.length ? new Set() : next);
+      return;
+    }
+
+    const next = allSelected ? new Set(options) : new Set(selected);
     if (checked) {
       next.add(option);
     } else {
       next.delete(option);
     }
-    onChange(next);
+    if (next.size === 0) {
+      setClearedInPopover(true);
+      return;
+    }
+    onChange(next.size === options.length ? new Set() : next);
   };
 
+  const allCheckboxChecked = clearedInPopover ? false : allSelected ? true : 'indeterminate';
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label={`${label} 필터`} aria-expanded={open} className={getFilterTriggerClassName(hasSelection, className)}>
+        <button type="button" aria-label={`${label} 필터`} aria-expanded={open} className={getFilterTriggerClassName(isFiltered, className)}>
           <span className="truncate">{summaryText}</span>
-          <ChevronDown className={cn('size-3.5 shrink-0 transition-transform', hasSelection ? 'text-primary' : 'text-muted-foreground', open && 'rotate-180')} />
+          <ChevronDown className={cn('size-3.5 shrink-0 transition-transform', isFiltered ? 'text-primary' : 'text-muted-foreground', open && 'rotate-180')} />
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-56 p-2">
+      <PopoverContent align={align} className="w-56 p-2">
         <div className="border-b border-border px-1.5 pb-1.5">
           <span className="text-[11px] font-bold text-muted-foreground">{label} 선택</span>
         </div>
 
         <div className="mt-1 flex max-h-56 flex-col overflow-y-auto">
           <Checkbox
-            checked={selectionMode === 'explicit' ? (allSelected ? true : hasSelection ? 'indeterminate' : false) : !hasSelection}
-            onCheckedChange={(checked) => {
-              if (selectionMode === 'explicit') onChange(checked === true ? new Set(options) : new Set());
-              else if (checked === true) onChange(new Set());
-            }}
+            checked={allCheckboxChecked}
+            onCheckedChange={(checked) => handleToggleAll(checked === true)}
             wrapperClassName="min-h-8 w-full rounded-md px-1.5 hover:bg-accent/50"
             label={<span className="truncate text-xs font-medium text-foreground">{allLabel}</span>}
           />
@@ -160,10 +200,16 @@ export const FilterMultiSelect = ({
           {options.map((option) => (
             <Checkbox
               key={option}
-              checked={selected.has(option)}
+              checked={!clearedInPopover && (allSelected || selected.has(option))}
               onCheckedChange={(checked) => handleToggleOption(option, checked === true)}
               wrapperClassName="min-h-8 w-full rounded-md px-1.5 hover:bg-accent/50"
-              label={<span className="truncate text-xs font-medium text-foreground">{option}</span>}
+              label={
+                renderOption ? (
+                  <span className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-foreground">{renderOption(option)}</span>
+                ) : (
+                  <span className="truncate text-xs font-medium text-foreground">{option}</span>
+                )
+              }
             />
           ))}
         </div>
@@ -188,6 +234,7 @@ export const FilterChipGroup = <T extends string = string>(
         onChange: (nextSelected: Set<string>) => void;
         allLabel?: string;
         showAllOption?: boolean;
+        renderOption?: (option: string) => ReactNode;
         className?: string;
       }
     | {
@@ -217,7 +264,7 @@ export const FilterChipGroup = <T extends string = string>(
     );
   }
 
-  const { label, options, selected, onChange, allLabel = '전체', showAllOption = true, className } = props;
+  const { label, options, selected, onChange, allLabel = '전체', showAllOption = true, renderOption, className } = props;
 
   const handleToggle = (option: string) => {
     const next = new Set(selected);
@@ -241,8 +288,8 @@ export const FilterChipGroup = <T extends string = string>(
         {options.map((option) => {
           const active = selected.has(option);
           return (
-            <button key={option} type="button" aria-pressed={active} onClick={() => handleToggle(option)} className={getChipClassName(active)}>
-              {option}
+            <button key={option} type="button" aria-pressed={active} onClick={() => handleToggle(option)} className={cn(getChipClassName(active), renderOption && 'inline-flex items-center gap-1.5')}>
+              {renderOption ? renderOption(option) : option}
             </button>
           );
         })}

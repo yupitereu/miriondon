@@ -8,6 +8,9 @@ const cardVariants = cva('flex flex-col gap-2 text-card-foreground', {
     variant: {
       default: 'rounded-lg border border-border bg-card',
       hero: 'rounded-xl border-0 bg-gradient-to-br from-hero-from to-hero-to text-hero-foreground',
+      'hero-positive': 'rounded-xl border-0 bg-gradient-to-br from-hero-positive-from to-hero-positive-to text-hero-foreground',
+      'hero-expense': 'rounded-xl border-0 bg-gradient-to-br from-hero-expense-from to-hero-expense-to text-hero-foreground',
+      'hero-income': 'rounded-xl border-0 bg-gradient-to-br from-hero-income-from to-hero-income-to text-hero-foreground',
       muted: 'rounded-lg border border-border bg-muted text-foreground'
     },
     padding: {

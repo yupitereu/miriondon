@@ -10,6 +10,7 @@ const progressIndicatorVariants = cva('h-full w-full flex-1 rounded-full transit
   variants: {
     variant: {
       default: 'bg-primary',
+      expense: 'bg-expense',
       over: 'bg-destructive'
     }
   },

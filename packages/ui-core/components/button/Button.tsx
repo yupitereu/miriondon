@@ -11,6 +11,9 @@ const buttonVariants = cva(
       variant: {
         primary: 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
         default: 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
+        expense: 'bg-expense text-expense-foreground shadow-xs hover:bg-expense/90',
+        income: 'bg-income text-income-foreground shadow-xs hover:bg-income/90',
+        positive: 'bg-positive text-positive-foreground shadow-xs hover:bg-positive/90',
         secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
         outline: 'border border-border-strong bg-card text-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
         ghost: 'text-foreground hover:bg-accent hover:text-accent-foreground',

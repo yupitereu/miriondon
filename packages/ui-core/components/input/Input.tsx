@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 export interface InputProps extends Omit<ComponentProps<'input'>, 'prefix' | 'size'> {
   size?: 'md' | 'lg';
   error?: string;
+  invalid?: boolean;
   prefix?: ReactNode;
   suffix?: ReactNode;
   wrapperClassName?: string;
@@ -15,10 +16,11 @@ const INPUT_SIZE_CLASS = {
   lg: 'min-h-control-lg px-3 py-2.5 text-sm'
 } as const;
 
-const Input = ({ className, wrapperClassName, size = 'lg', type = 'text', error, prefix, suffix, id, disabled, 'aria-describedby': ariaDescribedBy, ...props }: InputProps) => {
+const Input = ({ className, wrapperClassName, size = 'lg', type = 'text', error, invalid = false, prefix, suffix, id, disabled, 'aria-describedby': ariaDescribedBy, ...props }: InputProps) => {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const errorId = `${inputId}-error`;
+  const isInvalid = Boolean(error || invalid);
   const describedBy = error ? [ariaDescribedBy, errorId].filter(Boolean).join(' ') : ariaDescribedBy;
 
   return (
@@ -28,7 +30,7 @@ const Input = ({ className, wrapperClassName, size = 'lg', type = 'text', error,
           'flex w-full min-w-0 items-center gap-2 rounded-md border border-border-strong bg-card text-foreground transition-colors',
           INPUT_SIZE_CLASS[size],
           'focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25',
-          error && 'border-destructive focus-within:border-destructive focus-within:ring-destructive/25',
+          isInvalid && 'border-destructive focus-within:border-destructive focus-within:ring-destructive/25',
           disabled && 'cursor-not-allowed bg-muted opacity-60'
         )}
       >
@@ -37,7 +39,7 @@ const Input = ({ className, wrapperClassName, size = 'lg', type = 'text', error,
           id={inputId}
           type={type}
           disabled={disabled}
-          aria-invalid={error ? true : undefined}
+          aria-invalid={isInvalid ? true : undefined}
           aria-describedby={describedBy || undefined}
           className={cn('w-full min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed', className)}
           {...props}
