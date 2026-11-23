@@ -6,9 +6,10 @@
 
 - `apps/design`(`miriondon-design`, 포트 `4100`)은 신규 화면 시안, 반응형 브레이크포인트(`320·375·768·1280px`), Light/Dark 테마, UI 인터랙션을 사전 검증하는 디자인 전용 앱입니다.
 - `[필수]` `apps/client` 및 `apps/server`의 내부 코드를 직접 import하지 않습니다. 공용 UI는 `@repo/ui-core`와 `@repo/ui-composition`의 공개 export만 사용합니다.
-- `[필수]` 실제 API·DB·인증 연동 대신 로컬 목 데이터와 인터랙션 상태만 사용합니다.
+- `[필수]` 실제 API·DB·인증 연동 대신 로컬 목 데이터와 메모리(in-memory) 인터랙션 상태만 사용합니다. `localStorage`·`sessionStorage` 등 브라우저 영속 저장소는 사용하지 않습니다.
 - 시안에서는 레이아웃·반응형·카피·핵심 상태 전환 검증에 집중하고, 실서버 분기나 전체 월별 데이터 생성 같은 과도한 구현은 `apps/client` 단계로 미룹니다.
 - 신규 시안 제작 시 공용 패턴(`DesignAppShell`, `FilterMultiSelect`/`FilterSingleSelect`, `table-fixed` 표 규격, `?` `Popover` 안내)을 우선 재사용합니다.
+- `[필수]` 폼 유효성 검사·저장 실패 등 에러 안내는 하단 인라인 박스 대신 기본적으로 `dialog.alert`([`showValidationAlert`](../../apps/design/shared/design-validation.ts))로 표시하고, 실패 원인이 된 모든 폼 컨트롤(`Input`, `NumberInput`, `Select`, `DatePicker`, `PeriodPicker`)은 `invalid` prop으로 빨간 테두리(`border-destructive`)·`aria-invalid="true"`를 표시하며 수정 시 즉시 해제합니다([`docs/design-system.md` §3.3](../../docs/design-system.md#33-폼-유효성-검증--에러-표기)).
 - 시안이 확정된 화면만 `apps/client`(FSD 구조) 본 화면으로 이관해 도메인 로직·API·Validation을 연결합니다. 여러 화면에 반복되는 도메인 중립 조합을 공용화할지는 [공용 패키지 규칙](shared-packages.md) 기준으로 판단합니다.
 
 ## 폴더 구조 (경량 시안별 Co-location)
