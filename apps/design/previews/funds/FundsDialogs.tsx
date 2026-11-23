@@ -55,7 +55,7 @@ export const AdjustmentEditDialog = ({ open, onOpenChange, initialAccountId, adj
       <DialogContent size="default" aria-describedby={undefined}>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-3">
           <DialogHeader>
-            <DialogTitle>조정 금액 수정</DialogTitle>
+            <DialogTitle>보정 금액 수정</DialogTitle>
           </DialogHeader>
 
           <DialogBody className="flex flex-col gap-3">
@@ -66,7 +66,7 @@ export const AdjustmentEditDialog = ({ open, onOpenChange, initialAccountId, adj
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-foreground">조정 금액</span>
+                <span className="text-xs font-semibold text-foreground">보정 금액</span>
                 {signedAdjustment !== 0 ? (
                   <button type="button" onClick={() => setAmount(0)} className="text-[11px] font-semibold text-primary hover:underline">
                     0원으로 초기화
@@ -74,7 +74,7 @@ export const AdjustmentEditDialog = ({ open, onOpenChange, initialAccountId, adj
                 ) : null}
               </div>
 
-              <NumberInput allowNegative aria-label="조정 금액" value={amount} onValueChange={setAmount} suffix="원" placeholder="예: -15,000 또는 15,000" />
+              <NumberInput allowNegative aria-label="보정 금액" value={amount} onValueChange={setAmount} suffix="원" placeholder="예: -15,000 또는 15,000" />
               <p className="text-[11px] leading-snug text-muted-foreground break-keep">결제 계좌나 현금의 입금·준비 오차가 발생한 경우 이를 맞추기 위해 입력해요.</p>
             </div>
 
@@ -88,10 +88,10 @@ export const AdjustmentEditDialog = ({ open, onOpenChange, initialAccountId, adj
             <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-xs tabular-nums">
               <div className="flex items-center justify-between gap-2 text-muted-foreground">
                 <span>거래 합계 {formatWon(baseTotal)}</span>
-                <span>조정 {formatSignedWon(signedAdjustment)}</span>
+                <span>보정 {formatSignedWon(signedAdjustment)}</span>
               </div>
               <div className="mt-1 flex items-center justify-between gap-2 font-bold text-foreground">
-                <span>채울 금액</span>
+                <span>더 채울 금액</span>
                 <span className="text-sm text-primary">{formatWon(previewNeeded)}</span>
               </div>
             </div>
@@ -352,11 +352,11 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
                       <p className="font-bold text-foreground break-keep">{group.account.name}</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground break-keep">
                         선택 {group.count}건 합계 {formatWon(group.total)}
-                        {group.adjustment !== 0 ? ` · 조정 ${formatSignedWon(group.adjustment)}` : ''}
+                        {group.adjustment !== 0 ? ` · 보정 ${formatSignedWon(group.adjustment)}` : ''}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <span className="block text-[10px] text-muted-foreground">채울 금액</span>
+                      <span className="block text-[10px] text-muted-foreground">더 채울 금액</span>
                       <span className="text-sm font-extrabold text-primary">{formatWon(group.needed)}</span>
                     </div>
                   </div>
@@ -559,7 +559,7 @@ type ReleaseToPrepareDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fromStatus: '지불 대기' | '지불 완료';
-  targetStatus?: '준비 필요' | '지불 대기';
+  targetStatus?: '지불 준비 필요' | '지불 대기';
   selectedCount: number;
   groups: FundAccountGroupSummary[];
   accountBalances: Record<string, number>;
@@ -571,7 +571,7 @@ export const ReleaseToPrepareDialog = ({
   open,
   onOpenChange,
   fromStatus,
-  targetStatus = '준비 필요',
+  targetStatus = '지불 준비 필요',
   selectedCount,
   groups,
   accountBalances,
@@ -690,7 +690,7 @@ export const ReleaseToPrepareDialog = ({
       <DialogContent size="default">
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-3">
           <DialogHeader>
-            <DialogTitle>{targetStatus === '지불 대기' ? '지불 대기로 변경' : '준비 필요로 변경'}</DialogTitle>
+            <DialogTitle>{targetStatus === '지불 대기' ? '지불 대기로 변경' : '지불 준비 필요로 변경'}</DialogTitle>
             <DialogDescription>
               {isFromCompleted
                 ? `지불 완료를 취소하고 환불·복구할 계좌가 있다면 잔액 반영을 선택한 뒤 변경해 주세요. (${selectedCount}건)`

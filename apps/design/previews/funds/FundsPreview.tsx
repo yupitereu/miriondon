@@ -43,7 +43,7 @@ import { formatSignedWon, formatWon } from '@/shared/design-format';
 import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/shared/expense-form/ExpenseFormView';
 import { DEFAULT_VIEWED_MONTH, PAYMENT_METHOD_ITEMS, formatPaymentMethodName, formatYearMonth, getPaymentMethodMeta } from '@/shared/expense-form/expense-form-model';
 
-const STATUS_ORDER: readonly PaymentStatus[] = ['준비 필요', '지불 대기', '지불 완료'] as const;
+const STATUS_ORDER: readonly PaymentStatus[] = ['지불 준비 필요', '지불 대기', '지불 완료'] as const;
 
 type FundPeriodScope = 'all-unpaid' | 'current-only' | 'past-only';
 
@@ -54,7 +54,7 @@ const PERIOD_SCOPE_OPTIONS: ReadonlyArray<{ id: FundPeriodScope; label: string }
 ];
 
 const EMPTY_STATE_COPY: Record<PaymentStatus, { title: string; description: string }> = {
-  '준비 필요': {
+  '지불 준비 필요': {
     title: '준비할 거래가 없어요',
     description: '모든 거래가 지불 대기·완료 상태이거나 조건에 맞는 거래가 없어요.'
   },
@@ -107,7 +107,7 @@ export const FundsPreview = () => {
   const [selectedMethods, setSelectedMethods] = useState<Set<string>>(() => new Set());
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
-  const [activeStatus, setActiveStatus] = useState<PaymentStatus>('준비 필요');
+  const [activeStatus, setActiveStatus] = useState<PaymentStatus>('지불 준비 필요');
   const [transactions, setTransactions] = useState<FundTransactionItem[]>(INITIAL_FUND_TRANSACTIONS);
   const [adjustments, setAdjustments] = useState<Record<FundAccountId, number>>(INITIAL_FUND_ADJUSTMENTS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -131,7 +131,7 @@ export const FundsPreview = () => {
   const [prepareConfirmOpen, setPrepareConfirmOpen] = useState(false);
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
-  const [releaseTargetStatus, setReleaseTargetStatus] = useState<'준비 필요' | '지불 대기'>('준비 필요');
+  const [releaseTargetStatus, setReleaseTargetStatus] = useState<'지불 준비 필요' | '지불 대기'>('지불 준비 필요');
 
   // Add-expense sheet integration
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
@@ -220,7 +220,7 @@ export const FundsPreview = () => {
 
   const countByStatus = useMemo(() => {
     const counts: Record<PaymentStatus, number> = {
-      '준비 필요': 0,
+      '지불 준비 필요': 0,
       '지불 대기': 0,
       '지불 완료': 0
     };
@@ -235,7 +235,7 @@ export const FundsPreview = () => {
   const selectedTotal = useMemo(() => selectedItems.reduce((sum, item) => sum + item.amount, 0), [selectedItems]);
 
   const summarySourceItems = selectedItems.length > 0 ? selectedItems : visibleItems;
-  const summaryGroups = useMemo(() => (activeStatus === '준비 필요' ? computeFundAccountGroups(summarySourceItems, adjustments) : []), [activeStatus, summarySourceItems, adjustments]);
+  const summaryGroups = useMemo(() => (activeStatus === '지불 준비 필요' ? computeFundAccountGroups(summarySourceItems, adjustments) : []), [activeStatus, summarySourceItems, adjustments]);
   const selectedGroups = useMemo(() => computeFundAccountGroups(selectedItems, adjustments), [selectedItems, adjustments]);
 
   const groupTotalsMap = useMemo(() => {
@@ -313,7 +313,7 @@ export const FundsPreview = () => {
       return;
     }
 
-    if (activeStatus === '준비 필요' && targetStatus === '지불 대기') {
+    if (activeStatus === '지불 준비 필요' && targetStatus === '지불 대기') {
       setPrepareConfirmOpen(true);
       return;
     }
@@ -323,7 +323,7 @@ export const FundsPreview = () => {
       return;
     }
 
-    if (targetStatus === '준비 필요' || (activeStatus === '지불 완료' && targetStatus === '지불 대기')) {
+    if (targetStatus === '지불 준비 필요' || (activeStatus === '지불 완료' && targetStatus === '지불 대기')) {
       setReleaseTargetStatus(targetStatus);
       setReleaseDialogOpen(true);
     }
@@ -349,7 +349,7 @@ export const FundsPreview = () => {
   };
 
   const renderActionButtons = () => {
-    if (activeStatus === '준비 필요') {
+    if (activeStatus === '지불 준비 필요') {
       return (
         <>
           <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 완료')}>
@@ -364,8 +364,8 @@ export const FundsPreview = () => {
     if (activeStatus === '지불 대기') {
       return (
         <>
-          <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('준비 필요')}>
-            준비 필요로 변경
+          <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 준비 필요')}>
+            지불 준비 필요로 변경
           </Button>
           <Button type="button" variant="primary" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 완료')}>
             지불 완료로 변경
@@ -375,8 +375,8 @@ export const FundsPreview = () => {
     }
     return (
       <>
-        <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('준비 필요')}>
-          준비 필요로 변경
+        <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 준비 필요')}>
+          지불 준비 필요로 변경
         </Button>
         <Button type="button" variant="secondary" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 대기')}>
           지불 대기로 변경
@@ -388,8 +388,8 @@ export const FundsPreview = () => {
   const renderAdjustmentEditButton = (account: { id: FundAccountId; name: string }) => (
     <button
       type="button"
-      aria-label={`${account.name} 조정 금액 수정`}
-      title="조정 금액 수정"
+      aria-label={`${account.name} 보정 금액 수정`}
+      title="보정 금액 수정"
       onClick={() => setAdjustDialogState({ open: true, accountId: account.id })}
       className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border-strong bg-card text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
     >
@@ -414,10 +414,10 @@ export const FundsPreview = () => {
           >
             <ArrowLeft className="size-4" />
           </button>
-          <h1 className="truncate text-base font-bold tracking-tight text-foreground">지불 관리</h1>
+          <h1 className="shrink-0 whitespace-nowrap text-base font-bold tracking-tight text-foreground">지불 관리</h1>
+          <PeriodPicker mode="month" size="compact" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={monthCellStatus} />
         </div>
       }
-      mobileHeaderRight={<PeriodPicker mode="month" size="compact" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={monthCellStatus} />}
       desktopHeaderLeft={
         <div className="flex items-center gap-2.5">
           <Button type="button" variant="ghost" size="sm" onClick={() => navigateWithQuery('/preview/expenses')} className="gap-1 px-2 text-muted-foreground">
@@ -437,7 +437,7 @@ export const FundsPreview = () => {
     >
       {/* 3-Status Tabs + Search & Multi-Select Filters */}
       <section aria-label="지불 상태 및 상세 검색" className="flex flex-col gap-2.5">
-        <div role="tablist" aria-label="지불 상태 탭" className="grid grid-cols-3 rounded-xl bg-muted p-1">
+        <div role="tablist" aria-label="지불 상태 탭" className="grid grid-cols-[1.3fr_1fr_1fr] rounded-xl bg-muted p-1 sm:grid-cols-3">
           {STATUS_ORDER.map((status) => {
             const active = activeStatus === status;
             return (
@@ -452,7 +452,7 @@ export const FundsPreview = () => {
                   active ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <span className="truncate">{status}</span>
+                <span className="whitespace-nowrap">{status}</span>
                 <span
                   className={cn(
                     'inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold tabular-nums',
@@ -675,8 +675,8 @@ export const FundsPreview = () => {
                       해제
                     </button>
                   </div>
-                  {activeStatus === '준비 필요' ? (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums break-keep">계좌별 채울 금액 합계 {formatWon(selectedNeededTotal)} · 조정 금액은 계좌별로 적용해요.</p>
+                  {activeStatus === '지불 준비 필요' ? (
+                    <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums break-keep">계좌별 더 채울 금액 합계 {formatWon(selectedNeededTotal)} · 보정 금액은 계좌별로 적용해요.</p>
                   ) : null}
                 </div>
 
@@ -687,17 +687,17 @@ export const FundsPreview = () => {
         ) : null}
       </Card>
 
-      {/* Account Summary Card (준비 필요 Tab Only) */}
-      {activeStatus === '준비 필요' ? (
+      {/* Account Summary Card (지불 준비 필요 Tab Only) */}
+      {activeStatus === '지불 준비 필요' ? (
         <Card>
           <CardHeader className="pb-2.5">
             <div className="flex items-center gap-1.5">
-              <CardTitle className="text-sm md:text-base">계좌별 채울 금액</CardTitle>
+              <CardTitle className="text-sm md:text-base">계좌별 더 채울 금액</CardTitle>
               <Popover>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    aria-label="채울 금액 · 조정 금액 안내"
+                    aria-label="더 채울 금액 · 보정 금액 안내"
                     className="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                   >
                     <HelpCircle className="size-4" />
@@ -706,10 +706,10 @@ export const FundsPreview = () => {
                 <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed break-keep">
                   <div className="flex flex-col gap-1.5 text-foreground">
                     <p>
-                      <strong className="font-bold">채울 금액</strong>은 확정된 지출을 결제하기 위해 결제 계좌로 옮기거나 현금으로 마련해 둘 금액이에요.
+                      <strong className="font-bold">더 채울 금액</strong>은 확정된 지출을 결제하기 위해 결제 계좌로 옮기거나 현금으로 마련해 둘 금액이에요.
                     </p>
                     <p className="text-muted-foreground">
-                      <strong className="font-semibold text-foreground">조정 금액</strong>은 결제 계좌나 현금의 입금·준비 오차가 발생한 경우 이를 맞추기 위해 입력하는 값이에요.
+                      <strong className="font-semibold text-foreground">보정 금액</strong>은 결제 계좌나 현금의 입금·준비 오차가 발생한 경우 이를 맞추기 위해 입력하는 값이에요.
                     </p>
                   </div>
                 </PopoverContent>
@@ -735,7 +735,7 @@ export const FundsPreview = () => {
                         <span>거래 합계 {formatWon(group.total)}</span>
                         <div className="flex items-center gap-1.5">
                           <span className={cn(group.adjustment < 0 ? 'font-semibold text-positive' : group.adjustment > 0 ? 'font-semibold text-destructive' : '')}>
-                            조정 {formatSignedWon(group.adjustment)}
+                            보정 {formatSignedWon(group.adjustment)}
                           </span>
                           {renderAdjustmentEditButton(group.account)}
                         </div>
@@ -751,8 +751,8 @@ export const FundsPreview = () => {
                       <tr className="border-b border-border bg-muted/45 text-left text-xs font-medium text-muted-foreground">
                         <th className="px-3.5 py-2.5 font-medium">결제 계좌 · 현금</th>
                         <th className="px-3.5 py-2.5 text-right font-medium">거래 합계</th>
-                        <th className="px-3.5 py-2.5 text-right font-medium">조정 금액</th>
-                        <th className="px-3.5 py-2.5 text-right font-medium">채울 금액</th>
+                        <th className="px-3.5 py-2.5 text-right font-medium">보정 금액</th>
+                        <th className="px-3.5 py-2.5 text-right font-medium">더 채울 금액</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border tabular-nums">

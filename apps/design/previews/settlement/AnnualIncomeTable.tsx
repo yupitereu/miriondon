@@ -55,7 +55,7 @@ export const AnnualIncomeTable = ({ records, availableKinds }: { records: Annual
     return (
       <button
         type="button"
-        className="inline-flex min-h-control-lg items-center justify-center gap-1 text-primary"
+        className="inline-flex min-h-control-lg items-center justify-center gap-1 text-income"
         aria-label={`${month === null ? '연간' : `${month}월`} ${kind} ${formatWon(value)} 지급·공제 상세`}
         aria-expanded={isSelected(month, kind)}
         aria-controls={isSelected(month, kind) ? detailId(prefix, month) : undefined}
@@ -96,11 +96,11 @@ export const AnnualIncomeTable = ({ records, availableKinds }: { records: Annual
             );
           }
           return (
-            <details key={month ?? 'annual'} className="group">
+            <details key={month ?? 'annual'} className="group/income-month">
               <summary className="flex min-h-control-lg cursor-pointer list-none items-center gap-3 px-3 py-3 text-sm [&::-webkit-details-marker]:hidden">
                 <span className="font-semibold">{month === null ? '연간 합계' : `${month}월`}</span>
-                <span className="ml-auto font-semibold tabular-nums">{cell(total)}</span>
-                <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-open:rotate-180" />
+                <span className="ml-auto font-semibold text-income tabular-nums">{cell(total)}</span>
+                <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-open/income-month:rotate-180" />
               </summary>
               <div className="space-y-1 border-t border-border bg-background px-3 py-2">
                 {kinds
@@ -160,7 +160,7 @@ export const AnnualIncomeTable = ({ records, availableKinds }: { records: Annual
                         {incomeButton(month, kind, 'desktop')}
                       </td>
                     ))}
-                    <td className="px-2 py-3 font-bold whitespace-nowrap">{cell(amount(items))}</td>
+                    <td className="px-2 py-3 font-bold whitespace-nowrap text-income">{cell(amount(items))}</td>
                   </tr>
                   {detailRow(month)}
                 </Fragment>
@@ -177,7 +177,7 @@ export const AnnualIncomeTable = ({ records, availableKinds }: { records: Annual
                   {incomeButton(null, kind, 'desktop')}
                 </td>
               ))}
-              <td className="px-2 py-3 whitespace-nowrap">{cell(amount(records))}</td>
+              <td className="px-2 py-3 whitespace-nowrap text-income">{cell(amount(records))}</td>
             </tr>
             {detailRow(null)}
           </tfoot>

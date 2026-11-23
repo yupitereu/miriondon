@@ -11,10 +11,10 @@ const colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3
 
 export const AnnualIncomeChart = ({ records, availableKinds }: { records: AnnualIncome[]; availableKinds: string[] }) => {
   const kinds = [...new Set(['근로소득', '사업소득', ...availableKinds])];
-  const [selection, setSelection] = useState<string[] | null>(null);
+  const [selectedKinds, setSelectedKinds] = useState<Set<string>>(() => new Set());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [hoveredMonth, setHoveredMonth] = useState<number | null>(null);
-  const active = kinds.filter((kind) => selection === null || selection.includes(kind));
+  const active = selectedKinds.size === 0 ? kinds : kinds.filter((kind) => selectedKinds.has(kind));
   const points = Array.from({ length: 12 }, (_, index) => ({
     month: index + 1,
     values: active.map((kind) => {
@@ -36,7 +36,7 @@ export const AnnualIncomeChart = ({ records, availableKinds }: { records: Annual
   return (
     <div>
       <div className="mb-3">
-        <FilterMultiSelect label="수입 종류" options={kinds} selected={new Set(active)} onChange={(next) => setSelection([...next])} selectionMode="explicit" />
+        <FilterMultiSelect label="수입 종류" options={kinds} selected={selectedKinds} onChange={setSelectedKinds} />
       </div>
       {active.length ? (
         <>

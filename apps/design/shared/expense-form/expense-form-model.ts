@@ -1,12 +1,34 @@
 import type { PeriodMonthValue } from '@repo/ui-composition';
 
+import { isFutureTransactionDate } from '@/shared/design-date';
 import { formatWon } from '@/shared/design-format';
 
 export type PaymentPlan = 'lump-sum' | 'installment';
 export type InstallmentType = 'interest-free' | 'interest';
-export type PaymentStatus = '준비 필요' | '지불 대기' | '지불 완료';
+export type PaymentStatus = '지불 준비 필요' | '지불 대기' | '지불 완료';
 export type PaymentMethodKind = 'card' | 'account' | 'cash';
 export type CardType = 'credit' | 'debit';
+
+export const EXPENSE_YEAR_END_TAX_OPTIONS = ['일반 공제 (카드·현금영수증)', '의료비', '교육비', '기부금', '대중교통', '전통시장', '도서·공연·문화'] as const;
+export type ExpenseYearEndTaxType = (typeof EXPENSE_YEAR_END_TAX_OPTIONS)[number];
+
+export const EXPENSE_CASH_RECEIPT_OPTIONS = ['소득공제용', '지출증빙용', '미발급'] as const;
+export type ExpenseCashReceiptType = (typeof EXPENSE_CASH_RECEIPT_OPTIONS)[number];
+
+export const EXPENSE_PROOF_OPTIONS = ['세금계산서', '계산서', '신용·체크카드', '현금영수증(지출증빙)', '간이영수증·기타'] as const;
+export type ExpenseProofType = (typeof EXPENSE_PROOF_OPTIONS)[number];
+
+export type ExpenseTaxScope = 'worker' | 'business';
+
+export type ExpenseTaxInfo = {
+  taxScope?: ExpenseTaxScope;
+  yearEndTaxType?: ExpenseYearEndTaxType;
+  cashReceiptType?: ExpenseCashReceiptType;
+  isBusinessExpense?: boolean;
+  businessId?: string;
+  proofType?: ExpenseProofType;
+  inputVatAmount?: number | null;
+};
 
 export type CardDiscountPerformanceRule = 'exclude-discount' | 'include-discount' | 'exclude-transaction';
 export type CardInstallmentPerformanceRule = 'first-month-total' | 'monthly-payment';
@@ -62,8 +84,8 @@ export const PAYMENT_METHOD_ITEMS: readonly PaymentMethodMeta[] = [
 ] as const;
 
 export const CATEGORIES = ['식비', '생활', '주거/통신', '의류', '구독', '교통', '의료', '기타'] as const;
-export const ACTUAL_USERS = ['민지 (나)', '지은', '박대리 (미참여)'] as const;
-export const RECOVERY_PEOPLE = ['박대리 (미참여)', '김과장 (미참여)', '지은 (구성원)', '민지 (구성원)'] as const;
+export const ACTUAL_USERS = ['민지 (나)', '지은'] as const;
+export const RECOVERY_PEOPLE = ['지은 (구성원)', '민지 (구성원)'] as const;
 export const DEPOSIT_ACCOUNTS = ['신한 쏠편한 입출금', 'KB 국민ONE 통장', '신한 주거래 통장', '민지 현금'] as const;
 
 export const DEFAULT_VIEWED_MONTH: PeriodMonthValue = { year: 2026, month: 11 };
@@ -73,6 +95,7 @@ export type ExpenseCategorySplit = {
   category: string;
   amount: number | null;
   discount: number | null;
+  installmentFee?: number | null;
 };
 
 export type ExpenseRecoveryItem = {
@@ -109,10 +132,12 @@ export type ExpenseDraft = {
   installmentRemainingEditableCount?: number;
   actualUser: string;
   paymentStatus: PaymentStatus;
-  /** 현금·직접 계좌이체에서 '준비 필요'를 선택했을 때 조건부로 지정하는 송금 계좌 */
+  paymentStatusManuallySet?: boolean;
+  /** 현금·직접 계좌이체에서 '지불 준비 필요'를 선택했을 때 조건부로 지정하는 송금 계좌 */
   transferSourceAccount?: string;
   includeInCardPerformance: boolean;
   recoveries: ExpenseRecoveryItem[];
+  taxInfo?: ExpenseTaxInfo;
 };
 
 export const formatPaymentMethodName = (label: string): string => label.replace(/\s*\(.*?\)/, '').trim();
@@ -156,15 +181,18 @@ export const syncSingleSplitDraft = (draft: ExpenseDraft): ExpenseDraft => {
     return draft;
   }
   const metrics = computeExpensePreview(draft);
-  const targetAmount = draft.paymentPlan === 'installment' ? metrics.installmentRoundTotal : metrics.approved;
-  const targetDiscount = draft.paymentPlan === 'installment' ? 0 : Math.max(0, draft.cardDiscount ?? 0);
+  const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
+  const isInstallment = draft.paymentPlan === 'installment';
+  const targetAmount = isInstallment ? metrics.principal : metrics.approved;
+  const targetDiscount = methodMeta.kind !== 'card' || isInstallment ? 0 : Math.max(0, draft.cardDiscount ?? 0);
+  const targetFee = methodMeta.kind === 'card' && isInstallment && draft.installmentType === 'interest' ? metrics.fee : 0;
   const current = draft.splits[0];
   if (!current) {
     return draft;
   }
   return {
     ...draft,
-    splits: [{ ...current, amount: targetAmount > 0 ? targetAmount : null, discount: targetDiscount }]
+    splits: [{ ...current, amount: targetAmount > 0 ? targetAmount : null, discount: targetDiscount, installmentFee: targetFee }]
   };
 };
 
@@ -188,12 +216,12 @@ export const createLumpSumSplitPreset = (): ExpenseDraft => ({
   installmentPrincipal: null,
   installmentFee: 0,
   actualUser: '민지 (나)',
-  paymentStatus: '준비 필요',
+  paymentStatus: '지불 준비 필요',
   includeInCardPerformance: true,
   recoveries: [
     {
       id: 'rec-1',
-      person: '박대리 (미참여)',
+      person: '지은 (구성원)',
       targetAmount: 48000,
       receivedAmount: 0,
       depositAccount: '신한 쏠편한 입출금'
@@ -206,7 +234,7 @@ export const createInstallmentPreset = (): ExpenseDraft => ({
   viewedMonth: DEFAULT_VIEWED_MONTH,
   approvedAmount: 600000,
   cardDiscount: 0,
-  splits: [{ id: 'split-1', category: '의류', amount: 204200, discount: 0 }],
+  splits: [{ id: 'split-1', category: '의류', amount: 200000, discount: 0, installmentFee: 4200 }],
   merchant: '가을 외투 (현대백화점)',
   memo: '3개월 유이자 할부 · 1회차',
   paymentMethod: '신한카드 Deep Dream (민지)',
@@ -218,7 +246,7 @@ export const createInstallmentPreset = (): ExpenseDraft => ({
   installmentPrincipal: 200000,
   installmentFee: 4200,
   actualUser: '민지 (나)',
-  paymentStatus: '준비 필요',
+  paymentStatus: '지불 준비 필요',
   includeInCardPerformance: true,
   recoveries: []
 });
@@ -260,23 +288,20 @@ export const getDefaultTransferSourceAccountForMethod = (meta: PaymentMethodMeta
   return '신한 쏠편한 입출금';
 };
 
-export const getDefaultPaymentStatusForMethod = (meta: PaymentMethodMeta, viewedMonth: PeriodMonthValue = DEFAULT_VIEWED_MONTH): PaymentStatus => {
-  if (isPastPeriodMonth(viewedMonth)) {
-    return '지불 완료';
-  }
+export const getDefaultPaymentStatusForMethod = (meta: PaymentMethodMeta, date: Date | null = null): PaymentStatus => {
   if (meta.kind === 'account' || meta.kind === 'cash') {
-    return '지불 대기';
+    return date && !isFutureTransactionDate(date) ? '지불 완료' : '지불 준비 필요';
   }
   if (meta.kind === 'card' && meta.paymentAccountId && meta.transferSourceAccountId && meta.paymentAccountId === meta.transferSourceAccountId) {
     return '지불 대기';
   }
-  return '준비 필요';
+  return '지불 준비 필요';
 };
 
 export const createEmptyExpensePreset = (viewedMonth: PeriodMonthValue = DEFAULT_VIEWED_MONTH): ExpenseDraft => {
   const defaultPaymentMethod = '신한카드 Deep Dream (민지)';
-  const defaultStatus = getDefaultPaymentStatusForMethod(getPaymentMethodMeta(defaultPaymentMethod), viewedMonth);
   const defaultDate = new Date(viewedMonth.year, viewedMonth.month - 1, Math.min(17, new Date(viewedMonth.year, viewedMonth.month, 0).getDate()));
+  const defaultStatus = getDefaultPaymentStatusForMethod(getPaymentMethodMeta(defaultPaymentMethod), defaultDate);
   return {
     mode: 'create',
     viewedMonth,
@@ -384,8 +409,10 @@ export const withAutoInstallmentPrincipal = (prevDraft: ExpenseDraft, nextDraft:
 };
 
 export const computeExpensePreview = (draft: ExpenseDraft) => {
+  const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
+  const isCardMethod = methodMeta.kind === 'card';
   const approved = Math.max(0, Math.trunc(draft.approvedAmount ?? 0));
-  const discount = Math.max(0, Math.trunc(draft.cardDiscount ?? 0));
+  const discount = isCardMethod ? Math.max(0, Math.trunc(draft.cardDiscount ?? 0)) : 0;
   const actualPaid = Math.max(0, approved - discount);
 
   const months = Math.max(2, Math.min(36, Math.trunc(draft.installmentMonths ?? 3)));
@@ -423,8 +450,6 @@ export const computeExpensePreview = (draft: ExpenseDraft) => {
   const livingBudgetExpense = baseRoundAmount - recoveryTarget;
   const paymentReserve = baseRoundAmount;
 
-  const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
-  const isCardMethod = methodMeta.kind === 'card';
   const { cardPerformanceAmount, cardPerformanceNote } = computeCardPerformance({
     methodMeta,
     includeInCardPerformance: draft.includeInCardPerformance,
@@ -524,23 +549,65 @@ const computeCardPerformance = ({
   return { cardPerformanceAmount: actualPaid, cardPerformanceNote: '' };
 };
 
-export const validateExpenseDraft = (draft: ExpenseDraft): string[] => {
+export type ExpenseValidationFieldErrors = {
+  merchant: boolean;
+  transactionDate: boolean;
+  approvedAmount: boolean;
+  cardDiscount: boolean;
+  installmentMonths: boolean;
+  installmentRound: boolean;
+  installmentPrincipal: boolean;
+  installmentFee: boolean;
+  splitCategories: Record<string, boolean>;
+  splitAmounts: Record<string, boolean>;
+  splitAdjustments: Record<string, boolean>;
+  recoveryPersons: Record<string, boolean>;
+  recoveryTargets: Record<string, boolean>;
+  recoveryReceived: Record<string, boolean>;
+  businessId: boolean;
+  inputVatAmount: boolean;
+};
+
+export const validateExpenseDraftDetailed = (draft: ExpenseDraft, options?: { checkTaxInfo?: boolean }): { errors: string[]; fieldErrors: ExpenseValidationFieldErrors } => {
+  const checkTaxInfo = options?.checkTaxInfo ?? true;
   const errors: string[] = [];
+  const fieldErrors: ExpenseValidationFieldErrors = {
+    merchant: false,
+    transactionDate: false,
+    approvedAmount: false,
+    cardDiscount: false,
+    installmentMonths: false,
+    installmentRound: false,
+    installmentPrincipal: false,
+    installmentFee: false,
+    splitCategories: {},
+    splitAmounts: {},
+    splitAdjustments: {},
+    recoveryPersons: {},
+    recoveryTargets: {},
+    recoveryReceived: {},
+    businessId: false,
+    inputVatAmount: false
+  };
   const metrics = computeExpensePreview(draft);
   const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
 
   if (!draft.merchant.trim()) {
     errors.push('사용처를 입력해 주세요.');
+    fieldErrors.merchant = true;
   }
   if (!draft.transactionDate) {
     errors.push('거래일을 선택해 주세요.');
+    fieldErrors.transactionDate = true;
   }
 
   if (metrics.approved <= 0) {
     errors.push('결제 금액을 0원보다 크게 입력해 주세요.');
+    fieldErrors.approvedAmount = true;
   }
-  if (metrics.discount > metrics.approved) {
+  if (metrics.isCardMethod && metrics.discount > metrics.approved) {
     errors.push(`할인 금액(${formatWon(metrics.discount)})이 결제 금액(${formatWon(metrics.approved)})보다 클 수 없어요.`);
+    fieldErrors.cardDiscount = true;
   }
 
   if (draft.paymentPlan === 'installment') {
@@ -550,64 +617,148 @@ export const validateExpenseDraft = (draft: ExpenseDraft): string[] => {
     const rawMonths = draft.installmentMonths ?? 0;
     if (!Number.isInteger(rawMonths) || rawMonths < 2 || rawMonths > 36) {
       errors.push('할부 개월 수는 2~36개월 사이의 정수로 입력해 주세요.');
+      fieldErrors.installmentMonths = true;
     }
     const rawRound = draft.installmentRound ?? 0;
     if (!Number.isInteger(rawRound) || rawRound < 1 || rawRound > metrics.months) {
       errors.push(`이번 회차는 1~${metrics.months}회차 범위여야 해요.`);
+      fieldErrors.installmentRound = true;
     }
     if ((draft.installmentPrincipal ?? 0) <= 0) {
       errors.push('이번 회차 납부원금을 0원보다 크게 입력해 주세요.');
+      fieldErrors.installmentPrincipal = true;
     }
     if ((draft.installmentPrincipal ?? 0) > metrics.availablePrincipalBalance) {
       errors.push(`이번 회차 납부원금은 남은 원금 잔액(${formatWon(metrics.availablePrincipalBalance)})을 초과할 수 없어요.`);
+      fieldErrors.installmentPrincipal = true;
     }
     if (metrics.installmentRoundTotal <= 0) {
       errors.push('이번 회차 총 납부액이 0원보다 커야 해요.');
+      fieldErrors.installmentPrincipal = true;
+      if (draft.installmentType === 'interest') {
+        fieldErrors.installmentFee = true;
+      }
     }
     if (rawRound >= 2 && draft.recoveries.length > 0) {
       errors.push('할부 거래의 회수 금액은 1회차(승인월)에서만 연결할 수 있어요.');
+      fieldErrors.installmentRound = true;
     }
   }
 
   const splitSum = draft.splits.reduce((sum, row) => sum + Math.max(0, Math.trunc(row.amount ?? 0)), 0);
   const splitDiscountSum = draft.splits.reduce((sum, row) => sum + Math.max(0, Math.trunc(row.discount ?? 0)), 0);
-  const expectedAmount = draft.paymentPlan === 'installment' ? metrics.installmentRoundTotal : metrics.approved;
+  const splitFeeSum = draft.splits.reduce((sum, row) => sum + Math.max(0, Math.trunc(row.installmentFee ?? 0)), 0);
+  const isInstallment = draft.paymentPlan === 'installment';
+  const isInterestInstallment = metrics.isCardMethod && isInstallment && draft.installmentType === 'interest';
+  const expectedAmount = isInstallment ? metrics.principal : metrics.approved;
 
-  if (draft.splits.some((row) => !row.category)) {
+  for (const row of draft.splits) {
+    if (!row.category) {
+      fieldErrors.splitCategories[row.id] = true;
+    }
+    if ((row.amount ?? 0) < 0 || ((row.amount ?? 0) === 0 && !(isInterestInstallment && (row.installmentFee ?? 0) > 0))) {
+      fieldErrors.splitAmounts[row.id] = true;
+    }
+  }
+  if (Object.keys(fieldErrors.splitCategories).length > 0) {
     errors.push('모든 분할 항목의 분류를 선택해 주세요.');
   }
-  if (draft.splits.some((row) => (row.amount ?? 0) <= 0)) {
+  if (Object.keys(fieldErrors.splitAmounts).length > 0) {
     errors.push('모든 분할 항목의 금액은 0원보다 커야 해요.');
   }
   if (expectedAmount > 0 && splitSum !== expectedAmount) {
+    const amountTargetLabel = isInstallment ? '이번 회차 납부원금' : '결제 금액';
     errors.push(
-      `분류 금액 합계(${formatWon(splitSum)})가 ${draft.paymentPlan === 'installment' ? '이번 회차 총 납부액' : '결제 금액'}(${formatWon(expectedAmount)})과 ${formatWon(Math.abs(expectedAmount - splitSum))} 차이나요.`
+      `분류 금액 합계(${formatWon(splitSum)})가 ${amountTargetLabel}(${formatWon(expectedAmount)})보다 ${formatWon(Math.abs(expectedAmount - splitSum))} ${splitSum < expectedAmount ? '적어요' : '많아요'}.`
     );
+    for (const row of draft.splits) {
+      fieldErrors.splitAmounts[row.id] = true;
+    }
   }
-  if (draft.paymentPlan !== 'installment') {
-    if (draft.splits.some((row) => (row.discount ?? 0) < 0 || (row.discount ?? 0) > (row.amount ?? 0))) {
+  if (metrics.isCardMethod && !isInstallment) {
+    let hasInvalidRowDiscount = false;
+    for (const row of draft.splits) {
+      if ((row.discount ?? 0) < 0 || (row.discount ?? 0) > (row.amount ?? 0)) {
+        fieldErrors.splitAdjustments[row.id] = true;
+        hasInvalidRowDiscount = true;
+      }
+    }
+    if (hasInvalidRowDiscount) {
       errors.push('분류별 할인은 0원 이상 해당 분류 금액 이하여야 해요.');
     }
     if (splitDiscountSum !== metrics.discount) {
-      errors.push(`분류별 할인 합계(${formatWon(splitDiscountSum)})가 할인 금액(${formatWon(metrics.discount)})과 ${formatWon(Math.abs(metrics.discount - splitDiscountSum))} 차이나요.`);
+      errors.push(
+        `분류별 할인 합계(${formatWon(splitDiscountSum)})가 할인 금액(${formatWon(metrics.discount)})보다 ${formatWon(Math.abs(metrics.discount - splitDiscountSum))} ${splitDiscountSum < metrics.discount ? '적어요' : '많아요'}.`
+      );
+      for (const row of draft.splits) {
+        fieldErrors.splitAdjustments[row.id] = true;
+      }
+    }
+  }
+  if (isInterestInstallment) {
+    let hasInvalidRowFee = false;
+    for (const row of draft.splits) {
+      if ((row.installmentFee ?? 0) < 0) {
+        fieldErrors.splitAdjustments[row.id] = true;
+        hasInvalidRowFee = true;
+      }
+    }
+    if (hasInvalidRowFee) {
+      errors.push('분류별 이자·수수료는 0원 이상이어야 해요.');
+    }
+    if (splitFeeSum !== metrics.fee) {
+      errors.push(
+        `분류별 이자·수수료 합계(${formatWon(splitFeeSum)})가 이자·수수료(${formatWon(metrics.fee)})보다 ${formatWon(Math.abs(metrics.fee - splitFeeSum))} ${splitFeeSum < metrics.fee ? '적어요' : '많아요'}.`
+      );
+      for (const row of draft.splits) {
+        fieldErrors.splitAdjustments[row.id] = true;
+      }
     }
   }
 
-  if (draft.recoveries.some((rec) => rec.person.trim().length === 0)) {
+  for (const rec of draft.recoveries) {
+    if (rec.person.trim().length === 0) {
+      fieldErrors.recoveryPersons[rec.id] = true;
+    }
+    if ((rec.targetAmount ?? 0) <= 0) {
+      fieldErrors.recoveryTargets[rec.id] = true;
+    }
+    if ((rec.receivedAmount ?? 0) > (rec.targetAmount ?? 0)) {
+      fieldErrors.recoveryReceived[rec.id] = true;
+    }
+  }
+  if (Object.keys(fieldErrors.recoveryPersons).length > 0) {
     errors.push('회수 상대 이름을 입력해 주세요.');
   }
-  if (draft.recoveries.some((rec) => (rec.targetAmount ?? 0) <= 0)) {
+  if (Object.keys(fieldErrors.recoveryTargets).length > 0) {
     errors.push('회수 대상 금액은 0원보다 커야 해요.');
   }
-  if (draft.recoveries.some((rec) => (rec.receivedAmount ?? 0) > (rec.targetAmount ?? 0))) {
+  if (Object.keys(fieldErrors.recoveryReceived).length > 0) {
     errors.push('회수한 금액이 회수 대상 금액보다 클 수 없어요.');
   }
   if (metrics.livingBudgetExpense < 0) {
-    errors.push('회수 대상 금액 합계가 실결제 금액보다 커서 생활비 반영액이 음수가 돼요.');
+    errors.push('회수 대상 금액 합계가 실결제 금액보다 커서 생활비 지출 반영 금액이 음수가 돼요.');
+    for (const rec of draft.recoveries) {
+      if ((rec.targetAmount ?? 0) > 0) {
+        fieldErrors.recoveryTargets[rec.id] = true;
+      }
+    }
   }
 
-  return errors;
+  const isBusinessTaxSelected = draft.taxInfo?.taxScope === 'business' || Boolean(draft.taxInfo?.isBusinessExpense);
+  if (checkTaxInfo && isBusinessTaxSelected && !draft.taxInfo?.businessId) {
+    errors.push('사업 경비에 연결할 사업자를 선택해 주세요.');
+    fieldErrors.businessId = true;
+  }
+  if (checkTaxInfo && isBusinessTaxSelected && (draft.taxInfo?.inputVatAmount ?? 0) < 0) {
+    errors.push('매입 부가세는 0원 이상으로 입력해 주세요.');
+    fieldErrors.inputVatAmount = true;
+  }
+
+  return { errors, fieldErrors };
 };
+
+export const validateExpenseDraft = (draft: ExpenseDraft): string[] => validateExpenseDraftDetailed(draft).errors;
 
 export const formatInstallmentTypeLabel = (type: InstallmentType): string => {
   return type === 'interest-free' ? '무이자' : '유이자';

@@ -1,13 +1,14 @@
 'use client';
 
-import { EmptyState, FilterChipGroup, FilterMultiSelect, PeriodPicker, dialog, mergeFilterOptions, type PeriodCellStatus, type PeriodMonthValue } from '@repo/ui-composition';
+import { EmptyState, FilterChipGroup, FilterMultiSelect, PeriodPicker, SummaryHeroCard, dialog, mergeFilterOptions, type PeriodCellStatus, type PeriodMonthValue } from '@repo/ui-composition';
 import { Badge, Button, Card, CardHeader, CardTitle, SearchInput, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
 import { CalendarRange, ChevronRight, HandCoins, MoreHorizontal, Plus, Repeat, SlidersHorizontal, Upload, WalletCards } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import { INITIAL_INSTALLMENT_PLANS } from '@/previews/installments/installments-model';
 import { DesignAppShell } from '@/shared/DesignAppShell';
+import { MemberAvatar } from '@/shared/MemberAvatar';
 import { INITIAL_DESIGN_ASSETS, findDesignAssetByName, getInitialAssetBalancesMap, type AccountBalanceDelta } from '@/shared/design-assets-store';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/shared/expense-form/ExpenseFormView';
@@ -50,7 +51,7 @@ const getExpenseKind = (draft: ExpenseDraft): ExpenseKind => {
   return 'regular';
 };
 
-const normalizeActualUser = (value: string): string => value.replace(/\s+\(나\)$/, '(나)').replace(/\s+\(미참여\)$/, '(미참여)');
+const normalizeActualUser = (value: string): string => value.replace(/\s+\(나\)$/, '(나)');
 
 const getMonthCellStatus = ({ year, month }: { year: number; month?: number }): PeriodCellStatus | undefined => {
   if (!month) {
@@ -75,8 +76,8 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
     merchant: '점심 회식 정산',
     memo: '팀 회식 · 2인 정산',
     paymentMethod: '신한카드 Deep Dream',
-    actualUser: '박대리(미참여)',
-    status: '준비 필요',
+    actualUser: '민지(나)',
+    status: '지불 준비 필요',
     amount: 48000,
     actualAmount: 96000,
     livingAmount: 48000,
@@ -97,13 +98,13 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
       installmentRound: 1,
       installmentPrincipal: null,
       installmentFee: 0,
-      actualUser: '박대리 (미참여)',
-      paymentStatus: '준비 필요',
+      actualUser: '민지 (나)',
+      paymentStatus: '지불 준비 필요',
       includeInCardPerformance: true,
       recoveries: [
         {
           id: 'r1',
-          person: '박대리 (미참여)',
+          person: '박대리 (외부인)',
           targetAmount: 48000,
           receivedAmount: 0,
           depositAccount: '신한 쏠편한 입출금'
@@ -162,7 +163,7 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
     memo: '의류 구매',
     paymentMethod: '현대카드 ZERO',
     actualUser: '지은',
-    status: '준비 필요',
+    status: '지불 준비 필요',
     amount: 100000,
     actualAmount: 100000,
     livingAmount: 100000,
@@ -184,7 +185,7 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
       installmentPrincipal: 100000,
       installmentFee: 0,
       actualUser: '지은',
-      paymentStatus: '준비 필요',
+      paymentStatus: '지불 준비 필요',
       includeInCardPerformance: true,
       recoveries: []
     }
@@ -231,12 +232,12 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
 ];
 
 const STATUS_BADGE_PROPS: Record<PaymentStatus, { variant: 'wine' | 'neutral' | 'positive'; className?: string }> = {
-  '준비 필요': { variant: 'wine', className: 'bg-primary text-primary-foreground' },
+  '지불 준비 필요': { variant: 'wine', className: 'bg-primary text-primary-foreground' },
   '지불 대기': { variant: 'positive' },
   '지불 완료': { variant: 'neutral' }
 };
 
-const STATUS_FILTER_OPTIONS: readonly PaymentStatus[] = ['준비 필요', '지불 대기', '지불 완료'] as const;
+const STATUS_FILTER_OPTIONS: readonly PaymentStatus[] = ['지불 준비 필요', '지불 대기', '지불 완료'] as const;
 
 const draftToRecord = (draft: ExpenseDraft, fallbackId?: string): ExpenseRecord => {
   const preview = computeExpensePreview(draft);
@@ -269,7 +270,7 @@ const draftToRecord = (draft: ExpenseDraft, fallbackId?: string): ExpenseRecord 
     actualAmount,
     livingAmount,
     uncollectedAmount: preview.recoveryUncollected,
-    draft: { ...draft, id, mode: 'edit', initialPaymentStatus: draft.paymentStatus }
+    draft: { ...draft, id, mode: 'edit', initialPaymentStatus: draft.paymentStatus, paymentStatusManuallySet: false }
   };
 };
 
@@ -370,6 +371,7 @@ export const ExpensesPreview = () => {
     setFormDraft({
       ...structuredClone(record.draft),
       initialPaymentStatus: record.status,
+      paymentStatusManuallySet: false,
       viewedMonth: periodMonth
     });
     setFormOpen(true);
@@ -422,10 +424,10 @@ export const ExpensesPreview = () => {
     }
 
     const currentInitialStatus = targetDraft.initialPaymentStatus ?? targetDraft.paymentStatus;
-    if (currentInitialStatus !== '준비 필요') {
+    if (currentInitialStatus !== '지불 준비 필요') {
       await dialog.alert({
         title: '지출 삭제 불가',
-        description: `${currentInitialStatus} 상태의 거래는 삭제할 수 없어요. 지불 상태를 준비 필요로 먼저 변경해 저장한 뒤 삭제해 주세요.`
+        description: `${currentInitialStatus} 상태의 거래는 삭제할 수 없어요. 지불 상태를 지불 준비 필요로 먼저 변경해 저장한 뒤 삭제해 주세요.`
       });
       return;
     }
@@ -441,7 +443,7 @@ export const ExpensesPreview = () => {
 
       const goInstallments = await dialog.confirm({
         title: '할부 거래 삭제 안내',
-        description: '할부 회차는 한 건만 따로 삭제할 수 없어요. 할부 관리에서 할부 삭제 또는 조기 완납으로 정리해 주세요.',
+        description: '할부 회차는 한 건만 따로 삭제할 수 없어요. 할부 현황에서 할부 삭제 또는 조기 완납으로 정리해 주세요.',
         cancelText: '닫기',
         confirmText: '이동'
       });
@@ -480,7 +482,7 @@ export const ExpensesPreview = () => {
     setFormOpen(false);
   };
 
-  const prepareCount = expenses.filter((item) => item.status === '준비 필요').length;
+  const prepareCount = expenses.filter((item) => item.status === '지불 준비 필요').length;
   const installmentCount =
     INITIAL_INSTALLMENT_PLANS.filter((plan) => plan.status === 'active').length +
     expenses.filter((item) => item.draft.paymentPlan === 'installment' && !INITIAL_EXPENSES.some((seed) => seed.id === item.id)).length;
@@ -514,10 +516,12 @@ export const ExpensesPreview = () => {
   const selectedFilterCount = selectedCategories.size + selectedMethods.size + selectedUsers.size + selectedStatuses.size;
   const hasActiveFilters = searchQuery.trim().length > 0 || selectedFilterCount > 0;
 
+  const renderUserOption = (option: string): ReactNode => <MemberAvatar name={option} size="xs" />;
+
   const filterGroups = [
     { key: 'category', label: '분류', options: categoryOptions, selected: selectedCategories, onChange: setSelectedCategories },
     { key: 'method', label: '결제 수단', options: methodOptions, selected: selectedMethods, onChange: setSelectedMethods },
-    { key: 'user', label: '실사용자', options: userOptions, selected: selectedUsers, onChange: setSelectedUsers },
+    { key: 'user', label: '실사용자', options: userOptions, selected: selectedUsers, onChange: setSelectedUsers, renderOption: renderUserOption },
     { key: 'status', label: '지불 상태', options: STATUS_FILTER_OPTIONS, selected: selectedStatuses, onChange: setSelectedStatuses }
   ] as const;
 
@@ -553,19 +557,38 @@ export const ExpensesPreview = () => {
     }
     return [item.merchant, item.memo].some((field) => field.toLowerCase().includes(q));
   });
+  const livingExpenseTotal = filteredExpenses.reduce((sum, item) => sum + item.livingAmount, 0);
+  const paidExpenseTotal = filteredExpenses.reduce((sum, item) => sum + item.actualAmount, 0);
+  const expenseDetails = filteredExpenses.reduce(
+    (totals, item) => {
+      const metrics = computeExpensePreview(item.draft);
+      const monthlyDiscount = item.kind === 'installment' ? Math.floor(metrics.discount / metrics.months) + (metrics.round === 1 ? metrics.discount % metrics.months : 0) : metrics.discount;
+      const approvalDate = item.draft.transactionDate;
+      const isApprovalMonth = approvalDate?.getFullYear() === periodMonth.year && approvalDate.getMonth() + 1 === periodMonth.month;
+      return {
+        approved: totals.approved + (item.kind !== 'installment' || isApprovalMonth ? metrics.approved : 0),
+        beforeDiscount: totals.beforeDiscount + item.actualAmount + monthlyDiscount,
+        discount: totals.discount + monthlyDiscount,
+        recovery: totals.recovery + metrics.recoveryTarget
+      };
+    },
+    { approved: 0, beforeDiscount: 0, discount: 0, recovery: 0 }
+  );
 
   return (
     <DesignAppShell
       activeNav="expenses"
       onAddExpense={handleOpenCreate}
-      mobileHeaderLeft={<h1 className="truncate text-base font-bold tracking-tight text-foreground">지출 내역</h1>}
-      mobileHeaderRight={
-        <>
+      mobileHeaderLeft={
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="shrink-0 whitespace-nowrap text-base font-bold tracking-tight text-foreground">지출 내역</h1>
           <PeriodPicker mode="month" size="compact" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />
-          <Button variant="outline" size="icon" aria-label="지출 관리 메뉴 더보기" onClick={() => setMobileMenuOpen(true)}>
-            <MoreHorizontal className="size-4" />
-          </Button>
-        </>
+        </div>
+      }
+      mobileHeaderRight={
+        <Button variant="outline" size="icon" aria-label="지출 관리 메뉴 더보기" onClick={() => setMobileMenuOpen(true)}>
+          <MoreHorizontal className="size-4" />
+        </Button>
       }
       desktopHeaderLeft={
         <div className="flex items-center gap-2 lg:gap-3">
@@ -585,27 +608,70 @@ export const ExpensesPreview = () => {
             <span>카드 내역 가져오기</span>
           </Button>
 
-          <Button variant="primary" size="md" className="px-2.5 lg:px-3" onClick={handleOpenCreate}>
+          <Button variant="expense" size="md" className="px-2.5 lg:px-3" onClick={handleOpenCreate}>
             <Plus className="size-4" />
             <span>지출 추가</span>
           </Button>
         </>
       }
     >
+      <SummaryHeroCard
+        variant="hero-expense"
+        aria-label={hasActiveFilters ? '검색 결과 지출 요약' : '월별 지출 요약'}
+        title={hasActiveFilters ? '검색 결과 생활비 지출 합계' : '생활비 지출 합계'}
+        helpLabel="생활비 지출 안내"
+        helpText="실결제 금액에서 회수 대상 금액을 뺀 값이에요."
+        value={filteredExpenses.length ? formatWon(livingExpenseTotal) : '—'}
+        mobileSummary={[
+          { label: '실결제 금액', value: filteredExpenses.length ? formatWon(paidExpenseTotal) : '—' },
+          { label: '회수 대상 금액', value: filteredExpenses.length ? formatWon(expenseDetails.recovery) : '—' }
+        ]}
+        groups={[
+          {
+            key: 'payment-approved',
+            items: [
+              {
+                label: '결제 금액',
+                value: filteredExpenses.length ? formatWon(expenseDetails.beforeDiscount) : '—',
+                helpLabel: '결제 금액 안내',
+                helpText: '일시불과 이번 달 할부금을 할인 전 기준으로 합산해요. 할부 이자·수수료도 포함돼요.'
+              },
+              {
+                label: '승인 금액',
+                value: filteredExpenses.length ? formatWon(expenseDetails.approved) : '—',
+                helpLabel: '할부 금액 안내',
+                helpText: filteredExpenses.some((item) => item.kind === 'installment') ? '할부는 승인된 달에만 전체 금액을 합산해요.' : undefined
+              }
+            ]
+          },
+          {
+            key: 'discount-recovery',
+            items: [
+              { label: '할인 금액', value: filteredExpenses.length ? formatWon(expenseDetails.discount) : '—' },
+              { label: '회수 대상 금액', value: filteredExpenses.length ? formatWon(expenseDetails.recovery) : '—', hideOnMobileDetails: true }
+            ]
+          },
+          {
+            key: 'actual-paid',
+            hideOnMobileDetails: true,
+            items: [{ label: '실결제 금액', value: filteredExpenses.length ? formatWon(paidExpenseTotal) : '—' }]
+          }
+        ]}
+      />
       {/* Top 3 Management Navigation Action Cards */}
       <section aria-label="지출 세부 관리 이동" className="grid grid-cols-3 gap-2 md:gap-3">
         {[
           {
             label: '지불 관리',
-            mobileValue: `준비 필요 ${prepareCount}건`,
-            desktopValue: `준비 필요 ${prepareCount}건`,
+            mobileValue: `지불 준비 필요 ${prepareCount}건`,
+            desktopValue: `지불 준비 필요 ${prepareCount}건`,
             icon: WalletCards,
             iconClass: 'bg-primary-tint text-primary',
             valueClass: 'text-primary',
             onClick: handleGoFunds
           },
           {
-            label: '할부 관리',
+            label: '할부 현황',
             mobileValue: `진행중 ${installmentCount}건`,
             desktopValue: `진행중 ${installmentCount}건`,
             icon: CalendarRange,
@@ -614,7 +680,7 @@ export const ExpensesPreview = () => {
             onClick: handleGoInstallments
           },
           {
-            label: '회수금 관리',
+            label: '회수금 현황',
             mobileValue: formatWon(totalUncollected),
             desktopValue: `미회수 ${formatWon(totalUncollected)}`,
             icon: HandCoins,
@@ -644,7 +710,7 @@ export const ExpensesPreview = () => {
                 </span>
                 <div className="min-w-0 flex flex-col gap-0.5">
                   <span className="truncate text-xs font-bold text-foreground md:text-sm">{item.label}</span>
-                  <span className={cn('truncate text-[11px] font-semibold tabular-nums md:hidden', item.valueClass)}>{item.mobileValue}</span>
+                  <span className={cn('text-[11px] font-semibold leading-snug break-keep tabular-nums md:hidden', item.valueClass)}>{item.mobileValue}</span>
                   <span className={cn('hidden truncate text-xs font-semibold tabular-nums md:inline', item.valueClass)}>{item.desktopValue}</span>
                 </div>
               </div>
@@ -683,7 +749,14 @@ export const ExpensesPreview = () => {
 
         <div className="hidden md:flex md:shrink-0 md:items-center md:gap-1.5 lg:gap-2">
           {filterGroups.map((group) => (
-            <FilterMultiSelect key={group.key} label={group.label} options={group.options} selected={group.selected} onChange={group.onChange} />
+            <FilterMultiSelect
+              key={group.key}
+              label={group.label}
+              options={group.options}
+              selected={group.selected}
+              onChange={group.onChange}
+              renderOption={'renderOption' in group ? group.renderOption : undefined}
+            />
           ))}
           {hasActiveFilters ? (
             <Button type="button" variant="ghost" size="sm" onClick={handleResetFilters} className="shrink-0 px-2 text-muted-foreground">
@@ -702,7 +775,7 @@ export const ExpensesPreview = () => {
               actions={
                 expenses.length === 0 ? (
                   <>
-                    <Button variant="primary" size="md" onClick={handleOpenCreate}>
+                    <Button variant="expense" size="md" onClick={handleOpenCreate}>
                       <Plus className="size-4" />
                       <span>지출 추가</span>
                     </Button>
@@ -737,11 +810,11 @@ export const ExpensesPreview = () => {
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium text-muted-foreground tabular-nums md:text-xs">
                     <span>
-                      실결제 <strong className="font-bold text-foreground">{formatWon(actualSum)}</strong>
+                      실결제 <strong className="font-bold text-expense">{formatWon(actualSum)}</strong>
                     </span>
                     <span aria-hidden="true">·</span>
                     <span>
-                      생활비 <strong className="font-bold text-foreground">{formatWon(livingSum)}</strong>
+                      생활비 <strong className="font-bold text-expense">{formatWon(livingSum)}</strong>
                     </span>
                   </div>
                 </CardHeader>
@@ -770,15 +843,16 @@ export const ExpensesPreview = () => {
                             {item.memo ? <span className="truncate text-xs text-muted-foreground">{item.memo}</span> : null}
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
-                            <span className="text-sm font-extrabold text-foreground">{formatWon(item.amount)}</span>
+                            <span className="text-sm font-extrabold text-expense">{formatWon(item.amount)}</span>
                             {item.uncollectedAmount > 0 ? <span className="text-[11px] font-semibold text-warning">미회수 {formatWon(item.uncollectedAmount)}</span> : null}
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between gap-2 pt-0.5">
-                          <span className="truncate text-xs text-muted-foreground">
-                            {item.paymentMethod} · {item.actualUser}
-                          </span>
+                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                            <MemberAvatar name={item.actualUser} mode="icon-hover" size="xs" />
+                            <span className="truncate">{item.paymentMethod}</span>
+                          </div>
                           <Badge {...STATUS_BADGE_PROPS[item.status]}>{item.status}</Badge>
                         </div>
                       </button>
@@ -797,11 +871,8 @@ export const ExpensesPreview = () => {
                         </th>
                         <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">분류</th>
                         <th className="px-3 py-3 text-left font-medium">내역</th>
-                        <th className="w-36 px-3 py-3 text-left font-medium whitespace-nowrap lg:w-40">
-                          <span className="lg:hidden">결제 수단 · 실사용자</span>
-                          <span className="hidden lg:inline">결제 수단</span>
-                        </th>
-                        <th className="hidden w-28 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">실사용자</th>
+                        <th className="w-40 px-3 py-3 text-left font-medium whitespace-nowrap lg:w-44">결제 수단</th>
+                        <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">실사용자</th>
                         <th className="w-24 px-3 py-3 text-center font-medium whitespace-nowrap">지불 상태</th>
                         <th className="w-28 py-3 pl-3 pr-4 text-right font-medium whitespace-nowrap">금액</th>
                       </tr>
@@ -837,18 +908,22 @@ export const ExpensesPreview = () => {
                               </div>
                             </td>
                             <td className="px-3 py-3.5 text-xs whitespace-nowrap">
-                              <div className="flex min-w-0 flex-col gap-0.5">
-                                <span className="truncate text-muted-foreground">{item.paymentMethod}</span>
-                                <span className="truncate text-[11px] text-muted-foreground lg:hidden">{item.actualUser}</span>
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <span className="lg:hidden">
+                                  <MemberAvatar name={item.actualUser} mode="icon-hover" size="xs" />
+                                </span>
+                                <span className="min-w-0 truncate text-muted-foreground">{item.paymentMethod}</span>
                               </div>
                             </td>
-                            <td className="hidden truncate px-3 py-3.5 text-center text-xs text-muted-foreground whitespace-nowrap lg:table-cell">{item.actualUser}</td>
+                            <td className="hidden px-3 py-3.5 text-center whitespace-nowrap lg:table-cell">
+                              <MemberAvatar name={item.actualUser} mode="icon-hover" size="sm" />
+                            </td>
                             <td className="px-3 py-3.5 text-center whitespace-nowrap">
                               <Badge {...STATUS_BADGE_PROPS[item.status]}>{item.status}</Badge>
                             </td>
                             <td className="py-3.5 pl-3 pr-4 text-right tabular-nums whitespace-nowrap">
                               <div className="flex flex-col items-end gap-0.5">
-                                <span className="font-extrabold text-foreground">{formatWon(item.amount)}</span>
+                                <span className="font-extrabold text-expense">{formatWon(item.amount)}</span>
                                 {item.uncollectedAmount > 0 ? <span className="text-[11px] font-semibold text-warning">미회수 {formatWon(item.uncollectedAmount)}</span> : null}
                               </div>
                             </td>
@@ -878,7 +953,7 @@ export const ExpensesPreview = () => {
                   label: '지출 추가',
                   description: '일시불·할부·분류 분할 지출 등록',
                   icon: Plus,
-                  iconClass: 'bg-primary text-primary-foreground',
+                  iconClass: 'bg-expense text-expense-foreground',
                   onClick: handleOpenCreate
                 },
                 {
@@ -931,7 +1006,14 @@ export const ExpensesPreview = () => {
           </SheetHeader>
           <SheetBody className="max-h-[60dvh] gap-4 overflow-y-auto pb-1">
             {filterGroups.map((group) => (
-              <FilterChipGroup key={group.key} label={group.label} options={group.options} selected={group.selected} onChange={group.onChange} />
+              <FilterChipGroup
+                key={group.key}
+                label={group.label}
+                options={group.options}
+                selected={group.selected}
+                onChange={group.onChange}
+                renderOption={'renderOption' in group ? group.renderOption : undefined}
+              />
             ))}
           </SheetBody>
           <SheetFooter className="grid grid-cols-3 gap-2">

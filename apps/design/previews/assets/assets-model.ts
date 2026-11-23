@@ -1,4 +1,11 @@
+import type { ProfileAvatarColor } from '@repo/ui-composition';
+
 export type AssetOwnerKey = '민지(나)' | '지은';
+
+export const INITIAL_OWNER_PROFILES: Record<AssetOwnerKey, { color: ProfileAvatarColor; src: string | null }> = {
+  '민지(나)': { color: 'wine', src: null },
+  지은: { color: 'teal', src: null }
+};
 
 export type AssetGroupKey = 'cash-liquid' | 'savings-invest' | 'loan-deposit' | 'debt';
 
@@ -87,10 +94,10 @@ export type AssetReceivablePersonSummary = {
   count: number;
 };
 
-/** 전체 기간 미회수 요약 (회수금 관리 시안과 일치: 총 258,000원 · 4건) */
+/** 전체 기간 미회수 요약 (회수금 현황 시안과 일치: 총 258,000원 · 4건) */
 export const ASSET_RECEIVABLES_BY_PERSON: readonly AssetReceivablePersonSummary[] = [
-  { person: '박대리(미참여)', amount: 128000, count: 2 },
-  { person: '김과장(미참여)', amount: 90000, count: 2 },
+  { person: '박대리(외부인)', amount: 128000, count: 2 },
+  { person: '김과장(외부인)', amount: 90000, count: 2 },
   { person: '지은(구성원)', amount: 40000, count: 1 }
 ] as const;
 
@@ -172,10 +179,10 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
         direction: 'inflow',
         kind: 'receivable',
         label: '미회수 정산 예정 (박대리 · 김과장 · 지은)',
-        subLabel: '회수금 관리 대기 3건 연결',
+        subLabel: '회수금 현황 대기 3건 연결',
         amount: 208000,
         linkPath: '/preview/receivables',
-        linkLabel: '회수금 관리'
+        linkLabel: '회수금 현황'
       },
       {
         id: 'ef-2',
@@ -291,7 +298,7 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 500000,
-    counterparty: '박대리(미참여)',
+    counterparty: '박대리(외부인)',
     updatedAt: '10.15 14:20'
   },
   {
@@ -327,7 +334,7 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
         subLabel: '추석 부모님 선물 세트 정산',
         amount: 50000,
         linkPath: '/preview/receivables',
-        linkLabel: '회수금 관리'
+        linkLabel: '회수금 현황'
       },
       {
         id: 'ef-5',

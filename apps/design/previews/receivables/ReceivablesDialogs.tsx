@@ -28,6 +28,7 @@ import {
   normalizePersonDisplay,
   type ReceivableRecord
 } from '@/previews/receivables/receivables-model';
+import { MemberAvatar } from '@/shared/MemberAvatar';
 import { INITIAL_DESIGN_ASSETS, findDesignAssetByName, type AccountBalanceDelta } from '@/shared/design-assets-store';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 import { DEPOSIT_ACCOUNTS } from '@/shared/expense-form/expense-form-model';
@@ -202,7 +203,7 @@ export const BulkReceiveDialog = ({
                   <div key={group.person} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
                       <div className="flex min-w-0 items-center gap-1.5">
-                        <span className="truncate text-sm font-bold text-foreground">{normalizePersonDisplay(group.person)}</span>
+                        <MemberAvatar name={normalizePersonDisplay(group.person)} size="sm" labelClassName="text-sm font-bold text-foreground" />
                         {group.isMember ? <Badge variant="wine">구성원</Badge> : <Badge variant="neutral">외부 정산</Badge>}
                       </div>
                       <span className="shrink-0 text-sm font-extrabold text-positive tabular-nums">{formatWon(group.totalUncollected)}</span>

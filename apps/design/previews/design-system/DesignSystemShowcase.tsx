@@ -1,6 +1,24 @@
 'use client';
 
-import { Calendar, DatePicker, EmptyState, FilterChipGroup, FilterMultiSelect, FilterSingleSelect, PeriodPicker, dialog, type PeriodCellStatus, type PeriodMonthValue } from '@repo/ui-composition';
+import {
+  Calendar,
+  DatePicker,
+  EmptyState,
+  FilterChipGroup,
+  FilterMultiSelect,
+  FilterSingleSelect,
+  PROFILE_AVATAR_COLORS,
+  PeriodPicker,
+  ProfileAvatar,
+  ProfileAvatarColorPicker,
+  SummaryHeroCard,
+  dialog,
+  resolveProfileAvatarPreset,
+  type PeriodCellStatus,
+  type PeriodMonthValue,
+  type ProfileAvatarColor,
+  type SummaryHeroVariant
+} from '@repo/ui-composition';
 import {
   Badge,
   Button,
@@ -60,6 +78,7 @@ import { ChevronRight, SearchX } from 'lucide-react';
 import { useState } from 'react';
 
 import { CardPerformanceCard, type CardPerformanceItem } from '@/shared/CardPerformanceCard';
+import { MemberAvatar } from '@/shared/MemberAvatar';
 
 const STANDARD_CARD_TIERS = [
   { step: 1, threshold: 300000, benefits: [{ name: '생활 영역 할인', limit: '월 한도 10,000원' }] },
@@ -127,6 +146,10 @@ const COLOR_TOKENS = [
   { name: 'background', swatchClass: 'bg-background text-foreground border border-border' },
   { name: 'card', swatchClass: 'bg-card text-card-foreground border border-border' },
   { name: 'surface-elevated', swatchClass: 'bg-surface-elevated text-popover-foreground border border-border-strong' },
+  { name: 'expense', swatchClass: 'bg-expense text-expense-foreground' },
+  { name: 'expense-tint', swatchClass: 'bg-expense-tint text-expense' },
+  { name: 'income', swatchClass: 'bg-income text-income-foreground' },
+  { name: 'income-tint', swatchClass: 'bg-income-tint text-income' },
   { name: 'positive', swatchClass: 'bg-positive text-positive-foreground' },
   { name: 'positive-tint', swatchClass: 'bg-positive-tint text-positive' },
   { name: 'destructive', swatchClass: 'bg-destructive text-destructive-foreground' },
@@ -167,6 +190,12 @@ export const DesignSystemShowcase = () => {
   const [searchValue, setSearchValue] = useState('점심');
   const [periodScope, setPeriodScope] = useState<'all' | 'current' | 'past'>('all');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set(['식비']));
+  const [selectedProfileColor, setSelectedProfileColor] = useState<ProfileAvatarColor>('wine');
+  const [selectedProfileImage, setSelectedProfileImage] = useState<string | null>(null);
+  const [heroDemoVariant, setHeroDemoVariant] = useState<SummaryHeroVariant>('hero');
+
+  const sampleAvatarDataUri =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23f6d365'/%3E%3Cstop offset='100%25' stop-color='%23fda085'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' fill='url(%23g)'/%3E%3Ccircle cx='32' cy='25' r='11' fill='%23fff' fill-opacity='.9'/%3E%3Cpath d='M14 58c2-11 9-17 18-17s16 6 18 17' fill='%23fff' fill-opacity='.9'/%3E%3C/svg%3E";
 
   const sampleFilterOptions = ['식비', '카페·간식', '생활용품', '고정지출'] as const;
   const samplePeriodOptions = [
@@ -221,16 +250,48 @@ export const DesignSystemShowcase = () => {
               </div>
             ))}
           </div>
-          <Card variant="hero">
-            <CardHeader>
-              <CardDescription className="text-hero-foreground/80">11월 남은 생활비 (Hero Card · tabular-nums)</CardDescription>
-              <CardTitle className="text-3xl font-extrabold tracking-tight text-hero-foreground tabular-nums">1,420,000원</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-3 text-xs text-hero-foreground/85 tabular-nums">
-              <span>예산 2,200,000원</span>
-              <span>지출 −780,000원</span>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <Card variant="hero">
+              <CardHeader>
+                <CardDescription className="text-hero-foreground/80">11월 남은 예산 (Hero · tabular-nums)</CardDescription>
+                <CardTitle className="text-2xl font-extrabold tracking-tight text-hero-foreground tabular-nums">1,420,000원</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-3 text-xs text-hero-foreground/85 tabular-nums">
+                <span>예산 2,200,000원</span>
+                <span>지출 −780,000원</span>
+              </CardContent>
+            </Card>
+            <Card variant="hero-expense">
+              <CardHeader>
+                <CardDescription className="text-hero-foreground/80">11월 지출 합계 (Hero Expense)</CardDescription>
+                <CardTitle className="text-2xl font-extrabold tracking-tight text-hero-foreground tabular-nums">780,000원</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-3 text-xs text-hero-foreground/85 tabular-nums">
+                <span>실결제 828,000원</span>
+                <span>회수 48,000원</span>
+              </CardContent>
+            </Card>
+            <Card variant="hero-income">
+              <CardHeader>
+                <CardDescription className="text-hero-foreground/80">11월 수입 합계 (Hero Income)</CardDescription>
+                <CardTitle className="text-2xl font-extrabold tracking-tight text-hero-foreground tabular-nums">4,280,000원</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-3 text-xs text-hero-foreground/85 tabular-nums">
+                <span>입금 완료 3,500,000원</span>
+                <span>입금 예정 780,000원</span>
+              </CardContent>
+            </Card>
+            <Card variant="hero-positive">
+              <CardHeader>
+                <CardDescription className="text-hero-foreground/80">전체 미회수 금액 (Hero Positive)</CardDescription>
+                <CardTitle className="text-2xl font-extrabold tracking-tight text-hero-foreground tabular-nums">258,000원</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-3 text-xs text-hero-foreground/85 tabular-nums">
+                <span>회수 대기 4건</span>
+                <span>부분 회수 2건</span>
+              </CardContent>
+            </Card>
+          </div>
         </section>
       ) : null}
 
@@ -250,7 +311,13 @@ export const DesignSystemShowcase = () => {
               <CardContent className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="primary" size="lg">
-                    지출 기록
+                    저장하기
+                  </Button>
+                  <Button variant="expense" size="lg">
+                    지출 추가
+                  </Button>
+                  <Button variant="income" size="lg">
+                    수입 추가
                   </Button>
                   <Button variant="secondary" size="md">
                     보조 액션
@@ -273,9 +340,11 @@ export const DesignSystemShowcase = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge variant="wine">카드 실적</Badge>
+                  <Badge variant="expense">지출 · 출금</Badge>
+                  <Badge variant="income">수입 · 입금</Badge>
                   <Badge variant="positive">회수 완료</Badge>
                   <Badge variant="wine" className="bg-primary text-primary-foreground">
-                    준비 필요
+                    지불 준비 필요
                   </Badge>
                   <Badge variant="positive">지불 대기</Badge>
                   <Badge variant="neutral">지불 완료</Badge>
@@ -325,6 +394,11 @@ export const DesignSystemShowcase = () => {
                     <span className="font-semibold text-foreground">68%</span>
                   </div>
                   <ProgressBar value={68} variant="default" />
+                  <div className="flex items-center justify-between text-xs tabular-nums">
+                    <span className="text-muted-foreground">지출 합계 소진율</span>
+                    <span className="font-semibold text-expense">42%</span>
+                  </div>
+                  <ProgressBar value={42} variant="expense" />
                   <div className="flex items-center justify-between text-xs tabular-nums">
                     <span className="text-muted-foreground">쇼핑 예산 초과</span>
                     <span className="font-semibold text-destructive">118%</span>
@@ -558,7 +632,7 @@ export const DesignSystemShowcase = () => {
                     size="lg"
                     onClick={async () => {
                       const ok = await dialog.confirm({
-                        title: "'박대리' 미참여 인물을 삭제할까요?",
+                        title: "'박대리' 외부인을 삭제할까요?",
                         description: '앞으로 실사용자 선택 목록에서 숨겨져요.',
                         notice: '이미 기록된 지출·회수 내역의 이름은 그대로 보존돼요.',
                         confirmText: '삭제',
@@ -575,8 +649,8 @@ export const DesignSystemShowcase = () => {
                     size="lg"
                     onClick={async () => {
                       const value = await dialog.prompt({
-                        title: '미참여 인물 이름 변경',
-                        label: '미참여 인물 이름',
+                        title: '미참여 구성원 이름 변경',
+                        label: '미참여 구성원 이름',
                         placeholder: '박대리 → 박과장',
                         defaultValue: '박대리',
                         confirmText: '변경',
@@ -644,6 +718,140 @@ export const DesignSystemShowcase = () => {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>ProfileAvatar &amp; ProfileAvatarColorPicker (이미지 · 12색)</CardTitle>
+              <CardDescription>프로필 이미지(src) 우선 표시 및 미설정·로드 실패 시 고정 12색 배경 + WCAG 상대 휘도 기반 글자색 자동 결정</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-col items-center gap-1">
+                  <ProfileAvatar name="민지" src={sampleAvatarDataUri} color={selectedProfileColor} className="size-8 text-sm" />
+                  <span className="text-[11px] font-medium text-muted-foreground">이미지</span>
+                  <span className="text-[10px] text-muted-foreground/80">사진 우선</span>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <ProfileAvatar name="박대리" color="indigo" variant="non-member" className="size-8 text-sm" />
+                  <span className="text-[11px] font-medium text-muted-foreground">미참여 · 외부인</span>
+                  <span className="text-[10px] text-muted-foreground/80">점선 테두리</span>
+                </div>
+                {PROFILE_AVATAR_COLORS.map((preset) => {
+                  const resolved = resolveProfileAvatarPreset(preset.id);
+                  return (
+                    <div key={preset.id} className="flex flex-col items-center gap-1">
+                      <ProfileAvatar name="민지" color={preset.id} className="size-8 text-sm" />
+                      <span className="text-[11px] font-medium text-muted-foreground">{preset.label}</span>
+                      <span className="text-[10px] text-muted-foreground/80 tabular-nums">{resolved.textColor === '#FFFFFF' ? '흰 글자' : '어두운 글자'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3.5 sm:flex-row sm:items-center sm:gap-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <ProfileAvatar
+                      name="민지(나)"
+                      src={selectedProfileImage}
+                      color={selectedProfileColor}
+                      showNameOnInteraction
+                      onColorChange={setSelectedProfileColor}
+                      onImageChange={setSelectedProfileImage}
+                      className="size-9 text-sm"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-foreground">민지(나)</span>
+                      <span className="text-[11px] text-muted-foreground">{selectedProfileImage ? '사진 사용 중' : `배경: ${resolveProfileAvatarPreset(selectedProfileColor).label}`}</span>
+                    </div>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSelectedProfileImage((prev) => (prev ? null : sampleAvatarDataUri))} className="text-xs">
+                    {selectedProfileImage ? '예시 이미지 해제' : '예시 이미지 적용'}
+                  </Button>
+                </div>
+                <ProfileAvatarColorPicker value={selectedProfileColor} onChange={setSelectedProfileColor} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <CardTitle>SummaryHeroCard (공통 히어로 요약 카드)</CardTitle>
+                  <CardDescription>결산·지출·수입·회수금·할부·자산 상단 요약 공통 규격 · 모바일 1열 / 태블릿·PC 세로 구분선 가로 배치</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(
+                    [
+                      { id: 'hero', label: 'Hero' },
+                      { id: 'hero-expense', label: 'Expense' },
+                      { id: 'hero-income', label: 'Income' },
+                      { id: 'hero-positive', label: 'Positive' }
+                    ] as const
+                  ).map((option) => (
+                    <Button key={option.id} type="button" size="sm" variant={heroDemoVariant === option.id ? 'primary' : 'outline'} onClick={() => setHeroDemoVariant(option.id)}>
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <SummaryHeroCard
+                variant={heroDemoVariant}
+                title="단일 지표형 요약 (items)"
+                helpText="결산·회수금·할부처럼 단일 행 지표를 표시할 때 사용해요. 모바일에서는 구분선 없는 1열, 태블릿·PC에서는 세로 구분선 3단으로 정렬돼요."
+                badge={<span className="rounded-full bg-hero-foreground/15 px-2 py-0.5 text-[11px] font-semibold text-hero-foreground">공통 규격</span>}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => void dialog.alert({ title: '우측 액션', description: 'SummaryHeroCard의 action 슬롯 예시예요.' })}
+                    className="-my-2 inline-flex min-h-9 cursor-pointer items-center gap-0.5 text-xs font-bold text-hero-foreground/90 hover:underline"
+                  >
+                    상세 이동
+                  </button>
+                }
+                value="1,420,000원"
+                items={[
+                  { label: '수입', value: '5,950,000원' },
+                  { label: '지출', value: '1,417,000원' },
+                  { label: '예산 (이월 포함)', value: '12,456,000원' }
+                ]}
+              />
+              <SummaryHeroCard
+                variant="hero-expense"
+                title="접이식 상세형 요약 (groups + mobileSummary)"
+                helpText="지출·수입 내역처럼 세부 항목이 많을 때 모바일에서 핵심 2줄 + 상세 보기 토글을 제공해요."
+                value="780,000원"
+                mobileSummary={[
+                  { label: '실결제 금액', value: '828,000원' },
+                  { label: '회수 대상 금액', value: '48,000원' }
+                ]}
+                groups={[
+                  {
+                    key: 'g1',
+                    items: [
+                      { label: '결제 금액', value: '858,000원', helpText: '할인 전 결제 금액 기준 합계예요.' },
+                      { label: '승인 금액', value: '1,120,000원' }
+                    ]
+                  },
+                  {
+                    key: 'g2',
+                    items: [
+                      { label: '할인 금액', value: '30,000원' },
+                      { label: '회수 대상 금액', value: '48,000원', hideOnMobileDetails: true }
+                    ]
+                  },
+                  {
+                    key: 'g3',
+                    hideOnMobileDetails: true,
+                    items: [{ label: '실결제 금액', value: '828,000원' }]
+                  }
+                ]}
+              />
+            </CardContent>
+          </Card>
         </section>
       ) : null}
 
@@ -667,7 +875,7 @@ export const DesignSystemShowcase = () => {
             <Card>
               <CardHeader>
                 <CardTitle>ActionRow · AmountText · PersonSelector</CardTitle>
-                <CardDescription>44px 터치 행, 원화 부호/색상 톤, 실사용자/미참여 구분 칩</CardDescription>
+                <CardDescription>44px 터치 행, 원화 부호/색상 톤, 구성원/외부인 프로필 아이콘 표기(넓음: 아이콘+이름 / 좁음: 호버 이름)</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <div className="divide-y divide-border rounded-lg border border-border px-3">
@@ -691,10 +899,19 @@ export const DesignSystemShowcase = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex min-h-control-sm items-center rounded-full border border-primary bg-primary-tint px-3.5 text-xs font-bold text-primary">민지 (나)</span>
-                  <span className="inline-flex min-h-control-sm items-center rounded-full border border-border bg-background px-3.5 text-xs font-medium text-foreground">지은</span>
-                  <span className="inline-flex min-h-control-sm items-center rounded-full border border-warning/30 bg-warning-tint px-3.5 text-xs font-semibold text-warning">박대리 (미참여)</span>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5 text-xs font-medium text-foreground">
+                    <MemberAvatar name="민지 (나)" size="sm" />
+                    <MemberAvatar name="지은" size="sm" />
+                    <MemberAvatar name="박대리 (외부인)" size="sm" />
+                    <MemberAvatar name="김과장 (외부인)" size="sm" />
+                  </div>
+                  <div className="flex items-center gap-1 border-l border-border pl-3">
+                    <MemberAvatar name="민지 (나)" size="sm" mode="icon-hover" />
+                    <MemberAvatar name="지은" size="sm" mode="icon-hover" />
+                    <MemberAvatar name="박대리 (외부인)" size="sm" mode="icon-hover" />
+                    <MemberAvatar name="김과장 (외부인)" size="sm" mode="icon-hover" />
+                  </div>
                 </div>
               </CardContent>
             </Card>

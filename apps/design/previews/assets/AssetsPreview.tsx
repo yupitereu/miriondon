@@ -1,11 +1,12 @@
 'use client';
 
-import { EmptyState, FilterChipGroup, FilterMultiSelect, dialog } from '@repo/ui-composition';
+import { EmptyState, FilterChipGroup, FilterMultiSelect, SummaryHeroCard, dialog, type ProfileAvatarColor } from '@repo/ui-composition';
 import {
   Badge,
   Button,
   Card,
   CardContent,
+  Checkbox,
   NoticeBox,
   Popover,
   PopoverContent,
@@ -20,7 +21,7 @@ import {
   SheetTitle,
   cn
 } from '@repo/ui-core';
-import { Calculator, ChevronRight, HandCoins, Handshake, HelpCircle, Info, Landmark, Pencil, PiggyBank, Settings, SlidersHorizontal, Wallet } from 'lucide-react';
+import { Calculator, ChevronDown, ChevronRight, HandCoins, Handshake, HelpCircle, Info, Landmark, Pencil, PiggyBank, Settings, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ComponentType } from 'react';
 
@@ -32,6 +33,7 @@ import {
   ASSET_REFERENCE_RATES_NOTICE,
   BUDGET_REMAINING_BASELINE,
   INITIAL_DETAILED_ASSETS,
+  INITIAL_OWNER_PROFILES,
   computeOwnerSummary,
   formatQuantityWithUnit,
   getAssetCurrentValuation,
@@ -39,13 +41,76 @@ import {
   getAssetProjectedBalance,
   getTotalUncollectedReceivables,
   type AssetDetailItem,
-  type AssetGroupKey
+  type AssetGroupKey,
+  type AssetOwnerKey
 } from '@/previews/assets/assets-model';
 import { DesignAppShell } from '@/shared/DesignAppShell';
+import { MemberAvatar } from '@/shared/MemberAvatar';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
-import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft } from '@/shared/expense-form/ExpenseFormView';
+import { DESIGN_PROFILE_NAME, updatePersonalProfile } from '@/shared/design-personal-businesses';
 
 const GROUP_LABEL_OPTIONS = ASSET_GROUP_ORDER.map((group) => group.label);
+
+const AssetOwnerAvatar = ({
+  owner,
+  profile,
+  onColorChange,
+  onImageChange,
+  size = 'sm'
+}: {
+  owner: AssetOwnerKey;
+  profile: { color: ProfileAvatarColor; src: string | null };
+  onColorChange: (color: ProfileAvatarColor) => void;
+  onImageChange: (src: string | null) => void;
+  size?: 'sm' | 'md';
+}) => (
+  <MemberAvatar
+    name={owner}
+    mode="icon-interactive"
+    size={size}
+    colorOverride={owner === DESIGN_PROFILE_NAME ? undefined : profile.color}
+    srcOverride={owner === DESIGN_PROFILE_NAME ? undefined : profile.src}
+    onColorChange={owner === DESIGN_PROFILE_NAME ? (avatarColor) => updatePersonalProfile((prev) => ({ ...prev, avatarColor, avatarSrc: null })) : onColorChange}
+    onImageChange={owner === DESIGN_PROFILE_NAME ? (avatarSrc) => updatePersonalProfile((prev) => ({ ...prev, avatarSrc })) : onImageChange}
+  />
+);
+
+const AssetOwnerDescription = ({
+  owner,
+  profile,
+  onColorChange,
+  onImageChange,
+  description,
+  multiline = false,
+  className
+}: {
+  owner: AssetOwnerKey;
+  profile: { color: ProfileAvatarColor; src: string | null };
+  onColorChange: (color: ProfileAvatarColor) => void;
+  onImageChange: (src: string | null) => void;
+  description: string;
+  multiline?: boolean;
+  className?: string;
+}) => (
+  <div className={cn('flex min-w-0 items-center gap-1.5 text-muted-foreground', className)}>
+    <span className="-m-3 inline-flex shrink-0">
+      <AssetOwnerAvatar owner={owner} profile={profile} onColorChange={onColorChange} onImageChange={onImageChange} size="sm" />
+    </span>
+    <span className={cn('min-w-0', multiline ? 'leading-snug break-keep' : 'truncate')}>{description}</span>
+  </div>
+);
+
+const AssetEditIconButton = ({ assetName, onClick }: { assetName: string; onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={`${assetName} 금액 수정`}
+    title="금액 수정"
+    className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+  >
+    <Pencil className="size-3.5" />
+  </button>
+);
 
 const ASSET_GROUP_VISUALS: Record<
   AssetGroupKey,
@@ -86,6 +151,7 @@ export const AssetsPreview = () => {
   const router = useRouter();
 
   const [assets, setAssets] = useState<AssetDetailItem[]>(INITIAL_DETAILED_ASSETS);
+  const [ownerProfiles, setOwnerProfiles] = useState<Record<AssetOwnerKey, { color: ProfileAvatarColor; src: string | null }>>(INITIAL_OWNER_PROFILES);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOwners, setSelectedOwners] = useState<Set<string>>(() => new Set());
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(() => new Set());
@@ -101,32 +167,29 @@ export const AssetsPreview = () => {
   const [receivablesDialogOpen, setReceivablesDialogOpen] = useState(false);
   const [flowDetailAssetId, setFlowDetailAssetId] = useState<string | null>(null);
 
-  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
-  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(createEmptyExpensePreset);
-
   const navigateWithQuery = (path: string) => {
     const query = new URLSearchParams(window.location.search).toString();
     router.push(query ? `${path}?${query}` : path);
   };
 
-  // Global summary (all members, per ASSET-03)
-  const overallSummary = useMemo(() => computeOwnerSummary(assets), [assets]);
+  const summaryAssets = useMemo(() => assets.filter((item) => selectedOwners.size === 0 || selectedOwners.has(item.owner)), [assets, selectedOwners]);
+  const summaryOwnerLabel = selectedOwners.size === 0 ? '전체' : ASSET_OWNER_ORDER.filter((owner) => selectedOwners.has(owner)).join(' · ');
+  const overallSummary = useMemo(() => computeOwnerSummary(summaryAssets), [summaryAssets]);
   const overallExpectedNet = useMemo(
     () =>
-      assets.reduce((sum, item) => {
+      summaryAssets.reduce((sum, item) => {
         if (item.group === 'debt') {
           return sum;
         }
         const { inflow, outflow } = getAssetExpectedTotals(item);
         return sum + inflow - outflow;
       }, 0),
-    [assets]
+    [summaryAssets]
   );
   const overallProjectedNetWorth = overallSummary.netWorth + overallExpectedNet;
 
   // Living budget reconciliation (living-included cash & accounts)
   const livingAssets = useMemo(() => assets.filter((item) => item.includeInLivingBudget), [assets]);
-  const livingActualTotal = useMemo(() => livingAssets.reduce((sum, item) => sum + getAssetCurrentValuation(item), 0), [livingAssets]);
   const livingProjectedTotal = useMemo(() => livingAssets.reduce((sum, item) => sum + getAssetProjectedBalance(item), 0), [livingAssets]);
   const livingBudgetDiff = livingProjectedTotal - BUDGET_REMAINING_BASELINE;
 
@@ -134,18 +197,18 @@ export const AssetsPreview = () => {
 
   const assetGroupBreakdowns = useMemo(() => {
     return ASSET_GROUP_ORDER.filter((meta) => meta.key !== 'debt').map((meta) => {
-      const groupItems = assets.filter((item) => item.group === meta.key);
+      const groupItems = summaryAssets.filter((item) => item.group === meta.key);
       const total = groupItems.reduce((sum, item) => sum + getAssetCurrentValuation(item), 0);
       return {
         meta,
         total
       };
     });
-  }, [assets]);
+  }, [summaryAssets]);
 
   const debtTypeBreakdowns = useMemo(() => {
     const map = new Map<string, { typeLabel: string; count: number; total: number }>();
-    for (const item of assets) {
+    for (const item of summaryAssets) {
       if (item.group !== 'debt') {
         continue;
       }
@@ -159,7 +222,7 @@ export const AssetsPreview = () => {
       }
     }
     return Array.from(map.values());
-  }, [assets]);
+  }, [summaryAssets]);
 
   const groupLabelByKey = useMemo(() => {
     const map = new Map<AssetGroupKey, string>();
@@ -189,43 +252,26 @@ export const AssetsPreview = () => {
     });
   }, [assets, livingOnly, searchQuery, selectedOwners, selectedGroups, groupLabelByKey]);
 
-  const groupedByOwner = useMemo(() => {
-    return ASSET_OWNER_ORDER.map((owner) => {
-      const ownerAllItems = assets.filter((item) => item.owner === owner);
-      const ownerFilteredItems = filteredAssets.filter((item) => item.owner === owner);
-      const groups = ASSET_GROUP_ORDER.map((groupMeta) => ({
-        meta: groupMeta,
-        items: ownerFilteredItems.filter((item) => item.group === groupMeta.key)
-      })).filter((entry) => entry.items.length > 0);
+  const groupedAssets = useMemo(
+    () => ASSET_GROUP_ORDER.map((meta) => ({ meta, items: filteredAssets.filter((item) => item.group === meta.key) })).filter(({ items }) => items.length > 0),
+    [filteredAssets]
+  );
 
-      return {
-        owner,
-        summary: computeOwnerSummary(ownerAllItems),
-        visibleCount: ownerFilteredItems.length,
-        groups
-      };
-    }).filter((section) => section.groups.length > 0);
-  }, [assets, filteredAssets]);
+  const detailFilterCount = selectedGroups.size + (livingOnly ? 1 : 0);
+  const hasActiveFilters = searchQuery.trim().length > 0 || detailFilterCount > 0;
 
-  const detailFilterCount = selectedOwners.size + selectedGroups.size;
-  const hasActiveFilters = searchQuery.trim().length > 0 || detailFilterCount > 0 || livingOnly;
-
-  const filterGroups = [
-    { key: 'owner', label: '소유자', options: ASSET_OWNER_ORDER, selected: selectedOwners, onChange: setSelectedOwners },
-    { key: 'group', label: '자산 구분', options: GROUP_LABEL_OPTIONS, selected: selectedGroups, onChange: setSelectedGroups }
-  ];
+  const filterGroups = [{ key: 'group', label: '자산 구분', options: GROUP_LABEL_OPTIONS, selected: selectedGroups, onChange: setSelectedGroups }];
 
   const editingAsset = useMemo(() => assets.find((item) => item.id === editingAssetState.assetId) ?? null, [assets, editingAssetState.assetId]);
   const flowDetailAsset = useMemo(() => (flowDetailAssetId ? (assets.find((item) => item.id === flowDetailAssetId) ?? null) : null), [assets, flowDetailAssetId]);
 
   const handleResetDetailFilters = () => {
-    setSelectedOwners(new Set());
     setSelectedGroups(new Set());
+    setLivingOnly(false);
   };
 
   const handleResetFilters = () => {
     setSearchQuery('');
-    setLivingOnly(false);
     handleResetDetailFilters();
   };
 
@@ -255,20 +301,6 @@ export const AssetsPreview = () => {
     );
   };
 
-  const handleOpenExpenseForm = () => {
-    setExpenseDraft(createEmptyExpensePreset());
-    setExpenseSheetOpen(true);
-  };
-
-  const handleSaveExpense = async (savedDraft: ExpenseDraft) => {
-    const preview = computeExpensePreview(savedDraft);
-    setExpenseSheetOpen(false);
-    await dialog.alert({
-      title: '지출 저장 미리보기',
-      description: `${savedDraft.merchant || '사용처 미입력'} · 실결제 ${formatWon(preview.actualPaid)} (생활비 반영 ${formatWon(preview.livingBudgetExpense)})`
-    });
-  };
-
   const handleOpenSettingsGuide = async () => {
     await dialog.alert({
       title: '자산 · 카드 설정 안내',
@@ -279,19 +311,39 @@ export const AssetsPreview = () => {
   return (
     <DesignAppShell
       activeNav="assets"
-      onAddExpense={handleOpenExpenseForm}
       mobileHeaderLeft={<h1 className="truncate text-base font-bold tracking-tight text-foreground">자산 현황</h1>}
       mobileHeaderRight={
-        <Button variant="outline" size="icon" aria-label="가계부 설정에서 자산·카드 관리 안내" onClick={() => void handleOpenSettingsGuide()}>
-          <Settings className="size-4" />
-        </Button>
+        <>
+          <FilterMultiSelect
+            label="구성원"
+            options={ASSET_OWNER_ORDER}
+            selected={selectedOwners}
+            onChange={setSelectedOwners}
+            renderOption={(option) => <MemberAvatar name={option} size="xs" />}
+            align="end"
+            className="min-h-11"
+          />
+          <Button variant="outline" size="icon" aria-label="가계부 설정에서 자산·카드 관리 안내" onClick={() => void handleOpenSettingsGuide()}>
+            <Settings className="size-4" />
+          </Button>
+        </>
       }
       desktopHeaderLeft={<h1 className="text-lg font-bold tracking-tight text-foreground">자산 현황</h1>}
       desktopHeaderRight={
-        <Button variant="outline" size="md" onClick={() => void handleOpenSettingsGuide()} className="gap-1.5">
-          <Settings className="size-4" />
-          <span>자산·카드 설정</span>
-        </Button>
+        <>
+          <FilterMultiSelect
+            label="구성원"
+            options={ASSET_OWNER_ORDER}
+            selected={selectedOwners}
+            onChange={setSelectedOwners}
+            renderOption={(option) => <MemberAvatar name={option} size="xs" />}
+            align="end"
+          />
+          <Button variant="outline" size="md" onClick={() => void handleOpenSettingsGuide()} className="gap-1.5">
+            <Settings className="size-4" />
+            <span>자산·카드 설정</span>
+          </Button>
+        </>
       }
     >
       {/* Top Page-level Living Budget Reconciliation Notice (directly below header) */}
@@ -299,7 +351,7 @@ export const AssetsPreview = () => {
         <NoticeBox variant="warning" className="items-center">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-medium text-foreground tabular-nums break-keep">
-              생활비 포함 계좌·현금의 예상 잔액이 11월 남은 생활비보다{' '}
+              생활비 계좌·현금 예상 잔액이 11월 예산상 남은 생활비보다{' '}
               <strong className="font-bold text-warning">
                 {formatWon(Math.abs(livingBudgetDiff))} {livingBudgetDiff > 0 ? '더 많아요' : '더 적어요'}
               </strong>
@@ -317,17 +369,73 @@ export const AssetsPreview = () => {
         </NoticeBox>
       ) : null}
 
+      <section aria-label={`${summaryOwnerLabel} 자산 요약`} className="md:hidden">
+        <SummaryHeroCard
+          variant="hero"
+          title={`${summaryOwnerLabel} 순자산`}
+          titleAs="span"
+          helpLabel="순자산 계산 기준 안내"
+          helpText="순자산은 총자산에서 총부채를 뺀 금액이며, 현재 보유금과 평가액을 기준으로 해요."
+          value={formatWon(overallSummary.netWorth)}
+          subContent={
+            overallExpectedNet !== 0 ? (
+              <div className="flex items-center justify-between gap-2 text-xs text-hero-foreground/80">
+                <span>예정 입출금 반영 시</span>
+                <span className="font-semibold whitespace-nowrap text-hero-foreground">{formatWon(overallProjectedNetWorth)}</span>
+              </div>
+            ) : null
+          }
+        >
+          <div className="border-t border-hero-foreground/20">
+            <details className="group border-b border-hero-foreground/20">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm [&::-webkit-details-marker]:hidden">
+                <span className="font-semibold">총자산</span>
+                <strong className="ml-auto whitespace-nowrap text-hero-foreground">{formatWon(overallSummary.totalAssets)}</strong>
+                <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-hero-foreground/80 group-open:rotate-180" />
+              </summary>
+              <div className="space-y-2 pb-3 text-xs text-hero-foreground/80">
+                {assetGroupBreakdowns.map(({ meta, total }) => (
+                  <div key={meta.key} className="flex justify-between gap-2">
+                    <span>{meta.label}</span>
+                    <span className="font-semibold whitespace-nowrap text-hero-foreground">{formatWon(total)}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+            <details className="group">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm [&::-webkit-details-marker]:hidden">
+                <span className="font-semibold">총부채</span>
+                <strong className="ml-auto whitespace-nowrap text-hero-foreground">{formatWon(overallSummary.totalDebt)}</strong>
+                <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-hero-foreground/80 group-open:rotate-180" />
+              </summary>
+              <div className="space-y-2 pb-3 text-xs text-hero-foreground/80">
+                {debtTypeBreakdowns.length ? (
+                  debtTypeBreakdowns.map((entry) => (
+                    <div key={entry.typeLabel} className="flex justify-between gap-2">
+                      <span>{entry.typeLabel}</span>
+                      <span className="font-semibold whitespace-nowrap text-hero-foreground">{formatWon(entry.total)}</span>
+                    </div>
+                  ))
+                ) : (
+                  <span>등록된 부채 없음</span>
+                )}
+              </div>
+            </details>
+          </div>
+        </SummaryHeroCard>
+      </section>
+
       {/* Top 3-Card Net Worth KPI (전체 구성원 기준 · ASSET-03) */}
-      <section aria-label="전체 구성원 자산 요약" className="grid grid-cols-1 gap-2.5 md:grid-cols-3 md:gap-3">
-        <Card className="flex flex-col gap-3 p-4">
+      <section aria-label={`${summaryOwnerLabel} 자산 요약`} className="hidden gap-3 md:grid md:grid-cols-3">
+        <Card className="flex flex-col gap-3 border-primary/25 bg-primary-tint/50 p-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-1">
-              <span className="text-xs font-semibold text-muted-foreground">전체 총자산</span>
+              <span className="text-xs font-semibold text-muted-foreground">{summaryOwnerLabel} 총자산</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    aria-label="전체 총자산 계산 기준 안내"
+                    aria-label="총자산 계산 기준 안내"
                     className="inline-flex size-5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                   >
                     <HelpCircle className="size-3.5" />
@@ -338,10 +446,10 @@ export const AssetsPreview = () => {
                 </PopoverContent>
               </Popover>
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-foreground tabular-nums lg:text-2xl">{formatWon(overallSummary.totalAssets)}</span>
+            <span className="text-xl font-extrabold tracking-tight text-primary tabular-nums lg:text-2xl">{formatWon(overallSummary.totalAssets)}</span>
           </div>
 
-          <div className="flex flex-col gap-1.5 border-t border-border/70 pt-2.5 text-xs tabular-nums md:text-[11px] lg:text-xs">
+          <div className="flex flex-col gap-1.5 border-t border-primary/15 pt-2.5 text-xs tabular-nums md:text-[11px] lg:text-xs">
             {assetGroupBreakdowns.map(({ meta, total }) => (
               <div key={meta.key} className="flex items-center justify-between gap-2">
                 <span className="text-muted-foreground break-keep">{meta.label}</span>
@@ -354,12 +462,12 @@ export const AssetsPreview = () => {
         <Card className="flex flex-col gap-3 p-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-1">
-              <span className="text-xs font-semibold text-muted-foreground">전체 총부채</span>
+              <span className="text-xs font-semibold text-muted-foreground">{summaryOwnerLabel} 총부채</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    aria-label="전체 총부채 계산 기준 안내"
+                    aria-label="총부채 계산 기준 안내"
                     className="inline-flex size-5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
                   >
                     <HelpCircle className="size-3.5" />
@@ -377,9 +485,7 @@ export const AssetsPreview = () => {
             {debtTypeBreakdowns.length > 0 ? (
               debtTypeBreakdowns.map((entry) => (
                 <div key={entry.typeLabel} className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground break-keep">
-                    {entry.typeLabel} <span className="text-[11px]">({entry.count}건)</span>
-                  </span>
+                  <span className="text-muted-foreground break-keep">{entry.typeLabel}</span>
                   <span className="font-bold whitespace-nowrap text-destructive">{formatWon(entry.total)}</span>
                 </div>
               ))
@@ -389,16 +495,16 @@ export const AssetsPreview = () => {
           </div>
         </Card>
 
-        <Card className="flex flex-col gap-3 border-primary/25 bg-primary-tint/50 p-4">
+        <Card variant="hero" className="flex flex-col gap-3 p-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-1">
-              <span className="text-xs font-semibold text-muted-foreground">전체 순자산</span>
+              <span className="text-xs font-semibold text-hero-foreground/80">{summaryOwnerLabel} 순자산</span>
               <Popover>
                 <PopoverTrigger asChild>
                   <button
                     type="button"
                     aria-label="순자산 계산 기준 안내"
-                    className="inline-flex size-5 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+                    className="inline-flex size-5 cursor-pointer items-center justify-center rounded-full text-hero-foreground/80 transition-colors hover:bg-hero-foreground/15 hover:text-hero-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hero-foreground"
                   >
                     <HelpCircle className="size-3.5" />
                   </button>
@@ -408,49 +514,20 @@ export const AssetsPreview = () => {
                 </PopoverContent>
               </Popover>
             </div>
-            <span className="text-xl font-extrabold tracking-tight text-primary tabular-nums lg:text-2xl">{formatWon(overallSummary.netWorth)}</span>
+            <span className="text-xl font-extrabold tracking-tight text-hero-foreground tabular-nums lg:text-2xl">{formatWon(overallSummary.netWorth)}</span>
           </div>
 
           {overallExpectedNet !== 0 ? (
-            <div className="flex items-center justify-between gap-2 border-t border-primary/15 pt-2.5 text-xs tabular-nums md:text-[11px] lg:text-xs">
-              <span className="text-muted-foreground break-keep">예정 입출금 반영 시</span>
-              <span className="font-bold whitespace-nowrap text-primary">{formatWon(overallProjectedNetWorth)}</span>
+            <div className="flex items-center justify-between gap-2 border-t border-hero-foreground/20 pt-2.5 text-xs tabular-nums md:text-[11px] lg:text-xs">
+              <span className="text-hero-foreground/80 break-keep">예정 입출금 반영 시</span>
+              <span className="font-bold whitespace-nowrap text-hero-foreground">{formatWon(overallProjectedNetWorth)}</span>
             </div>
           ) : null}
         </Card>
       </section>
 
-      {/* Living Budget Accounts Summary & Uncollected Receivables Strip */}
-      <section aria-label="생활비 자금 및 미회수 현황" className={cn('grid grid-cols-1 gap-2', totalUncollected > 0 ? 'lg:grid-cols-2' : '')}>
-        <button
-          type="button"
-          aria-pressed={livingOnly}
-          onClick={() => setLivingOnly((prev) => !prev)}
-          className={cn(
-            'group flex min-h-control-md w-full cursor-pointer items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 text-left transition-colors',
-            livingOnly ? 'border-primary bg-primary-tint/40' : 'border-border-strong bg-card hover:border-primary/45 hover:bg-primary-tint/20'
-          )}
-        >
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary-tint text-primary">
-              <Wallet className="size-4" />
-            </span>
-            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-xs font-bold text-foreground">생활비 계좌 · 현금</span>
-              <span className="text-sm font-extrabold text-foreground tabular-nums">{formatWon(livingActualTotal)}</span>
-              <span className="text-[11px] font-semibold text-primary tabular-nums">예상 {formatWon(livingProjectedTotal)}</span>
-            </div>
-          </div>
-          {livingOnly ? (
-            <Badge variant="wine" className="shrink-0">
-              생활비만 보기
-            </Badge>
-          ) : (
-            <span className="hidden shrink-0 text-xs font-semibold text-muted-foreground transition-colors group-hover:text-primary min-[360px]:inline">생활비만 보기</span>
-          )}
-        </button>
-
-        {totalUncollected > 0 ? (
+      {totalUncollected > 0 ? (
+        <section aria-label="미회수 현황">
           <button
             type="button"
             onClick={() => setReceivablesDialogOpen(true)}
@@ -461,7 +538,7 @@ export const AssetsPreview = () => {
                 <HandCoins className="size-4" />
               </span>
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <span className="text-xs font-bold text-foreground">전체 기간 미회수 금액</span>
+                <span className="text-xs font-bold text-foreground">미회수 금액</span>
                 <span className="text-sm font-extrabold text-positive tabular-nums">{formatWon(totalUncollected)}</span>
                 <span className="text-[11px] text-muted-foreground tabular-nums">상대 {ASSET_RECEIVABLES_BY_PERSON.length}명</span>
               </div>
@@ -471,11 +548,13 @@ export const AssetsPreview = () => {
               <ChevronRight className="size-4" />
             </span>
           </button>
-        ) : null}
-      </section>
+        </section>
+      ) : null}
+
+      {totalUncollected > 0 ? <hr className="border-0 border-t border-border" /> : null}
 
       {/* Search & Multi-Select Filters (1-line on >= 768px) */}
-      <section aria-label="자산 검색 및 필터" className="flex flex-col gap-2 md:flex-row md:items-center">
+      <section aria-label="자산 검색 및 필터" className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
         <div className="flex items-center gap-2 md:min-w-40 md:max-w-56 md:flex-1 lg:w-64 lg:max-w-64 lg:flex-none">
           <SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="자산 검색" wrapperClassName="min-w-0 flex-1" />
 
@@ -507,15 +586,26 @@ export const AssetsPreview = () => {
             </Button>
           ) : null}
         </div>
+        <button
+          type="button"
+          aria-pressed={livingOnly}
+          onClick={() => setLivingOnly((prev) => !prev)}
+          className={cn(
+            'hidden min-h-11 w-fit cursor-pointer rounded-lg border px-3 text-xs font-semibold md:ml-auto md:inline-flex md:items-center',
+            livingOnly ? 'border-primary bg-primary-tint text-primary' : 'border-border-strong bg-card text-foreground hover:bg-accent/40'
+          )}
+        >
+          생활비만 보기
+        </button>
       </section>
 
-      {/* Member -> 4-Category Grouped Asset Details (ASSET-03) */}
-      {groupedByOwner.length === 0 ? (
+      {/* 자산 유형별 내역 */}
+      {groupedAssets.length === 0 ? (
         <Card padding="none">
           <CardContent className="p-0">
             <EmptyState
               title="조건에 맞는 자산·부채 항목이 없어요"
-              description="검색어나 소유자·자산 구분 필터를 초기화해 전체 현황을 확인해 보세요."
+              description="검색어나 자산 구분 필터를 초기화해 전체 현황을 확인해 보세요."
               actions={
                 hasActiveFilters ? (
                   <Button type="button" variant="outline" size="sm" onClick={handleResetFilters}>
@@ -528,289 +618,294 @@ export const AssetsPreview = () => {
         </Card>
       ) : (
         <div className="flex flex-col gap-5">
-          {groupedByOwner.map((ownerSection) => (
-            <Card key={ownerSection.owner} padding="none" className="gap-0 overflow-hidden border-border-strong/80">
-              {/* Member Header + Per-Owner Summary */}
-              <div className="flex flex-col gap-3 border-b border-border-strong/70 bg-muted/55 px-3.5 py-3.5 md:flex-row md:items-center md:justify-between md:px-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-extrabold text-primary-foreground">
-                    {ownerSection.owner.slice(0, 1)}
-                  </span>
-                  <h2 className="text-base font-extrabold tracking-tight text-foreground">{ownerSection.owner}</h2>
-                  <Badge variant="count" className="tabular-nums">
-                    {ownerSection.visibleCount}개
-                  </Badge>
-                </div>
+          {groupedAssets.map(({ meta, items }) => {
+            const visual = ASSET_GROUP_VISUALS[meta.key];
+            const GroupIcon = visual.icon;
+            const isLiquid = meta.key === 'cash-liquid';
+            const isDebtGroup = meta.key === 'debt';
+            const groupCurrentTotal = items.reduce((sum, item) => sum + getAssetCurrentValuation(item), 0);
+            const groupHasExpected = isLiquid && items.some((item) => (item.expectedFlows?.length ?? 0) > 0);
+            const groupProjectedTotal = isLiquid ? items.reduce((sum, item) => sum + getAssetProjectedBalance(item), 0) : groupCurrentTotal;
 
-                <div className="flex flex-col gap-1 rounded-lg border border-border bg-card px-3 py-2 text-xs tabular-nums min-[375px]:grid min-[375px]:grid-cols-3 min-[375px]:gap-2 md:flex md:flex-row md:items-center md:gap-5 md:border-0 md:bg-transparent md:p-0">
-                  <div className="flex items-baseline justify-between gap-1.5 min-[375px]:flex-col min-[375px]:gap-0.5 md:flex-row md:gap-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground md:text-xs">총자산</span>
-                    <span className="text-xs font-extrabold whitespace-nowrap text-foreground md:text-sm">{formatWon(ownerSection.summary.totalAssets)}</span>
-                  </div>
-                  <div className="flex items-baseline justify-between gap-1.5 min-[375px]:flex-col min-[375px]:gap-0.5 md:flex-row md:gap-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground md:text-xs">총부채</span>
-                    <span className={cn('text-xs font-extrabold whitespace-nowrap md:text-sm', ownerSection.summary.totalDebt > 0 ? 'text-destructive' : 'text-muted-foreground')}>
-                      {formatWon(ownerSection.summary.totalDebt)}
+            return (
+              <section key={meta.key} aria-label={meta.label} className="flex flex-col overflow-hidden rounded-xl border border-border-strong/75 bg-card">
+                {/* Prominent Category Header with Large Subtotal */}
+                <div className={cn('flex flex-col gap-2 border-b border-border px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between md:px-4', visual.headerBgClass)}>
+                  <div className="flex items-center gap-2">
+                    <span className={cn('inline-flex size-7 shrink-0 items-center justify-center rounded-lg', visual.iconBoxClass)}>
+                      <GroupIcon className="size-4" />
                     </span>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-sm font-extrabold tracking-tight text-foreground">{meta.label}</h3>
+                      <Badge variant="count" className="tabular-nums">
+                        {items.length}건
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-baseline justify-between gap-1.5 min-[375px]:flex-col min-[375px]:gap-0.5 md:flex-row md:gap-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground md:text-xs">순자산</span>
-                    <span className="text-xs font-extrabold whitespace-nowrap text-primary md:text-base">{formatWon(ownerSection.summary.netWorth)}</span>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 tabular-nums sm:justify-end sm:gap-2.5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[11px] font-semibold text-muted-foreground">소계</span>
+                      <span className={cn('text-base font-extrabold tracking-tight', visual.totalTextClass)}>{formatWon(groupCurrentTotal)}</span>
+                    </div>
+                    {groupHasExpected ? (
+                      <span className="inline-flex items-center rounded-md bg-primary-tint px-2 py-0.5 text-xs font-bold text-primary">예상 잔액 {formatWon(groupProjectedTotal)}</span>
+                    ) : null}
                   </div>
                 </div>
-              </div>
 
-              {/* Category Sub-sections as Distinct Nested Cards inside each Member */}
-              <div className="flex flex-col gap-3.5 bg-muted/20 p-3 md:gap-4 md:p-4">
-                {ownerSection.groups.map(({ meta, items }) => {
-                  const visual = ASSET_GROUP_VISUALS[meta.key];
-                  const GroupIcon = visual.icon;
-                  const isLiquid = meta.key === 'cash-liquid';
-                  const isDebtGroup = meta.key === 'debt';
-                  const groupCurrentTotal = items.reduce((sum, item) => sum + getAssetCurrentValuation(item), 0);
-                  const groupHasExpected = isLiquid && items.some((item) => (item.expectedFlows?.length ?? 0) > 0);
-                  const groupProjectedTotal = isLiquid ? items.reduce((sum, item) => sum + getAssetProjectedBalance(item), 0) : groupCurrentTotal;
+                {/* Mobile Stacked Rows (< 768px) */}
+                <div className="divide-y divide-border/80 md:hidden">
+                  {items.map((item) => {
+                    const currentVal = getAssetCurrentValuation(item);
+                    const { inflow, outflow } = getAssetExpectedTotals(item);
+                    const hasExpected = isLiquid && (inflow > 0 || outflow > 0);
+                    const projectedVal = getAssetProjectedBalance(item);
+                    const isFxAsset = item.marketQuote?.assetKind === 'fx';
+                    const isRefRate = item.marketQuote?.valuationMode === 'reference-rate';
 
-                  return (
-                    <section key={meta.key} aria-label={`${ownerSection.owner} ${meta.label}`} className="flex flex-col overflow-hidden rounded-xl border border-border-strong/75 bg-card">
-                      {/* Prominent Category Header with Large Subtotal */}
-                      <div className={cn('flex flex-col gap-2 border-b border-border px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between md:px-4', visual.headerBgClass)}>
-                        <div className="flex items-center gap-2">
-                          <span className={cn('inline-flex size-7 shrink-0 items-center justify-center rounded-lg', visual.iconBoxClass)}>
-                            <GroupIcon className="size-4" />
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="text-sm font-extrabold tracking-tight text-foreground">{meta.label}</h3>
-                            <Badge variant="count" className="tabular-nums">
-                              {items.length}건
-                            </Badge>
+                    return (
+                      <div key={item.id} className="flex flex-col gap-2 px-3.5 py-3">
+                        <div className="min-w-0 flex flex-col gap-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-bold text-foreground break-keep">{item.name}</span>
+                            {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
+                            {item.marketQuote ? <Badge variant={isRefRate ? 'neutral' : 'positive'}>{isRefRate ? '공통 시세' : '직접 입력'}</Badge> : null}
                           </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 tabular-nums sm:justify-end sm:gap-2.5">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className="text-[11px] font-semibold text-muted-foreground">소계</span>
-                            <span className={cn('text-base font-extrabold tracking-tight', visual.totalTextClass)}>{formatWon(groupCurrentTotal)}</span>
-                          </div>
-                          {groupHasExpected ? (
-                            <span className="inline-flex items-center rounded-md bg-primary-tint px-2 py-0.5 text-xs font-bold text-primary">예상 잔액 {formatWon(groupProjectedTotal)}</span>
+                          <AssetOwnerDescription
+                            owner={item.owner}
+                            profile={ownerProfiles[item.owner]}
+                            onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
+                            onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
+                            description={[item.institution, item.typeLabel].filter(Boolean).join(' · ')}
+                            multiline
+                            className="text-[11px]"
+                          />
+                          {item.counterparty ? (
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <span>상대</span>
+                              <MemberAvatar name={item.counterparty} size="xs" />
+                            </div>
+                          ) : null}
+                          {item.marketQuote ? (
+                            <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+                              {isFxAsset
+                                ? `1 ${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`
+                                : `보유 ${formatQuantityWithUnit(item.marketQuote)} · 1${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`}
+                            </span>
                           ) : null}
                         </div>
-                      </div>
 
-                      {/* Mobile Stacked Rows (< 768px) */}
-                      <div className="divide-y divide-border/80 md:hidden">
+                        <div className="flex items-center justify-between gap-2 text-xs tabular-nums">
+                          <div className="flex min-w-0 items-center gap-1">
+                            {isFxAsset && item.marketQuote ? (
+                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                <span className="text-sm font-bold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
+                                <span className="text-[11px] font-medium text-muted-foreground">{isRefRate ? `≈ ${formatWon(currentVal)}` : `${formatWon(currentVal)} (직접 입력)`}</span>
+                              </div>
+                            ) : (
+                              <span className={cn('text-sm font-bold', isDebtGroup ? 'text-destructive' : 'text-foreground')}>{isRefRate ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}</span>
+                            )}
+                            <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
+                          </div>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">{item.updatedAt}</span>
+                        </div>
+
+                        {hasExpected ? (
+                          <button
+                            type="button"
+                            onClick={() => setFlowDetailAssetId(item.id)}
+                            className="flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border border-border bg-muted/35 px-3 py-2.5 text-left text-xs tabular-nums transition-colors hover:border-primary/40 hover:bg-primary-tint/30"
+                          >
+                            <div className="flex flex-col gap-1">
+                              {inflow > 0 ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[11px] text-muted-foreground">입금 예정</span>
+                                  <span className="font-semibold whitespace-nowrap text-income">{formatSignedWon(inflow)}</span>
+                                </div>
+                              ) : null}
+                              {outflow > 0 ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[11px] text-muted-foreground">출금 예정</span>
+                                  <span className="font-semibold whitespace-nowrap text-expense">{formatSignedWon(-outflow)}</span>
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-1.5">
+                              <span className="text-[11px] font-bold text-primary">예상 잔액</span>
+                              <span className="inline-flex items-center gap-0.5 font-extrabold whitespace-nowrap text-primary">
+                                <span>{formatWon(projectedVal)}</span>
+                                <ChevronRight className="size-3.5 shrink-0" />
+                              </span>
+                            </div>
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Tablet / PC Table (>= 768px) */}
+                <div className="hidden overflow-x-auto md:block">
+                  {isLiquid ? (
+                    <table className="w-full table-fixed border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-border/80 bg-card text-[11px] font-medium text-muted-foreground">
+                          <th className="py-2 pl-4 pr-2 text-left font-medium">계좌 · 현금</th>
+                          <th className="hidden w-16 px-2 py-2 text-center font-medium whitespace-nowrap lg:table-cell">소유자</th>
+                          <th className="w-[128px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-40">현재 보유금</th>
+                          <th className="w-[124px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-40">입금 · 출금 예정</th>
+                          <th className="w-[116px] py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-32 lg:pr-2">예상 잔액</th>
+                          <th className="hidden py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:table-cell lg:w-28">최종 수정</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/80">
                         {items.map((item) => {
                           const currentVal = getAssetCurrentValuation(item);
                           const { inflow, outflow } = getAssetExpectedTotals(item);
-                          const hasExpected = isLiquid && (inflow > 0 || outflow > 0);
+                          const hasExpected = inflow > 0 || outflow > 0;
                           const projectedVal = getAssetProjectedBalance(item);
-                          const isFxAsset = item.marketQuote?.assetKind === 'fx';
-                          const isRefRate = item.marketQuote?.valuationMode === 'reference-rate';
+                          const description = [item.institution, item.typeLabel].filter(Boolean).join(' · ');
 
                           return (
-                            <div key={item.id} className="flex flex-col gap-2 px-3.5 py-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0 flex flex-col gap-0.5">
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-sm font-bold text-foreground break-keep">{item.name}</span>
+                            <tr key={item.id} className="transition-colors hover:bg-muted/25">
+                              <td className="min-w-0 py-3 pl-4 pr-2">
+                                <div className="flex min-w-0 flex-col gap-0.5">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                    <span className="truncate font-bold text-foreground">{item.name}</span>
                                     {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
-                                    {item.marketQuote ? <Badge variant={isRefRate ? 'neutral' : 'positive'}>{isRefRate ? '공통 시세' : '직접 입력'}</Badge> : null}
                                   </div>
-                                  <span className="text-[11px] text-muted-foreground break-keep">
-                                    {[item.institution, item.typeLabel, item.counterparty ? `상대 ${item.counterparty}` : null].filter(Boolean).join(' · ')}
-                                  </span>
-                                  {item.marketQuote ? (
-                                    <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
-                                      {isFxAsset
-                                        ? `1 ${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`
-                                        : `보유 ${formatQuantityWithUnit(item.marketQuote)} · 1${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`}
-                                    </span>
-                                  ) : null}
+                                  <AssetOwnerDescription
+                                    owner={item.owner}
+                                    profile={ownerProfiles[item.owner]}
+                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
+                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
+                                    description={description}
+                                    className="text-xs lg:hidden"
+                                  />
+                                  <span className="hidden truncate text-xs text-muted-foreground lg:block">{description}</span>
                                 </div>
-
-                                <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEditAsset(item)} className="shrink-0 gap-1 px-2 text-xs">
-                                  <Pencil className="size-3" />
-                                  <span>수정</span>
-                                </Button>
-                              </div>
-
-                              <div className="flex items-baseline justify-between gap-2 text-xs tabular-nums">
-                                {isFxAsset && item.marketQuote ? (
-                                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                    <span className="text-sm font-bold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
-                                    <span className="text-[11px] font-medium text-muted-foreground">{isRefRate ? `≈ ${formatWon(currentVal)}` : `${formatWon(currentVal)} (직접 입력)`}</span>
-                                  </div>
-                                ) : (
-                                  <span className={cn('text-sm font-bold', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
-                                    {isRefRate ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}
-                                  </span>
-                                )}
-                                <span className="shrink-0 text-[11px] text-muted-foreground">{item.updatedAt}</span>
-                              </div>
-
-                              {hasExpected ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setFlowDetailAssetId(item.id)}
-                                  className="flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border border-border bg-muted/35 px-3 py-2.5 text-left text-xs tabular-nums transition-colors hover:border-primary/40 hover:bg-primary-tint/30"
-                                >
-                                  <div className="flex flex-col gap-1">
-                                    {inflow > 0 ? (
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] text-muted-foreground">입금 예정</span>
-                                        <span className="font-semibold whitespace-nowrap text-positive">{formatSignedWon(inflow)}</span>
-                                      </div>
-                                    ) : null}
-                                    {outflow > 0 ? (
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] text-muted-foreground">출금 예정</span>
-                                        <span className="font-semibold whitespace-nowrap text-destructive">{formatSignedWon(-outflow)}</span>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                  <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-1.5">
-                                    <span className="text-[11px] font-bold text-primary">예상 잔액</span>
-                                    <span className="inline-flex items-center gap-0.5 font-extrabold whitespace-nowrap text-primary">
-                                      <span>{formatWon(projectedVal)}</span>
-                                      <ChevronRight className="size-3.5 shrink-0" />
+                              </td>
+                              <td className="hidden px-2 py-1 text-center whitespace-nowrap lg:table-cell">
+                                <div className="inline-flex items-center justify-center">
+                                  <AssetOwnerAvatar
+                                    owner={item.owner}
+                                    profile={ownerProfiles[item.owner]}
+                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
+                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
+                                    size="md"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-2 py-3 text-right tabular-nums whitespace-nowrap">
+                                <div className="inline-flex items-center justify-end gap-1">
+                                  <span className="font-bold text-foreground">{formatWon(currentVal)}</span>
+                                  <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
+                                </div>
+                              </td>
+                              <td className="px-2 py-3 text-right text-xs tabular-nums whitespace-nowrap">
+                                {hasExpected ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setFlowDetailAssetId(item.id)}
+                                    className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border/70 bg-muted/35 px-2 py-1 transition-colors hover:border-primary/40 hover:bg-primary-tint/50"
+                                  >
+                                    <span className="flex flex-col items-end gap-0.5">
+                                      {inflow > 0 ? <span className="font-semibold text-income">{formatSignedWon(inflow)}</span> : null}
+                                      {outflow > 0 ? <span className="font-semibold text-expense">{formatSignedWon(-outflow)}</span> : null}
                                     </span>
-                                  </div>
-                                </button>
-                              ) : null}
-                            </div>
+                                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                                  </button>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="py-3 pl-2 pr-4 text-right tabular-nums whitespace-nowrap lg:pr-2">
+                                <span className={cn('font-bold', hasExpected ? 'text-primary' : 'text-foreground')}>{formatWon(projectedVal)}</span>
+                              </td>
+                              <td className="hidden py-3 pl-2 pr-4 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap lg:table-cell">{item.updatedAt}</td>
+                            </tr>
                           );
                         })}
-                      </div>
-
-                      {/* Tablet / PC Table (>= 768px) */}
-                      <div className="hidden overflow-x-auto md:block">
-                        {isLiquid ? (
-                          <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                              <tr className="border-b border-border/80 bg-card text-[11px] font-medium text-muted-foreground">
-                                <th className="py-2 pl-4 pr-2 text-left font-medium">계좌 · 현금</th>
-                                <th className="w-[108px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-32">현재 보유금</th>
-                                <th className="w-[124px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-40">입금 · 출금 예정</th>
-                                <th className="w-[108px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-32">예상 잔액</th>
-                                <th className="hidden px-2 py-2 text-right font-medium whitespace-nowrap lg:table-cell lg:w-28">최종 수정</th>
-                                <th className="w-[72px] py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-20">관리</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/80">
-                              {items.map((item) => {
-                                const currentVal = getAssetCurrentValuation(item);
-                                const { inflow, outflow } = getAssetExpectedTotals(item);
-                                const hasExpected = inflow > 0 || outflow > 0;
-                                const projectedVal = getAssetProjectedBalance(item);
-
-                                return (
-                                  <tr key={item.id} className="transition-colors hover:bg-muted/25">
-                                    <td className="min-w-0 py-3 pl-4 pr-2">
-                                      <div className="flex min-w-0 flex-col gap-0.5">
-                                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                          <span className="truncate font-bold text-foreground">{item.name}</span>
-                                          {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
-                                        </div>
-                                        <span className="truncate text-xs text-muted-foreground">{[item.institution, item.typeLabel].filter(Boolean).join(' · ')}</span>
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-3 text-right tabular-nums whitespace-nowrap">
-                                      <span className="font-bold text-foreground">{formatWon(currentVal)}</span>
-                                    </td>
-                                    <td className="px-2 py-3 text-right text-xs tabular-nums whitespace-nowrap">
-                                      {hasExpected ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => setFlowDetailAssetId(item.id)}
-                                          className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-border/70 bg-muted/35 px-2 py-1 transition-colors hover:border-primary/40 hover:bg-primary-tint/50"
-                                        >
-                                          <span className="flex flex-col items-end gap-0.5">
-                                            {inflow > 0 ? <span className="font-semibold text-positive">{formatSignedWon(inflow)}</span> : null}
-                                            {outflow > 0 ? <span className="font-semibold text-destructive">{formatSignedWon(-outflow)}</span> : null}
-                                          </span>
-                                          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
-                                        </button>
-                                      ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                      )}
-                                    </td>
-                                    <td className="px-2 py-3 text-right tabular-nums whitespace-nowrap">
-                                      <span className={cn('font-bold', hasExpected ? 'text-primary' : 'text-foreground')}>{formatWon(projectedVal)}</span>
-                                    </td>
-                                    <td className="hidden px-2 py-3 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap lg:table-cell">{item.updatedAt}</td>
-                                    <td className="py-3 pl-2 pr-4 text-right whitespace-nowrap">
-                                      <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEditAsset(item)}>
-                                        수정
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        ) : (
-                          <table className="w-full table-fixed border-collapse text-sm">
-                            <thead>
-                              <tr className="border-b border-border/80 bg-card text-[11px] font-medium text-muted-foreground">
-                                <th className="py-2 pl-4 pr-2 text-left font-medium">{isDebtGroup ? '부채 항목' : '자산 항목'}</th>
-                                <th className="w-44 px-2 py-2 text-left font-medium whitespace-nowrap lg:w-56">{meta.key === 'savings-invest' ? '보유 · 시세 기준' : '유형 · 상대방'}</th>
-                                <th className="w-32 px-2 py-2 text-right font-medium whitespace-nowrap lg:w-36">{isDebtGroup ? '남은 원금' : '현재 평가액'}</th>
-                                <th className="hidden px-2 py-2 text-right font-medium whitespace-nowrap lg:table-cell lg:w-28">최종 수정</th>
-                                <th className="w-20 py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap">관리</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/80">
-                              {items.map((item) => {
-                                const currentVal = getAssetCurrentValuation(item);
-                                const isRefRate = item.marketQuote?.valuationMode === 'reference-rate';
-                                return (
-                                  <tr key={item.id} className="transition-colors hover:bg-muted/25">
-                                    <td className="min-w-0 py-3 pl-4 pr-2">
-                                      <div className="flex min-w-0 flex-col gap-0.5">
-                                        <span className="truncate font-bold text-foreground">{item.name}</span>
-                                        <span className="truncate text-xs text-muted-foreground">{[item.institution, item.typeLabel].filter(Boolean).join(' · ')}</span>
-                                      </div>
-                                    </td>
-                                    <td className="min-w-0 px-2 py-3 text-xs text-muted-foreground">
-                                      {item.marketQuote ? (
-                                        <div className="flex flex-col gap-0.5 tabular-nums">
-                                          <div className="flex flex-wrap items-center gap-1.5">
-                                            <span className="font-semibold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
-                                            <Badge variant={isRefRate ? 'neutral' : 'positive'}>{isRefRate ? '공통 시세' : '직접 입력'}</Badge>
-                                          </div>
-                                          <span className="text-[11px] text-muted-foreground">
-                                            1{item.marketQuote.assetKind === 'fx' ? ` ${item.marketQuote.unitLabel}` : item.marketQuote.unitLabel} = {formatWon(item.marketQuote.ratePerUnit)}
-                                          </span>
-                                        </div>
-                                      ) : item.counterparty ? (
-                                        <span className="truncate font-medium text-foreground">{item.counterparty}</span>
-                                      ) : (
-                                        <span>직접 입력 평가액</span>
-                                      )}
-                                    </td>
-                                    <td className={cn('px-2 py-3 text-right font-bold tabular-nums whitespace-nowrap', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
-                                      {isRefRate ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}
-                                    </td>
-                                    <td className="hidden px-2 py-3 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap lg:table-cell">{item.updatedAt}</td>
-                                    <td className="py-3 pl-2 pr-4 text-right whitespace-nowrap">
-                                      <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEditAsset(item)}>
-                                        수정
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </Card>
-          ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <table className="w-full table-fixed border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-border/80 bg-card text-[11px] font-medium text-muted-foreground">
+                          <th className="py-2 pl-4 pr-2 text-left font-medium">{isDebtGroup ? '부채 항목' : '자산 항목'}</th>
+                          <th className="hidden w-16 px-2 py-2 text-center font-medium whitespace-nowrap lg:table-cell">소유자</th>
+                          <th className="w-44 px-2 py-2 text-left font-medium whitespace-nowrap lg:w-56">{meta.key === 'savings-invest' ? '보유 · 시세 기준' : '유형 · 상대방'}</th>
+                          <th className="w-40 py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-44 lg:pr-2">{isDebtGroup ? '남은 원금' : '현재 평가액'}</th>
+                          <th className="hidden py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:table-cell lg:w-28">최종 수정</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/80">
+                        {items.map((item) => {
+                          const currentVal = getAssetCurrentValuation(item);
+                          const isRefRate = item.marketQuote?.valuationMode === 'reference-rate';
+                          const description = [item.institution, item.typeLabel].filter(Boolean).join(' · ');
+                          return (
+                            <tr key={item.id} className="transition-colors hover:bg-muted/25">
+                              <td className="min-w-0 py-3 pl-4 pr-2">
+                                <div className="flex min-w-0 flex-col gap-0.5">
+                                  <span className="truncate font-bold text-foreground">{item.name}</span>
+                                  <AssetOwnerDescription
+                                    owner={item.owner}
+                                    profile={ownerProfiles[item.owner]}
+                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
+                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
+                                    description={description}
+                                    className="text-xs lg:hidden"
+                                  />
+                                  <span className="hidden truncate text-xs text-muted-foreground lg:block">{description}</span>
+                                </div>
+                              </td>
+                              <td className="hidden px-2 py-1 text-center whitespace-nowrap lg:table-cell">
+                                <div className="inline-flex items-center justify-center">
+                                  <AssetOwnerAvatar
+                                    owner={item.owner}
+                                    profile={ownerProfiles[item.owner]}
+                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
+                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
+                                    size="md"
+                                  />
+                                </div>
+                              </td>
+                              <td className="min-w-0 px-2 py-3 text-xs text-muted-foreground">
+                                {item.marketQuote ? (
+                                  <div className="flex flex-col gap-0.5 tabular-nums">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-semibold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
+                                      <Badge variant={isRefRate ? 'neutral' : 'positive'}>{isRefRate ? '공통 시세' : '직접 입력'}</Badge>
+                                    </div>
+                                    <span className="text-[11px] text-muted-foreground">
+                                      1{item.marketQuote.assetKind === 'fx' ? ` ${item.marketQuote.unitLabel}` : item.marketQuote.unitLabel} = {formatWon(item.marketQuote.ratePerUnit)}
+                                    </span>
+                                  </div>
+                                ) : item.counterparty ? (
+                                  <MemberAvatar name={item.counterparty} size="xs" labelClassName="font-medium text-foreground" />
+                                ) : (
+                                  <span>직접 입력 평가액</span>
+                                )}
+                              </td>
+                              <td className={cn('py-3 pl-2 pr-4 text-right font-bold tabular-nums whitespace-nowrap lg:pr-2', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
+                                <div className="inline-flex items-center justify-end gap-1">
+                                  <span>{isRefRate ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}</span>
+                                  <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
+                                </div>
+                              </td>
+                              <td className="hidden py-3 pl-2 pr-4 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap lg:table-cell">{item.updatedAt}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 
@@ -830,12 +925,13 @@ export const AssetsPreview = () => {
         <SheetContent side="bottom">
           <SheetHeader>
             <SheetTitle>상세 검색</SheetTitle>
-            <SheetDescription>소유자와 자산 구분으로 자산·부채 목록을 좁혀 볼 수 있어요.</SheetDescription>
+            <SheetDescription>자산 구분과 생활비 포함 여부로 자산·부채 목록을 좁혀 볼 수 있어요.</SheetDescription>
           </SheetHeader>
           <SheetBody className="flex flex-col gap-5 py-4">
             {filterGroups.map((group) => (
               <FilterChipGroup key={group.key} label={group.label} mode="multi" options={group.options} selected={group.selected} onChange={group.onChange} />
             ))}
+            <Checkbox label="생활비만 보기" checked={livingOnly} onCheckedChange={(checked) => setLivingOnly(checked === true)} />
           </SheetBody>
           <SheetFooter className="grid grid-cols-2 gap-2">
             <Button type="button" variant="outline" size="lg" onClick={handleResetDetailFilters}>
@@ -859,7 +955,7 @@ export const AssetsPreview = () => {
         />
       ) : null}
 
-      <LivingBudgetDiffDialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen} livingAssets={livingAssets} onNavigate={navigateWithQuery} />
+      <LivingBudgetDiffDialog open={diffDialogOpen} onOpenChange={setDiffDialogOpen} livingAssets={livingAssets} />
 
       <AssetReceivablesDialog open={receivablesDialogOpen} onOpenChange={setReceivablesDialogOpen} onGoReceivables={() => navigateWithQuery('/preview/receivables')} />
 
@@ -875,8 +971,6 @@ export const AssetsPreview = () => {
           onNavigate={navigateWithQuery}
         />
       ) : null}
-
-      <ExpenseFormOverlay open={expenseSheetOpen} onOpenChange={setExpenseSheetOpen} draft={expenseDraft} onDraftChange={setExpenseDraft} onSave={(saved) => void handleSaveExpense(saved)} />
     </DesignAppShell>
   );
 };

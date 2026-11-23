@@ -147,7 +147,7 @@ export const EarlyPayoffDialog = ({ open, onOpenChange, plan, remainingRounds, d
                   <SelectContent>
                     <SelectItem value="지불 완료">지불 완료 (출금 완료)</SelectItem>
                     <SelectItem value="지불 대기">지불 대기 (자금 확보)</SelectItem>
-                    <SelectItem value="준비 필요">준비 필요 (예정)</SelectItem>
+                    <SelectItem value="지불 준비 필요">지불 준비 필요 (예정)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

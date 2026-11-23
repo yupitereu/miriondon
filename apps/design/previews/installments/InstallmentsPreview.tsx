@@ -1,6 +1,6 @@
 'use client';
 
-import { DatePicker, EmptyState, FilterChipGroup, FilterMultiSelect, dialog, mergeFilterOptions } from '@repo/ui-composition';
+import { DatePicker, EmptyState, FilterChipGroup, FilterMultiSelect, SummaryHeroCard, dialog, mergeFilterOptions } from '@repo/ui-composition';
 import {
   Badge,
   Button,
@@ -56,7 +56,7 @@ const TAB_ITEMS: ReadonlyArray<{ key: InstallmentTabKey; label: string }> = [
 const DEFAULT_COMPLETED_DATE_RANGE: DateRangeValue = getRecentMonthsDateRange(DEFAULT_VIEWED_MONTH, 3);
 
 const STATUS_BADGE_PROPS: Record<PaymentStatus, { variant: 'wine' | 'neutral' | 'positive'; className?: string }> = {
-  '준비 필요': { variant: 'wine', className: 'bg-primary text-primary-foreground' },
+  '지불 준비 필요': { variant: 'wine', className: 'bg-primary text-primary-foreground' },
   '지불 대기': { variant: 'positive' },
   '지불 완료': { variant: 'neutral' }
 };
@@ -279,7 +279,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
           setEditingRoundContext(null);
           await dialog.alert({
             title: '일시불 전환 안내',
-            description: '납부방식을 일시불로 변경하여 할부 관리 목록에서 제외하고 지출 내역으로 이동했어요.'
+            description: '납부방식을 일시불로 변경하여 할부 현황 목록에서 제외하고 지출 내역으로 이동했어요.'
           });
           return;
         }
@@ -328,7 +328,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
     if (summary.hasWaitingRound) {
       await dialog.alert({
         title: '조기 완납 불가',
-        description: '남은 회차 중 지불 대기 상태가 있어요. 지불 관리에서 준비 필요 또는 지불 완료로 정리한 뒤 다시 시도해 주세요.'
+        description: '남은 회차 중 지불 대기 상태가 있어요. 지불 관리에서 지불 준비 필요 또는 지불 완료로 정리한 뒤 다시 시도해 주세요.'
       });
       return;
     }
@@ -383,7 +383,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
 
   const handleDeletePlan = async (plan: InstallmentPlanItem) => {
     const summary = computePlanSummary(plan, rounds);
-    const hasLockedRounds = summary.rounds.some((round) => round.status !== '준비 필요');
+    const hasLockedRounds = summary.rounds.some((round) => round.status !== '지불 준비 필요');
 
     if (hasLockedRounds) {
       await dialog.alert({
@@ -425,12 +425,12 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
   const renderPlanCard = (plan: InstallmentPlanItem) => {
     const summary = computePlanSummary(plan, rounds);
     const isExpanded = expandedPlanIds.has(plan.id);
-    const hasLockedRounds = summary.rounds.some((round) => round.status !== '준비 필요');
+    const hasLockedRounds = summary.rounds.some((round) => round.status !== '지불 준비 필요');
     const payoffDisabledReason =
       summary.remainingRounds.length === 0
         ? '남은 미지불 회차가 없어요.'
         : summary.hasWaitingRound
-          ? '남은 회차 중 지불 대기 상태가 있어요. 지불 관리에서 준비 필요 또는 지불 완료로 정리한 뒤 완납할 수 있어요.'
+          ? '남은 회차 중 지불 대기 상태가 있어요. 지불 관리에서 지불 준비 필요 또는 지불 완료로 정리한 뒤 완납할 수 있어요.'
           : summary.hasRecoveryOnUnpaid
             ? '남은 회차에 지출금 회수 내역이 연결되어 있어요. 회수 설정을 먼저 해제해 주세요.'
             : null;
@@ -438,7 +438,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
       summary.rounds.length === 0
         ? '삭제할 할부 회차가 없어요.'
         : hasLockedRounds
-          ? '지불 대기·지불 완료 상태의 회차가 포함된 할부는 삭제할 수 없어요. 모든 회차를 준비 필요 상태로 변경한 뒤 삭제할 수 있어요.'
+          ? '지불 대기·지불 완료 상태의 회차가 포함된 할부는 삭제할 수 없어요. 모든 회차를 지불 준비 필요 상태로 변경한 뒤 삭제할 수 있어요.'
           : summary.hasRecoveryOnUnpaid
             ? '회차에 지출금 회수 내역이 연결된 할부는 삭제할 수 없어요. 회수 설정을 먼저 해제해 주세요.'
             : null;
@@ -671,7 +671,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
           >
             <ArrowLeft className="size-4" />
           </button>
-          <h1 className="truncate text-base font-bold tracking-tight text-foreground">할부 관리</h1>
+          <h1 className="truncate text-base font-bold tracking-tight text-foreground">할부 현황</h1>
         </div>
       }
       desktopHeaderLeft={
@@ -680,25 +680,24 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
             <ArrowLeft className="size-4" />
             <span>지출 내역</span>
           </Button>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">할부 관리</h1>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">할부 현황</h1>
         </div>
       }
     >
-      {/* Top 2 KPI Summary Cards */}
-      <section aria-label="할부 현황 요약" className="grid grid-cols-2 gap-2.5 md:gap-3">
-        <div className="flex flex-col justify-start gap-0.5 rounded-xl border border-border-strong bg-card px-3.5 py-3 shadow-xs md:px-4 md:py-3.5">
-          <span className="text-xs font-medium text-muted-foreground">진행 중인 할부</span>
-          <span className="text-base font-extrabold tracking-tight text-foreground tabular-nums md:text-lg">{activePlans.length}건</span>
-          <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
-            {allActiveRemainingRounds.length > 0 ? `${allActiveRemainingRounds.length}회 남음 · ${totalRemainingMonthCount}개월간` : '남은 예정 회차 없음'}
-          </span>
-        </div>
-
-        <div className="flex flex-col justify-start gap-0.5 rounded-xl border border-border-strong bg-card px-3.5 py-3 shadow-xs md:px-4 md:py-3.5">
-          <span className="text-xs font-medium text-muted-foreground">남은 청구 예정 합계</span>
-          <span className="text-base font-extrabold tracking-tight text-primary tabular-nums md:text-lg">{formatWon(totalRemainingAmount)}</span>
-        </div>
-      </section>
+      {/* Top Hero Summary Card */}
+      <SummaryHeroCard
+        variant="hero-expense"
+        aria-label="할부 현황 요약"
+        title="남은 청구 예정 합계"
+        helpLabel="남은 청구 예정 합계 기준 안내"
+        helpText="진행 중인 할부의 미지불 회차 합계예요. 지불 완료 처리하면 제외돼요."
+        value={formatWon(totalRemainingAmount)}
+        items={[
+          { label: '진행 중인 할부', value: `${activePlans.length}건` },
+          { label: '남은 회차', value: `${allActiveRemainingRounds.length}회` },
+          { label: '남은 기간', value: `${totalRemainingMonthCount}개월` }
+        ]}
+      />
 
       {/* Top Conclusion: Monthly Installment Billing Schedule */}
       <Card padding="none" className="gap-0 overflow-hidden">
@@ -716,7 +715,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed text-muted-foreground break-keep">
-                진행 중인 할부의 <span className="font-semibold text-foreground">준비 필요</span> · <span className="font-semibold text-foreground">지불 대기</span> 회차를 예산 반영월별로 합산한
+                진행 중인 할부의 <span className="font-semibold text-foreground">지불 준비 필요</span> · <span className="font-semibold text-foreground">지불 대기</span> 회차를 예산 반영월별로 합산한
                 금액이에요. 지불 관리에서 상태를 지불 완료로 바꾸면 예정에서 빠져요.
               </PopoverContent>
             </Popover>
@@ -951,7 +950,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
                     </Button>
                   ) : null}
                   {!isCompletedTab ? (
-                    <Button type="button" variant="primary" size="sm" onClick={handleOpenAddExpense}>
+                    <Button type="button" variant="expense" size="sm" onClick={handleOpenAddExpense}>
                       지출 추가
                     </Button>
                   ) : null}

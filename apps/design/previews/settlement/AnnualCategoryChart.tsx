@@ -224,7 +224,7 @@ export const AnnualCategoryChart = ({
             </span>
             {selectedLabel ? (
               <span className="inline-flex items-center gap-1.5">
-                <span aria-hidden="true" className="w-4 border-t-2 border-dashed border-primary" />
+                <span aria-hidden="true" className="w-4 border-t-2 border-dashed border-expense" />
                 {selectedLabel}
               </span>
             ) : null}
@@ -284,13 +284,13 @@ export const AnnualCategoryChart = ({
                     {points.map((point, index) => (point.budget === null ? null : <circle key={`budget-dot-${point.month}`} cx={x(index)} cy={y(point.budget)} r="3" fill="hsl(var(--foreground))" />))}
                     {selectedLabel
                       ? linePaths((point) => point.selected).map((path, index) => (
-                          <path key={`selected-${index}`} d={path} fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" strokeDasharray="5 4" />
+                          <path key={`selected-${index}`} d={path} fill="none" stroke="hsl(var(--expense))" strokeWidth="2.5" strokeDasharray="5 4" />
                         ))
                       : null}
                     {selectedLabel
                       ? points.map((point, index) =>
                           point.selected === null || point.selected === undefined ? null : (
-                            <circle key={`selected-dot-${point.month}`} cx={x(index)} cy={y(point.selected)} r="3" fill="hsl(var(--primary))" />
+                            <circle key={`selected-dot-${point.month}`} cx={x(index)} cy={y(point.selected)} r="3" fill="hsl(var(--expense))" />
                           )
                         )
                       : null}

@@ -53,7 +53,7 @@ export const isMemberPerson = (person: string): boolean => person.includes('(구
 
 export const normalizePersonDisplay = (person: string): string =>
   person
-    .replace(/\s+\(미참여\)$/, '(미참여)')
+    .replace(/\s+\(외부인\)$/, '(외부인)')
     .replace(/\s+\(구성원\)$/, '(구성원)')
     .replace(/\s+\(나\)$/, '(나)');
 
@@ -207,12 +207,12 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
     memo: '팀 회식 · 2인 정산',
     categoryLabel: '식비',
     paymentMethod: '신한카드 Deep Dream',
-    paymentStatus: '준비 필요',
+    paymentStatus: '지불 준비 필요',
     actualAmount: 96000,
     entries: [
       {
         id: 'rec-1-e1',
-        person: '박대리 (미참여)',
+        person: '박대리 (외부인)',
         targetAmount: 48000,
         receivedAmount: 0,
         depositAccount: DEPOSIT_ACCOUNTS[0]
@@ -234,13 +234,13 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
       installmentRound: 1,
       installmentPrincipal: null,
       installmentFee: 0,
-      actualUser: '박대리 (미참여)',
-      paymentStatus: '준비 필요',
+      actualUser: '민지 (나)',
+      paymentStatus: '지불 준비 필요',
       includeInCardPerformance: true,
       recoveries: [
         {
           id: 'rec-1-e1',
-          person: '박대리 (미참여)',
+          person: '박대리 (외부인)',
           targetAmount: 48000,
           receivedAmount: 0,
           depositAccount: DEPOSIT_ACCOUNTS[0]
@@ -311,14 +311,14 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
     entries: [
       {
         id: 'rec-3-e1',
-        person: '박대리 (미참여)',
+        person: '박대리 (외부인)',
         targetAmount: 80000,
         receivedAmount: 0,
         depositAccount: DEPOSIT_ACCOUNTS[0]
       },
       {
         id: 'rec-3-e2',
-        person: '김과장 (미참여)',
+        person: '김과장 (외부인)',
         targetAmount: 80000,
         receivedAmount: 40000,
         depositAccount: DEPOSIT_ACCOUNTS[1]
@@ -346,14 +346,14 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
       recoveries: [
         {
           id: 'rec-3-e1',
-          person: '박대리 (미참여)',
+          person: '박대리 (외부인)',
           targetAmount: 80000,
           receivedAmount: 0,
           depositAccount: DEPOSIT_ACCOUNTS[0]
         },
         {
           id: 'rec-3-e2',
-          person: '김과장 (미참여)',
+          person: '김과장 (외부인)',
           targetAmount: 80000,
           receivedAmount: 40000,
           depositAccount: DEPOSIT_ACCOUNTS[1]
@@ -374,7 +374,7 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
     entries: [
       {
         id: 'rec-4-e1',
-        person: '김과장 (미참여)',
+        person: '김과장 (외부인)',
         targetAmount: 50000,
         receivedAmount: 0,
         depositAccount: DEPOSIT_ACCOUNTS[2]
@@ -402,7 +402,7 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
       recoveries: [
         {
           id: 'rec-4-e1',
-          person: '김과장 (미참여)',
+          person: '김과장 (외부인)',
           targetAmount: 50000,
           receivedAmount: 0,
           depositAccount: DEPOSIT_ACCOUNTS[2]
@@ -423,7 +423,7 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
     entries: [
       {
         id: 'rec-5-e1',
-        person: '박대리 (미참여)',
+        person: '박대리 (외부인)',
         targetAmount: 24000,
         receivedAmount: 24000,
         depositAccount: DEPOSIT_ACCOUNTS[0]
@@ -451,7 +451,7 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
       recoveries: [
         {
           id: 'rec-5-e1',
-          person: '박대리 (미참여)',
+          person: '박대리 (외부인)',
           targetAmount: 24000,
           receivedAmount: 24000,
           depositAccount: DEPOSIT_ACCOUNTS[0]
@@ -472,7 +472,7 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
     entries: [
       {
         id: 'rec-6-e1',
-        person: '김과장 (미참여)',
+        person: '김과장 (외부인)',
         targetAmount: 60000,
         receivedAmount: 60000,
         depositAccount: DEPOSIT_ACCOUNTS[0]
@@ -500,7 +500,7 @@ export const INITIAL_RECEIVABLES: ReceivableRecord[] = [
       recoveries: [
         {
           id: 'rec-6-e1',
-          person: '김과장 (미참여)',
+          person: '김과장 (외부인)',
           targetAmount: 60000,
           receivedAmount: 60000,
           depositAccount: DEPOSIT_ACCOUNTS[0]

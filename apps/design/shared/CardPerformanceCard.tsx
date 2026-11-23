@@ -13,7 +13,7 @@ export type CardPerformanceItem = {
   id: string;
   name: string;
   totalAmount: number | null;
-  meta: string;
+  meta: ReactNode;
   needsReview?: boolean;
   tiers: CardTierItem[];
 };
@@ -113,13 +113,13 @@ export const CardPerformanceCard = ({ card, paymentSummary, stateLabel, period }
       {period ? (
         <div className={cn('flex flex-col gap-3.5', paymentSummary && 'border-t border-border-strong pt-3')}>
           <div className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2.5">
-            <span className="text-xs font-semibold text-foreground">{period.month}월 적용 혜택</span>
-            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-              <p className="text-xs text-muted-foreground break-keep tabular-nums">
-                {period.previousMonth}월 인정 실적 {previousAmount === null ? '미확인' : <strong className="text-sm font-bold whitespace-nowrap text-foreground">{formatWon(previousAmount)}</strong>}
-              </p>
+            <div className="flex min-h-badge flex-wrap items-center gap-1.5">
+              <span className="text-xs font-semibold text-foreground">{period.month}월 적용 혜택</span>
               {appliedTier ? <Badge variant="positive">{appliedTier.step}단계 달성</Badge> : null}
             </div>
+            <p className="text-xs text-muted-foreground break-keep tabular-nums">
+              {period.previousMonth}월 인정 실적 {previousAmount === null ? '미확인' : <span className="font-medium whitespace-nowrap">{formatWon(previousAmount)}</span>}
+            </p>
           </div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <span className="text-sm font-semibold">{period.month}월 이용 실적</span>

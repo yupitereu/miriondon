@@ -5,6 +5,7 @@ import { Columns4, ExternalLink, Maximize2, Minimize2, Monitor, RotateCw, Smartp
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { MiriondonSymbol, MiriondonWordmark } from '@/shared/BrandLogo';
 import { COMPARE_VIEWPORT_IDS, DEFAULT_PREVIEW_ROUTE, PREVIEW_ROUTES, VIEWPORT_PRESETS, type ViewportPreset } from '@/workbench/preview-routes';
 
 type Theme = 'light' | 'dark';
@@ -162,9 +163,10 @@ export const DesignWorkbench = ({ initialTheme, initialRouteId, initialViewportM
       <header className="sticky top-0 z-40 shrink-0 border-b border-border bg-card/95 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex size-7 items-center justify-center rounded-md bg-primary text-xs font-extrabold text-primary-foreground">M</span>
-              <span className="text-sm font-bold tracking-tight text-foreground">미리온돈 Design</span>
+            <div className="flex items-center gap-1.5">
+              <MiriondonSymbol className="size-7 shrink-0" />
+              <MiriondonWordmark size="sm" />
+              <span className="text-xs font-semibold text-muted-foreground">Design</span>
             </div>
 
             <div className="w-48">

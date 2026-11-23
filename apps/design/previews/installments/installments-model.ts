@@ -93,7 +93,7 @@ export const computePlanSummary = (plan: InstallmentPlanItem, allRounds: Install
     paidRounds,
     paidAmount: paidRounds.reduce((sum, r) => sum + r.amount, 0),
     hasWaitingRound: remainingRounds.some((r) => r.status === '지불 대기'),
-    hasBeforeRound: remainingRounds.some((r) => r.status === '준비 필요'),
+    hasBeforeRound: remainingRounds.some((r) => r.status === '지불 준비 필요'),
     hasRecoveryOnUnpaid: remainingRounds.some((r) => r.hasRecovery || (r.recoveryAmount ?? 0) > 0)
   };
 };
@@ -139,11 +139,11 @@ export const roundToExpenseDraft = (plan: InstallmentPlanItem, round: Installmen
     month: Number(mStr) || DEFAULT_VIEWED_MONTH.month
   };
   const siblingRounds = allPlanRounds.filter((item) => item.planId === plan.id);
-  const hasLockedSiblingRounds = siblingRounds.some((item) => item.id !== round.id && item.status !== '준비 필요');
+  const hasLockedSiblingRounds = siblingRounds.some((item) => item.id !== round.id && item.status !== '지불 준비 필요');
   const fixedPrincipalSum = siblingRounds
-    .filter((item) => item.id !== round.id && (item.roundNumber < round.roundNumber || item.status !== '준비 필요'))
+    .filter((item) => item.id !== round.id && (item.roundNumber < round.roundNumber || item.status !== '지불 준비 필요'))
     .reduce((sum, item) => sum + item.basePrincipal, 0);
-  const remainingEditableCount = 1 + siblingRounds.filter((item) => item.id !== round.id && item.roundNumber > round.roundNumber && item.status === '준비 필요').length;
+  const remainingEditableCount = 1 + siblingRounds.filter((item) => item.id !== round.id && item.roundNumber > round.roundNumber && item.status === '지불 준비 필요').length;
 
   return {
     id: round.id,
@@ -152,7 +152,7 @@ export const roundToExpenseDraft = (plan: InstallmentPlanItem, round: Installmen
     viewedMonth,
     approvedAmount: plan.approvedAmount,
     cardDiscount: plan.cardDiscount,
-    splits: [{ id: 'split-1', category: plan.category, amount: round.amount, discount: 0 }],
+    splits: [{ id: 'split-1', category: plan.category, amount: round.basePrincipal, discount: 0, installmentFee: Math.max(0, round.amount - round.basePrincipal) }],
     merchant: plan.merchant,
     memo: plan.memo,
     paymentMethod: plan.paymentMethod,
@@ -222,7 +222,7 @@ export const createInstallmentPlanFromDraft = (draft: ExpenseDraft, fallbackPeri
     const basePrincipal = offset === 0 ? firstPrincipal : (futurePrincipals[offset - 1] ?? 0);
     const fee = draft.installmentType === 'interest' ? preview.fee : 0;
     const amount = offset === 0 ? preview.installmentRoundTotal : basePrincipal + fee;
-    const status: PaymentStatus = offset === 0 ? draft.paymentStatus : '준비 필요';
+    const status: PaymentStatus = offset === 0 ? draft.paymentStatus : '지불 준비 필요';
 
     rounds.push({
       id: `${planId}-r${roundNo}`,
@@ -321,7 +321,7 @@ export const applyRoundEditToPlanAndRounds = ({
         dueDate,
         basePrincipal,
         amount: offset === 0 ? preview.installmentRoundTotal : basePrincipal + fee,
-        status: offset === 0 ? savedDraft.paymentStatus : '준비 필요',
+        status: offset === 0 ? savedDraft.paymentStatus : '지불 준비 필요',
         hasRecovery: offset === 0 ? savedDraft.recoveries.length > 0 : false,
         recoveryAmount: offset === 0 ? savedDraft.recoveries.reduce((sum, r) => sum + (r.targetAmount ?? 0), 0) : 0
       });
@@ -335,12 +335,12 @@ export const applyRoundEditToPlanAndRounds = ({
     };
   }
 
-  // In-place update of edited round + proportional redistribution across subsequent editable ('준비 필요') rounds
+  // In-place update of edited round + proportional redistribution across subsequent editable ('지불 준비 필요') rounds
   const editedPrincipal = preview.principal > 0 ? preview.principal : preview.recommendedPrincipal;
   const fixedPrincipalSum =
-    sortedExisting.filter((r) => r.id !== editedRoundId && (r.roundNumber < editedRound.roundNumber || r.status !== '준비 필요')).reduce((sum, r) => sum + r.basePrincipal, 0) + editedPrincipal;
+    sortedExisting.filter((r) => r.id !== editedRoundId && (r.roundNumber < editedRound.roundNumber || r.status !== '지불 준비 필요')).reduce((sum, r) => sum + r.basePrincipal, 0) + editedPrincipal;
 
-  const subsequentEditable = sortedExisting.filter((r) => r.id !== editedRoundId && r.roundNumber > editedRound.roundNumber && r.status === '준비 필요');
+  const subsequentEditable = sortedExisting.filter((r) => r.id !== editedRoundId && r.roundNumber > editedRound.roundNumber && r.status === '지불 준비 필요');
   const remainingBalance = Math.max(0, nextNetApproval - fixedPrincipalSum);
   const distributedPrincipals = distributeInstallmentRemainingPrincipal(remainingBalance, subsequentEditable.length);
   const redistributedMap = new Map(subsequentEditable.map((r, index) => [r.id, distributedPrincipals[index] ?? 0]));
@@ -453,7 +453,7 @@ export const INITIAL_INSTALLMENT_PLANS: InstallmentPlanItem[] = [
 ];
 
 export const INITIAL_INSTALLMENT_ROUNDS: InstallmentRoundItem[] = [
-  // inst-1: 가을 외투 (3개월 무이자, 모두 준비 필요 -> 조기 완납·할부 삭제 바로 시연 가능)
+  // inst-1: 가을 외투 (3개월 무이자, 모두 지불 준비 필요 -> 조기 완납·할부 삭제 바로 시연 가능)
   {
     id: 'inst-1-r1',
     planId: 'inst-1',
@@ -464,7 +464,7 @@ export const INITIAL_INSTALLMENT_ROUNDS: InstallmentRoundItem[] = [
     dueDate: new Date(2026, 10, 2),
     basePrincipal: 100000,
     amount: 100000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'inst-1-r2',
@@ -476,7 +476,7 @@ export const INITIAL_INSTALLMENT_ROUNDS: InstallmentRoundItem[] = [
     dueDate: new Date(2026, 11, 2),
     basePrincipal: 100000,
     amount: 100000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'inst-1-r3',
@@ -488,7 +488,7 @@ export const INITIAL_INSTALLMENT_ROUNDS: InstallmentRoundItem[] = [
     dueDate: new Date(2027, 0, 2),
     basePrincipal: 100000,
     amount: 100000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   // inst-2: 무선 청소기 (6개월 유이자, 할인 후 원금 700,000원 -> 1회차 116,670원, 2~6회차 116,666원 + 수수료)
   {
@@ -537,7 +537,7 @@ export const INITIAL_INSTALLMENT_ROUNDS: InstallmentRoundItem[] = [
     dueDate: new Date(2026, 11, 15),
     basePrincipal: 116666,
     amount: 121400,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'inst-2-r5',
@@ -549,7 +549,7 @@ export const INITIAL_INSTALLMENT_ROUNDS: InstallmentRoundItem[] = [
     dueDate: new Date(2027, 0, 15),
     basePrincipal: 116666,
     amount: 121400,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'inst-2-r6',
@@ -561,7 +561,7 @@ export const INITIAL_INSTALLMENT_ROUNDS: InstallmentRoundItem[] = [
     dueDate: new Date(2027, 1, 15),
     basePrincipal: 116666,
     amount: 121400,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   // inst-3: 완료된 할부 (1회차 지불 완료 + 2~3회차 조기 완납 선결제)
   {

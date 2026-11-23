@@ -14,6 +14,7 @@ import {
   type AssetDetailItem,
   type AssetValuationMode
 } from '@/previews/assets/assets-model';
+import { MemberAvatar } from '@/shared/MemberAvatar';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 
 export type AssetBalanceSavePayload = {
@@ -86,9 +87,17 @@ export const AssetBalanceEditDialog = ({
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="break-keep">{asset.name} · 잔액 수정</DialogTitle>
-            <DialogDescription className="break-keep">
-              {[asset.owner, asset.institution, asset.typeLabel].filter(Boolean).join(' · ')}
-              {asset.counterparty ? ` · 상대 ${asset.counterparty}` : ''}
+            <DialogDescription className="flex flex-wrap items-center gap-1 break-keep">
+              <MemberAvatar name={asset.owner} size="xs" />
+              {[asset.institution, asset.typeLabel].filter(Boolean).map((part) => (
+                <span key={part}>· {part}</span>
+              ))}
+              {asset.counterparty ? (
+                <>
+                  <span>· 상대</span>
+                  <MemberAvatar name={asset.counterparty} size="xs" />
+                </>
+              ) : null}
             </DialogDescription>
           </DialogHeader>
 
@@ -225,17 +234,7 @@ export const AssetBalanceEditDialog = ({
   );
 };
 
-export const LivingBudgetDiffDialog = ({
-  open,
-  onOpenChange,
-  livingAssets,
-  onNavigate
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  livingAssets: readonly AssetDetailItem[];
-  onNavigate: (path: '/preview/funds' | '/preview/receivables') => void;
-}) => {
+export const LivingBudgetDiffDialog = ({ open, onOpenChange, livingAssets }: { open: boolean; onOpenChange: (open: boolean) => void; livingAssets: readonly AssetDetailItem[] }) => {
   const livingActualTotal = livingAssets.reduce((sum, item) => sum + getAssetCurrentValuation(item), 0);
   const livingInflowTotal = livingAssets.reduce((sum, item) => sum + getAssetExpectedTotals(item).inflow, 0);
   const livingOutflowTotal = livingAssets.reduce((sum, item) => sum + getAssetExpectedTotals(item).outflow, 0);
@@ -246,77 +245,60 @@ export const LivingBudgetDiffDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-0">
         <DialogHeader>
-          <DialogTitle>생활비 잔액 차이 계산 근거</DialogTitle>
-          <DialogDescription className="break-keep">생활비에 포함된 계좌·현금의 예상 잔액과 예산상 남은 생활비를 대조한 결과예요.</DialogDescription>
+          <DialogTitle>실계좌·가계부 차액</DialogTitle>
+          <DialogDescription className="break-keep">미기입 내역이나 계좌 잔액 차이가 있으면 두 금액이 달라질 수 있어요.</DialogDescription>
         </DialogHeader>
 
         <DialogBody className="flex flex-col gap-3.5 pt-4">
-          <div className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card text-xs tabular-nums">
-            <div className="flex flex-col gap-1.5 px-3.5 py-2.5">
+          <div className="flex flex-col divide-y divide-border text-xs tabular-nums">
+            <div className="flex flex-col gap-2.5 pb-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-foreground">생활비 포함 계좌 · 현금 ({livingAssets.length}건)</span>
-                <span className="font-bold text-foreground">{formatWon(livingActualTotal)}</span>
+                <span className="text-sm font-bold text-foreground">생활비 계좌·현금 예상 잔액</span>
+                <span className="text-sm font-extrabold text-foreground">{formatWon(projectedLivingTotal)}</span>
               </div>
-              <div className="flex flex-col gap-1 pl-2 text-[11px] text-muted-foreground">
-                {livingAssets.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-2">
-                    <span className="truncate">
-                      {item.name} ({item.owner})
-                    </span>
-                    <span className="shrink-0 font-medium text-foreground">{formatWon(getAssetCurrentValuation(item))}</span>
+              <div className="ml-1 flex flex-col gap-2 border-l-2 border-border pl-3 text-[11px]">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-foreground">생활비 계좌 · 현금 ({livingAssets.length}건)</span>
+                    <span className="font-bold text-foreground">{formatWon(livingActualTotal)}</span>
                   </div>
-                ))}
+                  <div className="flex flex-col gap-1 pl-2 text-muted-foreground">
+                    {livingAssets.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between gap-2">
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <MemberAvatar name={item.owner} mode="icon-hover" size="xs" className="shrink-0" />
+                          <span className="truncate">{item.name}</span>
+                        </span>
+                        <span className="shrink-0 font-medium text-foreground">{formatWon(getAssetCurrentValuation(item))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">입금 예정 (수입 예정 · 미회수)</span>
+                  <span className="font-bold text-income">{formatSignedWon(livingInflowTotal)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">출금 예정 (지불 준비 필요 · 지불 대기)</span>
+                  <span className="font-bold text-expense">{formatSignedWon(-livingOutflowTotal)}</span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
-              <span className="text-muted-foreground">입금 예정 (수입 예정 · 미회수)</span>
-              <span className="font-bold text-positive">{formatSignedWon(livingInflowTotal)}</span>
+            <div className="flex items-center justify-between gap-2 py-3">
+              <span className="text-sm font-bold text-foreground">
+                예산상 남은 생활비 <span className="text-xs font-medium text-muted-foreground">(11월 결산)</span>
+              </span>
+              <span className="text-sm font-extrabold text-foreground">{formatWon(BUDGET_REMAINING_BASELINE)}</span>
             </div>
-            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
-              <span className="text-muted-foreground">출금 예정 (준비 필요 · 지불 대기)</span>
-              <span className="font-bold text-destructive">{formatSignedWon(-livingOutflowTotal)}</span>
+            <div className="pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg bg-warning-tint/60 px-3.5 py-3">
+                <span className="text-sm font-bold text-foreground">실계좌 − 예산 차액</span>
+                <span className="ml-auto text-sm font-extrabold whitespace-nowrap text-warning">
+                  {formatSignedWon(diff)}
+                  {diff !== 0 ? <span className="ml-1 text-xs font-semibold">{diff > 0 ? '(많음)' : '(적음)'}</span> : null}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-2 bg-muted/35 px-3.5 py-2.5">
-              <span className="font-bold text-foreground">대조용 생활비 (예상 잔액)</span>
-              <span className="text-sm font-extrabold text-foreground">{formatWon(projectedLivingTotal)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
-              <span className="text-muted-foreground">예산상 남은 생활비 (11월 결산)</span>
-              <span className="font-bold text-foreground">{formatWon(BUDGET_REMAINING_BASELINE)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-2 bg-warning-tint/60 px-3.5 py-3">
-              <span className="font-bold text-foreground">생활비 잔액 차이</span>
-              <span className="text-sm font-extrabold text-warning">{formatSignedWon(diff)}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              onClick={() => {
-                onOpenChange(false);
-                onNavigate('/preview/funds');
-              }}
-              className="gap-1 text-xs"
-            >
-              <span>지불 관리</span>
-              <ArrowRight className="size-3.5" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="md"
-              onClick={() => {
-                onOpenChange(false);
-                onNavigate('/preview/receivables');
-              }}
-              className="gap-1 text-xs"
-            >
-              <span>회수금 관리</span>
-              <ArrowRight className="size-3.5" />
-            </Button>
           </div>
         </DialogBody>
 
@@ -337,7 +319,7 @@ export const AssetReceivablesDialog = ({ open, onOpenChange, onGoReceivables }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-0">
         <DialogHeader>
-          <DialogTitle>전체 미회수 금액 (받을 돈)</DialogTitle>
+          <DialogTitle>전체 미회수 금액</DialogTitle>
           <DialogDescription className="break-keep">전체 기간 기준으로 아직 정산받지 못한 상대별 미회수 잔액이에요.</DialogDescription>
         </DialogHeader>
 
@@ -351,7 +333,7 @@ export const AssetReceivablesDialog = ({ open, onOpenChange, onGoReceivables }: 
             {ASSET_RECEIVABLES_BY_PERSON.map((item) => (
               <div key={item.person} className="flex items-center justify-between gap-2 px-3.5 py-2.5">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-foreground">{item.person}</span>
+                  <MemberAvatar name={item.person} size="sm" labelClassName="font-bold text-foreground" />
                   <span className="text-[11px] text-muted-foreground tabular-nums">{item.count}건</span>
                 </div>
                 <span className="font-extrabold text-positive tabular-nums">{formatWon(item.amount)}</span>
@@ -404,9 +386,10 @@ export const ExpectedFlowDetailDialog = ({
       <DialogContent className="gap-0">
         <DialogHeader>
           <DialogTitle className="break-keep">예정 입출금 내역({asset.name})</DialogTitle>
-          <DialogDescription className="break-keep">
-            {asset.owner} · {asset.typeLabel}
-            {asset.marketQuote ? ` · ${formatQuantityWithUnit(asset.marketQuote)}` : ''}
+          <DialogDescription className="flex flex-wrap items-center gap-1 break-keep">
+            <MemberAvatar name={asset.owner} size="xs" />
+            <span>· {asset.typeLabel}</span>
+            {asset.marketQuote ? <span>· {formatQuantityWithUnit(asset.marketQuote)}</span> : null}
           </DialogDescription>
         </DialogHeader>
 
@@ -434,7 +417,7 @@ export const ExpectedFlowDetailDialog = ({
                   <span className="text-[11px] text-muted-foreground break-keep">{flow.subLabel}</span>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className={cn('font-extrabold tabular-nums', flow.direction === 'inflow' ? 'text-positive' : 'text-destructive')}>
+                  <span className={cn('font-extrabold tabular-nums', flow.direction === 'inflow' ? 'text-income' : 'text-expense')}>
                     {formatSignedWon(flow.direction === 'inflow' ? flow.amount : -flow.amount)}
                   </span>
                   {flow.linkPath ? (

@@ -7,12 +7,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatWon } from '@/shared/design-format';
 import { DEFAULT_VIEWED_MONTH, getPaymentMethodMeta, isCompletedEditLocked, type ExpenseCategorySplit, type ExpenseDraft } from '@/shared/expense-form/expense-form-model';
 
-type AssistScenarioId = 'simple' | 'split' | 'duplicate';
+type AssistScenarioId = 'simple' | 'split';
 type AssistStage = 'input' | 'loading' | 'review' | 'error';
 type AssistErrorKind = 'validation' | 'parse-failed' | 'timeout' | null;
 
 type AiDraftCandidate = {
-  scenario: AssistScenarioId;
   sourceSummary: string;
   merchant: string | null;
   transactionDate: Date | null;
@@ -68,31 +67,8 @@ const buildSyntheticCandidate = (scenario: AssistScenarioId, draft: ExpenseDraft
   const viewed = draft.viewedMonth ?? DEFAULT_VIEWED_MONTH;
   const baseDate = new Date(viewed.year, viewed.month - 1, 4);
 
-  if (scenario === 'duplicate') {
-    return {
-      scenario,
-      sourceSummary: '[합성 문자] 신한카드 11/04 점심 회식 정산 96,000원 일시불 승인',
-      merchant: '점심 회식 정산',
-      transactionDate: new Date(viewed.year, viewed.month - 1, 4),
-      paymentMethod: '신한카드 Deep Dream (민지)',
-      approvedAmount: 96000,
-      cardDiscount: 0,
-      memo: '기존 지출 내역과 날짜·사용처·금액 일치',
-      splits: [{ category: '식비', amount: 96000 }],
-      includeInCardPerformance: true,
-      cardPerformanceReason: '일반 가맹점 · 실적 반영',
-      duplicateMatch: {
-        dateLabel: `${String(viewed.month).padStart(2, '0')}.04`,
-        merchant: '점심 회식 정산',
-        amount: 96000,
-        paymentMethod: '신한카드 Deep Dream'
-      }
-    };
-  }
-
   if (scenario === 'split') {
     return {
-      scenario,
       sourceSummary: '[합성 메모] 예시 마트에서 현대카드 ZERO로 100,000원 결제(할인 5,000원), 식비 80,000원 + 생활 20,000원',
       merchant: '예시 마트',
       transactionDate: baseDate,
@@ -111,7 +87,6 @@ const buildSyntheticCandidate = (scenario: AssistScenarioId, draft: ExpenseDraft
   }
 
   return {
-    scenario: 'simple',
     sourceSummary: '[합성 알림] 11/04 예시 상점 12,000원 승인 (카드 번호 마스킹 · 분류 미확인)',
     merchant: '예시 상점',
     transactionDate: baseDate,
@@ -135,7 +110,6 @@ type ProposalItem = {
 
 export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenReview = false }: ExpenseAiAssistProps) => {
   const [stage, setStage] = useState<AssistStage>(defaultOpenReview ? 'review' : 'input');
-  const [scenario, setScenario] = useState<AssistScenarioId>(defaultOpenReview ? 'split' : 'simple');
   const [text, setText] = useState(defaultOpenReview ? '11/04 예시 마트에서 현대카드로 100,000원 결제(할인 5,000원), 식비 80,000원 · 생활 20,000원' : '');
   const [imageFile, setImageFile] = useState<{ name: string; url: string; size: number } | null>(null);
   const [errorKind, setErrorKind] = useState<AssistErrorKind>(null);
@@ -198,20 +172,8 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
     setStage('input');
   };
 
-  const handleLoadExample = (nextScenario: AssistScenarioId) => {
-    const sampleText: Record<AssistScenarioId, string> = {
-      simple: '11/04 예시 상점 12,000원 결제',
-      split: '11/04 예시 마트에서 현대카드로 100,000원 결제(할인 5,000원), 식비 80,000원 · 생활 20,000원',
-      duplicate: '11/04 점심 회식 정산 96,000원 신한카드 결제'
-    };
-    setScenario(nextScenario);
-    setText(sampleText[nextScenario]);
-    setErrorKind(null);
-    setErrorMessage('');
-  };
-
-  const runAnalysis = (nextScenario: AssistScenarioId, simulatedError: 'parse-failed' | 'timeout' | null = null) => {
-    if (!simulatedError && !text.trim() && !imageFile) {
+  const runAnalysis = () => {
+    if (!text.trim() && !imageFile) {
       setErrorKind('validation');
       setErrorMessage('결제 캡처 이미지를 올리거나 지출 설명을 입력해 주세요.');
       return;
@@ -228,20 +190,7 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
 
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-      if (simulatedError === 'parse-failed') {
-        setStage('error');
-        setErrorKind('parse-failed');
-        setErrorMessage('원문에서 결제 금액과 사용처를 명확히 찾지 못했어요. 설명을 보완하거나 아래 폼에 직접 입력해 주세요.');
-        return;
-      }
-      if (simulatedError === 'timeout') {
-        setStage('error');
-        setErrorKind('timeout');
-        setErrorMessage('초안 생성 시간이 초과됐어요. 입력한 원문과 폼 값은 그대로 유지됐습니다.');
-        return;
-      }
-
-      setCandidate(buildSyntheticCandidate(nextScenario, draft));
+      setCandidate(buildSyntheticCandidate('simple', draft));
       setReviewSnapshot(snapshotAtRequest);
       setDuplicateConfirmed(false);
       setStage('review');
@@ -258,7 +207,9 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
     }
     const splitSummary = candidate.splits.map((part) => `${part.category || '직접 선택'} ${formatWon(part.amount)}`).join(' · ');
     const resolvedMethodMeta = candidate.paymentMethod ? getPaymentMethodMeta(candidate.paymentMethod) : null;
-    const showCardPerfRow = !resolvedMethodMeta || resolvedMethodMeta.kind === 'card';
+    const effectiveMethodMeta = resolvedMethodMeta ?? getPaymentMethodMeta(draft.paymentMethod);
+    const showDiscountRow = effectiveMethodMeta.kind === 'card';
+    const showCardPerfRow = effectiveMethodMeta.kind === 'card';
 
     const items: ProposalItem[] = [
       {
@@ -275,23 +226,29 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
         label: '결제 금액',
         valueText: doneLocked || installmentLocked ? `${formatWon(draft.approvedAmount ?? 0)} (기존 유지)` : candidate.approvedAmount ? formatWon(candidate.approvedAmount) : '미확인',
         status: doneLocked || installmentLocked ? 'locked' : !candidate.approvedAmount ? 'uncertain' : draft.approvedAmount === candidate.approvedAmount ? 'unchanged' : 'proposed'
-      },
-      {
+      }
+    ];
+
+    if (showDiscountRow) {
+      items.push({
         label: '할인 금액',
         valueText: doneLocked || installmentLocked ? `${formatWon(draft.cardDiscount ?? 0)} (기존 유지)` : formatWon(candidate.cardDiscount ?? 0),
         status: doneLocked || installmentLocked ? 'locked' : (draft.cardDiscount ?? 0) === (candidate.cardDiscount ?? 0) ? 'unchanged' : 'proposed'
-      },
+      });
+    }
+
+    items.push(
       {
         label: '결제 수단',
         valueText: doneLocked ? `${draft.paymentMethod} (기존 유지)` : candidate.paymentMethodUncertain ? '미확인 · 직접 선택 필요' : (candidate.paymentMethod ?? draft.paymentMethod),
         status: doneLocked ? 'locked' : candidate.paymentMethodUncertain ? 'uncertain' : candidate.paymentMethod && candidate.paymentMethod !== draft.paymentMethod ? 'proposed' : 'unchanged'
       },
       {
-        label: '지출 분류',
+        label: '분류별 금액',
         valueText: doneLocked || installmentLocked ? '할부·완료 회차 기존 유지' : splitSummary,
         status: doneLocked || installmentLocked ? 'locked' : candidate.splits.some((part) => !part.category) ? 'uncertain' : 'proposed'
       }
-    ];
+    );
 
     if (showCardPerfRow) {
       items.push({
@@ -349,11 +306,15 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
         nextDraft.includeInCardPerformance = candidate.includeInCardPerformance;
       }
 
+      const discountAllowed = getPaymentMethodMeta(nextDraft.paymentMethod).kind === 'card';
+
       if (!installmentLocked) {
         if (candidate.approvedAmount !== null) {
           nextDraft.approvedAmount = candidate.approvedAmount;
         }
-        if (candidate.cardDiscount !== null) {
+        if (!discountAllowed) {
+          nextDraft.cardDiscount = 0;
+        } else if (candidate.cardDiscount !== null) {
           nextDraft.cardDiscount = candidate.cardDiscount;
         }
         if (candidate.splits.length > 0) {
@@ -362,20 +323,26 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
             id: `ai-split-${Date.now()}-${idx + 1}`,
             category: part.category || draft.splits[idx]?.category || '',
             amount: part.amount,
-            // 기존 분류별 할인은 유지하고 새 분류 할인은 미입력(null)으로 둠
-            discount: part.category && existingByCategory.has(part.category) ? (existingByCategory.get(part.category) ?? null) : null
+            // 기존 분류별 할인은 유지하고 새 분류 할인은 미입력(null)으로 둠(비카드 수단은 0 고정)
+            discount: !discountAllowed ? 0 : part.category && existingByCategory.has(part.category) ? (existingByCategory.get(part.category) ?? null) : null,
+            installmentFee: 0
           }));
           nextDraft.splits = mappedSplits;
+        } else if (!discountAllowed) {
+          nextDraft.splits = nextDraft.splits.map((row) => ({ ...row, discount: 0, installmentFee: 0 }));
         }
       }
     }
 
+    const discountAllowedAfterApply = getPaymentMethodMeta(nextDraft.paymentMethod).kind === 'card';
     revokeImage();
     setImageFile(null);
     setErrorKind(null);
     setErrorMessage('');
     setStage('input');
-    const summaryText = 'AI 초안을 폼에 반영했어요. 분류·할인을 확인한 뒤 지출 저장을 눌러 확정하세요.';
+    const summaryText = discountAllowedAfterApply
+      ? 'AI 초안을 폼에 반영했어요. 분류·할인을 확인한 뒤 지출 저장을 눌러 확정하세요.'
+      : 'AI 초안을 폼에 반영했어요. 분류·금액을 확인한 뒤 지출 저장을 눌러 확정하세요.';
     onApplyCandidate(nextDraft, summaryText);
   };
 
@@ -485,24 +452,6 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
             ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Button type="button" size="sm" variant={scenario === 'simple' ? 'secondary' : 'outline'} onClick={() => handleLoadExample('simple')}>
-              단건 예시
-            </Button>
-            <Button type="button" size="sm" variant={scenario === 'split' ? 'secondary' : 'outline'} onClick={() => handleLoadExample('split')}>
-              분할 예시
-            </Button>
-            <Button type="button" size="sm" variant={scenario === 'duplicate' ? 'secondary' : 'outline'} onClick={() => handleLoadExample('duplicate')}>
-              중복 후보
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => runAnalysis(scenario, 'parse-failed')}>
-              해석 실패
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => runAnalysis(scenario, 'timeout')}>
-              시간 초과
-            </Button>
-          </div>
-
           {stage === 'error' || errorMessage ? (
             <NoticeBox variant={errorKind === 'timeout' ? 'warning' : 'error'} className="text-xs">
               {errorMessage}
@@ -518,7 +467,7 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
                 직접 입력
               </Button>
             ) : null}
-            <Button type="button" variant="primary" size="sm" onClick={() => runAnalysis(scenario)}>
+            <Button type="button" variant="primary" size="sm" onClick={runAnalysis}>
               {stage === 'error' ? '다시 시도' : '초안 만들기 · 시연'}
             </Button>
           </div>

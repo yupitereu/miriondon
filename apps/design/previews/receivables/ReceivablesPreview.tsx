@@ -1,6 +1,6 @@
 'use client';
 
-import { DatePicker, EmptyState, FilterChipGroup, FilterMultiSelect, dialog, mergeFilterOptions } from '@repo/ui-composition';
+import { DatePicker, EmptyState, FilterChipGroup, FilterMultiSelect, SummaryHeroCard, dialog } from '@repo/ui-composition';
 import {
   Badge,
   Button,
@@ -9,9 +9,6 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   SearchInput,
   Sheet,
   SheetBody,
@@ -22,19 +19,17 @@ import {
   SheetTitle,
   cn
 } from '@repo/ui-core';
-import { ArrowLeft, CalendarRange, ChevronRight, HandCoins, HelpCircle, Landmark, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, CalendarRange, ChevronDown, ChevronRight, Landmark, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import { BulkReceiveDialog, type BulkReceiveConfirmPayload } from '@/previews/receivables/ReceivablesDialogs';
 import {
   INITIAL_RECEIVABLES,
   computeReceivableBalanceDeltas,
   draftToReceivableRecord,
-  formatCompactYearMonthDate,
   formatDateRangeLabel,
   formatDepositAccountsSummary,
-  formatPeopleSummary,
   getReceivableTotals,
   getRecentCompletedDateRange,
   getRecordDepositAccounts,
@@ -44,14 +39,22 @@ import {
   parseYearMonthToRange,
   toLocalDayStart,
   type ReceivableDateRange,
+  type ReceivableEntry,
   type ReceivableRecord,
   type ReceivableTabKey
 } from '@/previews/receivables/receivables-model';
 import { DesignAppShell } from '@/shared/DesignAppShell';
+import { MemberAvatar, MemberAvatarGroup } from '@/shared/MemberAvatar';
 import { INITIAL_DESIGN_ASSETS, getInitialAssetBalancesMap } from '@/shared/design-assets-store';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 import { ExpenseFormOverlay, createEmptyExpensePreset, type ExpenseDraft } from '@/shared/expense-form/ExpenseFormView';
-import { DEFAULT_VIEWED_MONTH, DEPOSIT_ACCOUNTS, RECOVERY_PEOPLE } from '@/shared/expense-form/expense-form-model';
+import { DEFAULT_VIEWED_MONTH } from '@/shared/expense-form/expense-form-model';
+
+const getVisibleReceivablePeople = (entries: readonly ReceivableEntry[], activeTab: ReceivableTabKey): string[] => {
+  const sourceEntries = activeTab === 'waiting' ? entries.filter((entry) => Math.max(0, entry.targetAmount ?? 0) > Math.max(0, entry.receivedAmount ?? 0)) : entries;
+  const targetEntries = sourceEntries.length > 0 ? sourceEntries : entries;
+  return Array.from(new Set(targetEntries.map((entry) => normalizePersonDisplay(entry.person.trim() || '미지정'))));
+};
 
 const TAB_ITEMS: ReadonlyArray<{ key: ReceivableTabKey; label: string }> = [
   { key: 'waiting', label: '대기 중인 회수' },
@@ -61,7 +64,7 @@ const TAB_ITEMS: ReadonlyArray<{ key: ReceivableTabKey; label: string }> = [
 const EMPTY_STATE_COPY: Record<ReceivableTabKey, { title: string; description: string }> = {
   waiting: {
     title: '대기 중인 회수 내역이 없어요',
-    description: '조건을 초기화하거나 지출 상세에서 받을 돈을 등록해 관리해 보세요.'
+    description: '조건을 초기화하거나 지출 상세에서 회수금을 등록해 관리해 보세요.'
   },
   completed: {
     title: '회수 완료된 내역이 없어요',
@@ -129,9 +132,24 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
   };
 
   const totalWaitingUncollected = useMemo(() => waitingRecords.reduce((sum, record) => sum + getReceivableTotals(record).uncollectedTotal, 0), [waitingRecords]);
+  const partialSummary = useMemo(
+    () =>
+      waitingRecords.reduce(
+        (acc, record) => {
+          const totals = getReceivableTotals(record);
+          if (totals.isPartiallyReceived) {
+            acc.count += 1;
+            acc.receivedAmount += totals.receivedTotal;
+          }
+          return acc;
+        },
+        { count: 0, receivedAmount: 0 }
+      ),
+    [waitingRecords]
+  );
 
   const waitingByPerson = useMemo(() => {
-    const map = new Map<string, { displayName: string; amount: number; count: number }>();
+    const map = new Map<string, { displayName: string; targetAmount: number; receivedAmount: number; amount: number; count: number }>();
     for (const record of waitingRecords) {
       const countedForRecord = new Set<string>();
       for (const entry of record.entries) {
@@ -144,13 +162,15 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
         const displayName = normalizePersonDisplay(entry.person.trim() || '미지정');
         const current = map.get(displayName);
         if (current) {
+          current.targetAmount += target;
+          current.receivedAmount += received;
           current.amount += remaining;
           if (!countedForRecord.has(displayName)) {
             current.count += 1;
             countedForRecord.add(displayName);
           }
         } else {
-          map.set(displayName, { displayName, amount: remaining, count: 1 });
+          map.set(displayName, { displayName, targetAmount: target, receivedAmount: received, amount: remaining, count: 1 });
           countedForRecord.add(displayName);
         }
       }
@@ -158,47 +178,41 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
   }, [waitingRecords]);
 
-  const personOptions = useMemo(
-    () =>
-      mergeFilterOptions(
-        RECOVERY_PEOPLE.map(normalizePersonDisplay),
-        records.flatMap((record) => record.entries.map((entry) => normalizePersonDisplay(entry.person.trim() || '미지정')))
-      ),
-    [records]
+  const tabBaseRecords = useMemo(
+    () => (isCompletedTab ? completedRecords.filter((record) => isWithinDateRange(record, completedDateRange)) : waitingRecords),
+    [isCompletedTab, completedRecords, completedDateRange, waitingRecords]
   );
 
-  const depositAccountOptions = useMemo(
-    () =>
-      mergeFilterOptions(
-        DEPOSIT_ACCOUNTS,
-        records.flatMap((record) => getRecordDepositAccounts(record.entries))
-      ),
-    [records]
-  );
+  const personOptions = useMemo(() => Array.from(new Set(tabBaseRecords.flatMap((record) => getVisibleReceivablePeople(record.entries, activeTab)))), [tabBaseRecords, activeTab]);
 
-  const tabRecords = activeTab === 'waiting' ? waitingRecords : completedRecords;
+  const activeSelectedPeople = useMemo(() => new Set(Array.from(selectedPeople).filter((person) => personOptions.includes(person))), [selectedPeople, personOptions]);
+
+  const depositAccountOptions = useMemo(() => Array.from(new Set(tabBaseRecords.flatMap((record) => getRecordDepositAccounts(record.entries)))), [tabBaseRecords]);
+
+  const activeSelectedDepositAccounts = useMemo(
+    () => new Set(Array.from(selectedDepositAccounts).filter((account) => depositAccountOptions.includes(account))),
+    [selectedDepositAccounts, depositAccountOptions]
+  );
 
   const visibleRecords = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
-    return tabRecords.filter((record) => {
-      if (isCompletedTab && !isWithinDateRange(record, completedDateRange)) {
+    return tabBaseRecords.filter((record) => {
+      const visiblePeople = getVisibleReceivablePeople(record.entries, activeTab);
+      if (activeSelectedPeople.size > 0 && !visiblePeople.some((person) => activeSelectedPeople.has(person))) {
         return false;
       }
-      if (selectedPeople.size > 0 && !record.entries.some((entry) => selectedPeople.has(normalizePersonDisplay(entry.person.trim() || '미지정')))) {
-        return false;
-      }
-      if (selectedDepositAccounts.size > 0 && !getRecordDepositAccounts(record.entries).some((account) => selectedDepositAccounts.has(account))) {
+      if (activeSelectedDepositAccounts.size > 0 && !getRecordDepositAccounts(record.entries).some((account) => activeSelectedDepositAccounts.has(account))) {
         return false;
       }
       if (!q) {
         return true;
       }
-      const peopleText = record.entries.map((entry) => entry.person).join(' ');
+      const peopleText = visiblePeople.join(' ');
       const depositText = getRecordDepositAccounts(record.entries).join(' ');
       return [record.merchant, record.memo, record.paymentMethod, record.yearMonth, peopleText, depositText].some((field) => field.toLowerCase().includes(q));
     });
-  }, [tabRecords, isCompletedTab, searchQuery, completedDateRange, selectedPeople, selectedDepositAccounts]);
+  }, [tabBaseRecords, activeTab, searchQuery, activeSelectedPeople, activeSelectedDepositAccounts]);
 
   const visibleSummaryTotal = useMemo(
     () =>
@@ -214,12 +228,14 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
 
   const hasCompletedDateRangeValue = startDate !== null || endDate !== null;
   const hasCustomCompletedDateRange = !isSameDateRange(completedDateRange, DEFAULT_COMPLETED_DATE_RANGE);
-  const detailFilterCount = (isCompletedTab && hasCustomCompletedDateRange ? 1 : 0) + selectedPeople.size + selectedDepositAccounts.size;
+  const detailFilterCount = (isCompletedTab && hasCustomCompletedDateRange ? 1 : 0) + activeSelectedPeople.size + activeSelectedDepositAccounts.size;
   const hasActiveFilters = searchQuery.trim().length > 0 || detailFilterCount > 0;
 
+  const renderPersonOption = (option: string): ReactNode => <MemberAvatar name={option} size="xs" />;
+
   const filterGroups = [
-    { key: 'person', label: '상대방', options: personOptions, selected: selectedPeople, onChange: setSelectedPeople },
-    { key: 'depositAccount', label: '입금 계좌', options: depositAccountOptions, selected: selectedDepositAccounts, onChange: setSelectedDepositAccounts }
+    { key: 'person', label: '회수 상대', options: personOptions, selected: activeSelectedPeople, onChange: setSelectedPeople, renderOption: renderPersonOption },
+    { key: 'depositAccount', label: '입금 계좌', options: depositAccountOptions, selected: activeSelectedDepositAccounts, onChange: setSelectedDepositAccounts }
   ];
 
   const handleStartDateChange = (next: Date | null) => {
@@ -255,20 +271,6 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
   const handleResetFilters = () => {
     setSearchQuery('');
     handleResetDetailFilters();
-  };
-
-  const handleTogglePersonQuickChip = (displayName: string | null) => {
-    setSelectedIds(new Set());
-    if (displayName === null) {
-      setSelectedPeople(new Set());
-      return;
-    }
-    setSelectedPeople((prev) => {
-      if (prev.size === 1 && prev.has(displayName)) {
-        return new Set();
-      }
-      return new Set([displayName]);
-    });
   };
 
   const handleToggleItem = (id: string) => {
@@ -415,7 +417,7 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
           >
             <ArrowLeft className="size-4" />
           </button>
-          <h1 className="truncate text-base font-bold tracking-tight text-foreground">회수금 관리</h1>
+          <h1 className="truncate text-base font-bold tracking-tight text-foreground">회수금 현황</h1>
         </div>
       }
       mobileHeaderRight={
@@ -430,7 +432,7 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
             <ArrowLeft className="size-4" />
             <span>지출 내역</span>
           </Button>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">회수금 관리</h1>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">회수금 현황</h1>
         </div>
       }
       desktopHeaderRight={
@@ -440,92 +442,90 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
         </Button>
       }
     >
-      {/* Top KPI + Per-Person Quick Filter Strip */}
-      <section aria-label="미회수 현황 요약" className="grid grid-cols-1 gap-3 md:grid-cols-12">
-        <Card className="md:col-span-5">
-          <CardContent className="flex flex-col justify-between gap-2 p-0">
-            <div className="flex items-center justify-between gap-1.5">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-positive-tint text-positive">
-                  <HandCoins className="size-3.5" />
-                </span>
-                <span className="whitespace-nowrap text-xs font-bold text-muted-foreground">전체 미회수 금액</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="미회수 금액 기준 안내"
-                      className="inline-flex size-6 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                    >
-                      <HelpCircle className="size-3.5" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed break-keep">
-                    <div className="flex flex-col gap-1.5 text-foreground">
-                      <p>
-                        <strong className="font-bold">거래일 기준 전체 기간</strong>에서 아직 돌려받지 못한 금액 합계예요.
-                      </p>
-                      <p className="text-muted-foreground">회수 기록은 일반 수입으로 중복 집계하지 않으며, 실제 계좌 잔액 반영 여부는 회수 완료 시 직접 선택해요.</p>
+      {/* Top Hero Summary */}
+      <SummaryHeroCard
+        variant="hero-positive"
+        aria-label="미회수 현황 요약"
+        title="전체 미회수 금액"
+        helpLabel="미회수 금액 기준 안내"
+        helpText="전체 기간의 미회수 금액 합계예요. 회수금은 수입에 중복 집계되지 않아요."
+        value={formatWon(totalWaitingUncollected)}
+        items={[
+          { label: '회수 대기', value: `${waitingRecords.length}건` },
+          { label: '부분 회수', value: `${partialSummary.count}건` },
+          { label: '부분 회수 완료', value: formatWon(partialSummary.receivedAmount) }
+        ]}
+      />
+
+      {waitingByPerson.length > 0 ? (
+        <Card padding="none" className="gap-0 overflow-hidden" aria-label="상대별 미회수 현황">
+          <details className="group">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3.5 py-2.5 text-sm font-bold text-foreground transition-colors hover:bg-muted/35 md:px-4 [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center gap-2">
+                <span>상대별 미회수 현황</span>
+                <Badge variant="count" className="tabular-nums">
+                  {waitingByPerson.length}명
+                </Badge>
+              </span>
+              <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+
+            <div className="border-t border-border">
+              {/* Mobile Compact List (< 768px) */}
+              <ul className="divide-y divide-border md:hidden">
+                {waitingByPerson.map((item) => (
+                  <li key={item.displayName} className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <MemberAvatar name={item.displayName} size="sm" labelClassName="text-xs font-bold text-foreground" />
+                      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{item.count}건</span>
                     </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <Badge variant="positive" className="tabular-nums">
-                대기 {waitingRecords.length}건
-              </Badge>
-            </div>
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
+                      <span className="text-xs font-extrabold text-positive">{formatWon(item.amount)}</span>
+                      {item.receivedAmount > 0 ? <span className="text-[11px] text-muted-foreground">완료 {formatWon(item.receivedAmount)}</span> : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
 
-            <div className="flex items-baseline justify-between gap-2 pt-1">
-              <span className="text-2xl font-extrabold tracking-tight text-positive tabular-nums">{formatWon(totalWaitingUncollected)}</span>
-              <span className="text-xs text-muted-foreground tabular-nums">완료 {completedRecords.length}건</span>
+              {/* Tablet / PC Table (>= 768px) */}
+              <table className="hidden w-full table-fixed border-collapse text-sm md:table">
+                <thead className="bg-background text-xs text-muted-foreground">
+                  <tr className="border-b border-border">
+                    <th scope="col" className="px-4 py-2.5 text-left font-medium">
+                      회수 상대
+                    </th>
+                    <th scope="col" className="w-24 px-2 py-2.5 text-center font-medium whitespace-nowrap">
+                      대기 건수
+                    </th>
+                    <th scope="col" className="w-28 px-2 py-2.5 text-right font-medium whitespace-nowrap lg:w-32">
+                      총액
+                    </th>
+                    <th scope="col" className="w-28 px-2 py-2.5 text-right font-medium whitespace-nowrap lg:w-32">
+                      회수액
+                    </th>
+                    <th scope="col" className="w-28 py-2.5 pr-4 pl-2 text-right font-medium whitespace-nowrap lg:w-36">
+                      미회수액
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {waitingByPerson.map((item) => (
+                    <tr key={item.displayName}>
+                      <td className="px-4 py-2.5">
+                        <MemberAvatar name={item.displayName} size="sm" labelClassName="text-xs font-bold text-foreground" />
+                      </td>
+                      <td className="px-2 py-2.5 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">{item.count}건</td>
+                      <td className="px-2 py-2.5 text-right text-xs font-medium text-foreground tabular-nums whitespace-nowrap">{formatWon(item.targetAmount)}</td>
+                      <td className="px-2 py-2.5 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap">{formatWon(item.receivedAmount)}</td>
+                      <td className="py-2.5 pr-4 pl-2 text-right text-xs font-extrabold text-positive tabular-nums whitespace-nowrap">{formatWon(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </CardContent>
+          </details>
         </Card>
-
-        <Card className="md:col-span-7">
-          <CardContent className="flex flex-col gap-2.5 p-0">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-muted-foreground">상대별 미회수 요약</span>
-              <span className="text-[11px] text-muted-foreground">선택해 바로 필터링</span>
-            </div>
-
-            {waitingByPerson.length === 0 ? (
-              <p className="py-1.5 text-xs text-muted-foreground">모든 회수 금액 정산이 완료됐어요.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => handleTogglePersonQuickChip(null)}
-                  className={cn(
-                    'inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full border px-2.5 text-xs transition-colors',
-                    selectedPeople.size === 0 ? 'border-primary bg-primary-tint font-bold text-primary' : 'border-border-strong bg-card font-medium text-foreground hover:bg-accent/50'
-                  )}
-                >
-                  <span>전체</span>
-                  <span className="tabular-nums">{formatWon(totalWaitingUncollected)}</span>
-                </button>
-                {waitingByPerson.map((personSummary) => {
-                  const isActive = selectedPeople.size === 1 && selectedPeople.has(personSummary.displayName);
-                  return (
-                    <button
-                      key={personSummary.displayName}
-                      type="button"
-                      onClick={() => handleTogglePersonQuickChip(personSummary.displayName)}
-                      className={cn(
-                        'inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors',
-                        isActive ? 'border-primary bg-primary-tint font-bold text-primary' : 'border-border-strong bg-card font-medium text-foreground hover:bg-accent/50'
-                      )}
-                    >
-                      <span>{personSummary.displayName}</span>
-                      <span className="font-bold tabular-nums">{formatWon(personSummary.amount)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+      ) : null}
 
       {/* Status Tabs + Search & Original-Month Filters */}
       <section aria-label="회수 상태 및 상세 검색" className="flex flex-col gap-2.5">
@@ -589,6 +589,7 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
                   label={group.label}
                   options={group.options}
                   selected={group.selected}
+                  renderOption={group.renderOption}
                   onChange={(next) => {
                     group.onChange(next);
                     setSelectedIds(new Set());
@@ -705,43 +706,32 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
               {visibleRecords.map((record) => {
                 const totals = getReceivableTotals(record);
                 const checked = selectedIds.has(record.id);
-                const peopleSummary = formatPeopleSummary(record.entries);
-                const depositSummary = formatDepositAccountsSummary(record.entries);
-                const compactDate = formatCompactYearMonthDate(record.yearMonth, record.dateLabel);
+                const peopleNames = getVisibleReceivablePeople(record.entries, activeTab);
 
                 return (
-                  <div key={record.id} className={cn('flex items-start gap-2 px-3 py-3 transition-colors', activeTab === 'waiting' && checked ? 'bg-primary-tint/45' : 'hover:bg-muted/35')}>
+                  <div key={record.id} className={cn('flex items-center gap-2 px-3 py-3 transition-colors', activeTab === 'waiting' && checked ? 'bg-primary-tint/45' : 'hover:bg-muted/35')}>
                     {activeTab === 'waiting' ? (
-                      <div className="shrink-0 pt-0.5">
+                      <div className="shrink-0">
                         <Checkbox checked={checked} aria-label={`${record.merchant} 선택`} onCheckedChange={() => handleToggleItem(record.id)} />
                       </div>
                     ) : null}
 
-                    <button type="button" onClick={() => handleOpenEditRecord(record)} className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1.5 text-left">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                            <span className="truncate text-sm font-bold text-foreground">{record.merchant}</span>
-                            {totals.isPartiallyReceived ? <Badge variant="warning">부분 회수</Badge> : null}
-                          </div>
-                          <p className="truncate text-[11px] text-muted-foreground tabular-nums">
-                            {compactDate} · {depositSummary}
-                          </p>
-                        </div>
+                    <button type="button" onClick={() => handleOpenEditRecord(record)} className="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-2 text-left">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate text-sm font-bold text-foreground">{record.merchant}</span>
+                        <p className="truncate text-[11px] text-muted-foreground tabular-nums">
+                          {record.dateLabel} · {record.memo || record.categoryLabel}
+                        </p>
+                      </div>
 
-                        <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <div className="flex flex-col items-end gap-1">
                           <span className={cn('text-sm font-extrabold tabular-nums', activeTab === 'waiting' ? 'text-positive' : 'text-foreground')}>
                             {formatWon(activeTab === 'waiting' ? totals.uncollectedTotal : totals.receivedTotal)}
                           </span>
-                          <ChevronRight className="size-4 text-muted-foreground" />
+                          <MemberAvatarGroup names={peopleNames} size="xs" className="justify-end" />
                         </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px]">
-                        <span className="truncate font-semibold text-foreground">{peopleSummary}</span>
-                        <span className="shrink-0 text-muted-foreground tabular-nums">
-                          대상 {formatWon(totals.targetTotal)} · 회수 {formatWon(totals.receivedTotal)}
-                        </span>
+                        <ChevronRight className="size-4 text-muted-foreground" />
                       </div>
                     </button>
                   </div>
@@ -764,21 +754,20 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
                         />
                       </th>
                     ) : null}
-                    <th className="w-[78px] px-2 py-3 text-center font-medium whitespace-nowrap">거래일</th>
+                    <th className="w-16 px-2 py-3 text-center font-medium whitespace-nowrap">거래일</th>
                     <th className="px-3 py-3 text-left font-medium">내역</th>
-                    <th className="w-32 px-2 py-3 text-left font-medium whitespace-nowrap lg:w-36">회수 상대</th>
+                    <th className="w-24 px-2 py-3 text-center font-medium whitespace-nowrap lg:w-28">회수 상대</th>
                     <th className="hidden px-2 py-3 text-left font-medium whitespace-nowrap lg:table-cell lg:w-40">입금 계좌</th>
-                    <th className="w-32 px-2 py-3 text-right font-medium whitespace-nowrap lg:w-36">대상 · 회수</th>
-                    <th className="w-28 py-3 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-32">{activeTab === 'waiting' ? '미회수 금액' : '회수한 금액'}</th>
+                    <th className="w-32 px-2 py-3 text-right font-medium whitespace-nowrap lg:w-36">총액 · 회수액</th>
+                    <th className="w-28 py-3 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-32">{activeTab === 'waiting' ? '미회수액' : '회수액'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {visibleRecords.map((record) => {
                     const totals = getReceivableTotals(record);
                     const checked = selectedIds.has(record.id);
-                    const peopleSummary = formatPeopleSummary(record.entries);
+                    const peopleNames = getVisibleReceivablePeople(record.entries, activeTab);
                     const depositSummary = formatDepositAccountsSummary(record.entries);
-                    const compactDate = formatCompactYearMonthDate(record.yearMonth, record.dateLabel);
 
                     return (
                       <tr
@@ -791,7 +780,7 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
                             <Checkbox checked={checked} aria-label={`${record.merchant} 선택`} onCheckedChange={() => handleToggleItem(record.id)} />
                           </td>
                         ) : null}
-                        <td className="px-2 py-3 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">{compactDate}</td>
+                        <td className="px-2 py-3 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">{record.dateLabel}</td>
                         <td className="min-w-0 px-3 py-3">
                           <div className="flex min-w-0 flex-col gap-0.5">
                             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -804,7 +793,9 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
                             </span>
                           </div>
                         </td>
-                        <td className="truncate px-2 py-3 text-xs font-semibold text-foreground whitespace-nowrap">{peopleSummary}</td>
+                        <td className="px-2 py-3 text-center whitespace-nowrap">
+                          <MemberAvatarGroup names={peopleNames} size="sm" className="justify-center" />
+                        </td>
                         <td className="hidden truncate px-2 py-3 text-xs text-muted-foreground whitespace-nowrap lg:table-cell">{depositSummary}</td>
                         <td className="px-2 py-3 text-right text-xs tabular-nums whitespace-nowrap">
                           <span className="block font-semibold text-foreground">{formatWon(totals.targetTotal)}</span>
@@ -913,6 +904,7 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
                 mode="multi"
                 options={group.options}
                 selected={group.selected}
+                renderOption={group.renderOption}
                 onChange={(next) => {
                   group.onChange(next);
                   setSelectedIds(new Set());

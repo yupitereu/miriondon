@@ -82,7 +82,7 @@ export const INITIAL_FUND_TRANSACTIONS: FundTransactionItem[] = [
     paymentMethod: '신한카드 Deep Dream',
     accountId: 'account-shinhan-card',
     amount: 96000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'fund-2',
@@ -93,7 +93,7 @@ export const INITIAL_FUND_TRANSACTIONS: FundTransactionItem[] = [
     paymentMethod: '현대카드 ZERO',
     accountId: 'account-shinhan-card',
     amount: 34000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'fund-3',
@@ -105,7 +105,7 @@ export const INITIAL_FUND_TRANSACTIONS: FundTransactionItem[] = [
     paymentMethod: '국민카드 탄탄대로',
     accountId: 'account-kb-card',
     amount: 100000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'fund-4',
@@ -116,7 +116,7 @@ export const INITIAL_FUND_TRANSACTIONS: FundTransactionItem[] = [
     paymentMethod: '신한 쏠편한 입출금',
     accountId: 'account-living',
     amount: 42000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'fund-5',
@@ -127,7 +127,7 @@ export const INITIAL_FUND_TRANSACTIONS: FundTransactionItem[] = [
     paymentMethod: '현금',
     accountId: 'cash',
     amount: 25000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'fund-6',
@@ -197,7 +197,7 @@ export const DECEMBER_FUND_TRANSACTIONS: FundTransactionItem[] = [
     paymentMethod: '국민카드 탄탄대로',
     accountId: 'account-kb-card',
     amount: 100000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   },
   {
     id: 'fund-dec-2',
@@ -208,7 +208,7 @@ export const DECEMBER_FUND_TRANSACTIONS: FundTransactionItem[] = [
     paymentMethod: '신한 쏠편한 입출금',
     accountId: 'account-living',
     amount: 65000,
-    status: '준비 필요'
+    status: '지불 준비 필요'
   }
 ];
 

@@ -1,6 +1,7 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, Checkbox, NoticeBox, Popover, PopoverContent, PopoverTrigger, cn } from '@repo/ui-core';
+import { SummaryHeroCard } from '@repo/ui-composition';
+import { Card, CardContent, CardHeader, CardTitle, NoticeBox, cn } from '@repo/ui-core';
 import { ChevronDown } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
 
@@ -9,6 +10,7 @@ import { AnnualIncomeChart } from '@/previews/settlement/AnnualIncomeChart';
 import { AnnualIncomeTable } from '@/previews/settlement/AnnualIncomeTable';
 import { ANNUAL_CATEGORIES, ANNUAL_OWNERS, annualIncomeExpenseChange, annualIncomeNet, getAnnualExample, type AnnualCategory, type AnnualOwner } from '@/previews/settlement/annual-settlement-data';
 import { useAnnualChartTooltip } from '@/previews/settlement/use-annual-chart-tooltip';
+import { MemberAvatar } from '@/shared/MemberAvatar';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 
 type ChartPoint = {
@@ -117,16 +119,16 @@ const AnnualChart = ({
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <svg aria-hidden="true" viewBox="0 0 20 8" className="h-2 w-5">
-            <path d="M1 4h18" stroke={secondLabel ? 'hsl(var(--positive))' : 'hsl(var(--primary))'} strokeWidth="2" />
-            <circle cx="10" cy="4" r="2.5" fill={secondLabel ? 'hsl(var(--positive))' : 'hsl(var(--primary))'} />
+            <path d="M1 4h18" stroke={secondLabel ? 'hsl(var(--income))' : 'hsl(var(--primary))'} strokeWidth="2" />
+            <circle cx="10" cy="4" r="2.5" fill={secondLabel ? 'hsl(var(--income))' : 'hsl(var(--primary))'} />
           </svg>
           {firstLabel}
         </span>
         {secondLabel ? (
           <span className="inline-flex items-center gap-1.5">
             <svg aria-hidden="true" viewBox="0 0 20 8" className="h-2 w-5">
-              <path d="M1 4h18" stroke="hsl(var(--primary))" strokeWidth="2" />
-              <circle cx="10" cy="4" r="2.5" fill="hsl(var(--primary))" />
+              <path d="M1 4h18" stroke="hsl(var(--expense))" strokeWidth="2" />
+              <circle cx="10" cy="4" r="2.5" fill="hsl(var(--expense))" />
             </svg>
             {secondLabel}
           </span>
@@ -193,7 +195,7 @@ const AnnualChart = ({
                   <path
                     d={linePath((point) => point.first)}
                     fill="none"
-                    stroke={secondLabel ? 'hsl(var(--positive))' : 'hsl(var(--primary))'}
+                    stroke={secondLabel ? 'hsl(var(--income))' : 'hsl(var(--primary))'}
                     strokeWidth="3"
                     vectorEffect="non-scaling-stroke"
                     strokeLinecap="round"
@@ -203,7 +205,7 @@ const AnnualChart = ({
                     <path
                       d={linePath((point) => point.second)}
                       fill="none"
-                      stroke="hsl(var(--primary))"
+                      stroke="hsl(var(--expense))"
                       strokeWidth="3"
                       vectorEffect="non-scaling-stroke"
                       strokeLinecap="round"
@@ -224,8 +226,8 @@ const AnnualChart = ({
                   {points.map((point, index) => {
                     const x = 50 + index * 100;
                     return [
-                      { value: point.first, color: secondLabel ? 'hsl(var(--positive))' : 'hsl(var(--primary))' },
-                      ...(secondLabel ? [{ value: point.second, color: 'hsl(var(--primary))' }] : []),
+                      { value: point.first, color: secondLabel ? 'hsl(var(--income))' : 'hsl(var(--primary))' },
+                      ...(secondLabel ? [{ value: point.second, color: 'hsl(var(--expense))' }] : []),
                       ...(thirdLabel ? [{ value: point.third, color: 'hsl(var(--warning))' }] : [])
                     ].map(({ value, color }, seriesIndex) =>
                       value === null || value === undefined ? null : (
@@ -322,12 +324,12 @@ const BudgetExpenseCell = ({
     </span>
     <div aria-hidden="true" className="md:hidden">
       <div className="text-muted-foreground">{tableAmount(budget)}</div>
-      <div className="font-semibold text-foreground">/{tableAmount(totalExpense)}</div>
+      <div className="font-semibold text-expense">/{tableAmount(totalExpense)}</div>
       {memberLabel ? <div className="text-muted-foreground">└ {tableAmount(memberExpense ?? null)}</div> : null}
       {budgetMonths !== undefined && budget !== null ? <div className="text-[10px] text-muted-foreground">({budgetMonths}개월)</div> : null}
     </div>
     <div aria-hidden="true" className="hidden md:block">
-      <div className={cn('font-semibold text-foreground', emphasize && 'font-bold')}>{tableAmount(totalExpense)}</div>
+      <div className={cn('font-semibold text-expense', emphasize && 'font-bold')}>{tableAmount(totalExpense)}</div>
       <div className={cn('text-muted-foreground', emphasize && 'font-semibold')}>/{tableAmount(budget)}</div>
       {budgetMonths !== undefined && budget !== null ? <div className="text-[10px] text-muted-foreground">({budgetMonths}개월)</div> : null}
       {memberLabel ? <div className="mt-1 text-muted-foreground">└ {tableAmount(memberExpense ?? null)}</div> : null}
@@ -354,7 +356,7 @@ const MobileExpenseAmounts = ({
       {budgetMonths !== undefined && budget !== null ? <span className="block text-xs text-muted-foreground">({budgetMonths}개월)</span> : null}
     </span>
     <span className="min-w-0 text-right text-sm tabular-nums">
-      <span className="block font-semibold">{tableAmount(totalExpense)}</span>
+      <span className="block font-semibold text-expense">{tableAmount(totalExpense)}</span>
       {memberLabel ? (
         <span className="block text-xs text-muted-foreground" aria-label={`${memberLabel} ${accessibleAmount(memberExpense ?? null)}`}>
           └ {tableAmount(memberExpense ?? null)}
@@ -364,67 +366,7 @@ const MobileExpenseAmounts = ({
   </>
 );
 
-const OwnerMultiSelect = ({ selection, onChange }: { selection: OwnerId[] | null; onChange: (selection: OwnerId[] | null) => void }) => {
-  const selectedNames = selectableOwners.filter((item) => selection?.includes(item.id)).map((item) => item.label);
-  const value = selection === null ? '전체' : selectedNames.length === 0 ? '선택 없음' : selectedNames.length <= 2 ? selectedNames.join(', ') : `${selectedNames[0]} 외 ${selectedNames.length - 1}개`;
-
-  return (
-    <div className="w-full sm:w-52">
-      <span id="annual-owner-label" className="mb-1.5 block text-xs font-semibold text-muted-foreground">
-        집계 대상
-      </span>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            aria-labelledby="annual-owner-label annual-owner-value"
-            className="flex min-h-control-lg w-full items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 py-2.5 text-left text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-          >
-            <span id="annual-owner-value" className="flex min-w-0">
-              {selection !== null && selectedNames.length === 2 ? (
-                <>
-                  <span aria-hidden="true" className="min-w-0 truncate">
-                    {selectedNames[0]}
-                  </span>
-                  <span aria-hidden="true" className="shrink-0 whitespace-pre">
-                    ,{' '}
-                  </span>
-                  <span aria-hidden="true" className="min-w-0 truncate">
-                    {selectedNames[1]}
-                  </span>
-                  <span className="sr-only">{value}</span>
-                </>
-              ) : (
-                <span className="truncate">{value}</span>
-              )}
-            </span>
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-56 max-w-[calc(100vw-2rem)] p-3" aria-label="집계 대상 선택">
-          <div className="flex flex-col">
-            <Checkbox label="전체" checked={selection === null ? true : selection.length ? 'indeterminate' : false} onCheckedChange={(checked) => onChange(checked === true ? null : [])} />
-            <div className="my-1 border-t border-border" />
-            {selectableOwners.map((item) => (
-              <Checkbox
-                key={item.id}
-                label={item.label}
-                checked={selection === null || selection.includes(item.id)}
-                onCheckedChange={(checked) => {
-                  const current = selection ?? selectableOwners.map((entry) => entry.id);
-                  onChange(checked === true ? [...current.filter((id) => id !== item.id), item.id] : current.filter((id) => id !== item.id));
-                }}
-              />
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-};
-
-export const AnnualSettlementView = ({ year }: { year: number }) => {
-  const [ownerSelection, setOwnerSelection] = useState<OwnerId[] | null>(null);
+export const AnnualSettlementView = ({ year, ownerSelection }: { year: number; ownerSelection: OwnerId[] | null }) => {
   const [categories, setCategories] = useState<AnnualCategory[]>(() => ANNUAL_CATEGORIES.map((item) => item.id));
   const [categoryChartOpen, setCategoryChartOpen] = useState(false);
   const [isTableAtEnd, setIsTableAtEnd] = useState(false);
@@ -492,7 +434,7 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
   return (
     <div className="flex min-w-0 flex-col gap-stack-mobile lg:gap-stack-desktop">
       {differenceMonths.length || unverifiedMonths.length ? (
-        <NoticeBox variant="info" className="[&>svg]:mt-1">
+        <NoticeBox variant="warning" className="[&>svg]:mt-1">
           {differenceMonths.length ? (
             <details className="group">
               <summary className="-my-2.5 flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 py-2.5 font-bold [&::-webkit-details-marker]:hidden">
@@ -513,54 +455,40 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
         </NoticeBox>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-foreground tabular-nums">{year}년 연간 결산</h2>
-        </div>
-        <OwnerMultiSelect selection={ownerSelection} onChange={setOwnerSelection} />
-      </div>
+      <h2 className="sr-only">{year}년 연간 결산</h2>
 
-      <section aria-labelledby="annual-summary-title">
-        <h2 id="annual-summary-title" className="mb-3 text-base font-bold text-foreground">
-          연간 요약
-        </h2>
-        <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-3">
-          <Card className="flex flex-col justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-baseline justify-between gap-1">
-                <p className="text-sm font-bold text-foreground">연간 수입액</p>
-              </div>
-              <p className="mt-2 text-xl font-extrabold text-foreground tabular-nums">{amountText(incomeTotal)}</p>
-            </div>
-            <div className="space-y-1 text-xs tabular-nums">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">지급액</span>
-                <span>{amountText(paymentTotal)}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">공제액</span>
-                <span>{amountText(deductionTotal)}</span>
-              </div>
-            </div>
-          </Card>
-          <Card className="flex flex-col justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-baseline justify-between gap-1">
-                <p className="text-sm font-bold text-foreground">연간 지출액</p>
-              </div>
-              <p className="mt-2 text-xl font-extrabold text-foreground tabular-nums">{amountText(expenseTotal)}</p>
-            </div>
-          </Card>
-          <Card variant="hero" className="flex flex-col justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-baseline justify-between gap-1">
-                <p className="text-sm font-bold text-hero-foreground">연간 잔액</p>
-              </div>
-              <p className="mt-2 text-2xl font-extrabold text-hero-foreground tabular-nums">{amountText(annualBalance)}</p>
-            </div>
-            <p className="text-xs text-hero-foreground/80">{example.remainingAsOfMonth === null ? '기준월 없음' : `1~${example.remainingAsOfMonth}월 수입 − 지출`}</p>
-          </Card>
-        </div>
+      <section aria-label="연간 요약">
+        <SummaryHeroCard
+          variant="hero"
+          title="연간 잔액"
+          titleAs="span"
+          helpLabel="연간 잔액 계산 기준 안내"
+          helpText={example.remainingAsOfMonth === null ? '기준월 없음' : `1~${example.remainingAsOfMonth}월 수입 − 지출`}
+          value={amountText(annualBalance)}
+          mobileSummary={[
+            { label: '연간 수입액', value: amountText(incomeTotal) },
+            { label: '연간 지출액', value: amountText(expenseTotal) }
+          ]}
+          groups={[
+            {
+              key: 'annual-income',
+              hideOnMobileDetails: true,
+              items: [{ label: '연간 수입액', value: amountText(incomeTotal) }]
+            },
+            {
+              key: 'annual-income-breakdown',
+              items: [
+                { label: '지급액', value: amountText(paymentTotal) },
+                { label: '공제액', value: amountText(deductionTotal) }
+              ]
+            },
+            {
+              key: 'annual-expense',
+              hideOnMobileDetails: true,
+              items: [{ label: '연간 지출액', value: amountText(expenseTotal) }]
+            }
+          ]}
+        />
       </section>
 
       <Card>
@@ -569,7 +497,7 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
         </CardHeader>
         <CardContent>
           {isNone ? (
-            <p className="text-sm text-muted-foreground">집계 대상을 선택해 주세요.</p>
+            <p className="text-sm text-muted-foreground">구성원을 선택해 주세요.</p>
           ) : (
             <AnnualChart key={`${year}-${selectionKey}-monthly`} points={monthlyPoints} firstLabel="수입" secondLabel="지출" showYAxis />
           )}
@@ -586,8 +514,8 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
                 {monthlyPoints.map((point) => (
                   <div key={point.month} className="grid grid-cols-[2.75rem_repeat(3,minmax(0,1fr))] gap-1 py-3 text-right text-xs tabular-nums">
                     <span className="text-left font-semibold text-foreground">{point.month}월</span>
-                    <span className="whitespace-nowrap">{tableAmount(point.first)}</span>
-                    <span className="whitespace-nowrap">{tableAmount(point.second ?? null)}</span>
+                    <span className="whitespace-nowrap text-income">{tableAmount(point.first)}</span>
+                    <span className="whitespace-nowrap text-expense">{tableAmount(point.second ?? null)}</span>
                     <span className="font-semibold whitespace-nowrap">{tableAmount(point.first === null && point.second == null ? null : (point.first ?? 0) - (point.second ?? 0))}</span>
                     {point.status ? <span className="col-span-4 text-left text-muted-foreground">{point.status}</span> : null}
                   </div>
@@ -610,7 +538,15 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
           <CardContent className="mt-4">
             <div>
               <div className={cn('mb-2 flex min-h-control-lg flex-wrap items-center gap-x-3', !hasSelectedOwners && 'hidden md:flex')}>
-                {hasSelectedOwners ? <p className="min-w-0 text-xs text-muted-foreground break-all">└ {selectedExpenseLabel}</p> : null}
+                {hasSelectedOwners ? (
+                  <div className="inline-flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    <span>└</span>
+                    {selectedOwners.map((owner) => (
+                      <MemberAvatar key={owner.id} name={owner.label} size="xs" />
+                    ))}
+                    <span>지출</span>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className={cn('ml-auto min-h-control-lg text-xs font-semibold text-primary', hasTableOverflow ? 'hidden md:block' : 'hidden')}
@@ -635,7 +571,7 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
                   const allExpenses = example.expenses.filter((entry) => month === null || entry.month === month);
                   const selectedExpenses = expenses.filter((entry) => month === null || entry.month === month);
                   return (
-                    <details key={month ?? 'annual'} className="group">
+                    <details key={month ?? 'annual'} className="group/expense-month">
                       <summary className="grid min-h-control-lg cursor-pointer list-none grid-cols-[minmax(0,0.85fr)_minmax(0,1.225fr)_minmax(0,1.225fr)_16px] items-center gap-1 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
                         <span className="font-semibold">{month === null ? '연간 합계' : `${month}월`}</span>
                         <MobileExpenseAmounts
@@ -645,7 +581,7 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
                           memberLabel={hasSelectedOwners ? selectedExpenseLabel : undefined}
                           budgetMonths={month === null ? new Set(budgets.map((entry) => entry.month)).size : undefined}
                         />
-                        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-open:rotate-180" />
+                        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-open/expense-month:rotate-180" />
                       </summary>
                       <div className="space-y-2 border-t border-border bg-background px-3 py-3 text-sm">
                         {ANNUAL_CATEGORIES.map((item) => (
@@ -798,7 +734,7 @@ export const AnnualSettlementView = ({ year }: { year: number }) => {
           </summary>
           <CardContent className="mt-4">
             {isNone ? (
-              <p className="text-sm text-muted-foreground">집계 대상을 선택해 주세요.</p>
+              <p className="text-sm text-muted-foreground">구성원을 선택해 주세요.</p>
             ) : (
               <div className="min-w-0">
                 <AnnualIncomeTable key={year} records={incomes} availableKinds={example.incomes.map((income) => income.kind)} />

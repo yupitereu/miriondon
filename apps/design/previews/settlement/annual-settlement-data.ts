@@ -1,4 +1,4 @@
-export type AnnualOwner = 'all' | 'me' | 'family' | 'unknown';
+export type AnnualOwner = 'all' | 'me' | 'family';
 export type AnnualCategory = 'food' | 'living' | 'housing' | 'transport' | 'other';
 
 export type AnnualIncome = {
@@ -8,7 +8,6 @@ export type AnnualIncome = {
   status: 'completed' | 'planned';
   payments: { name: string; amount: number }[];
   deductions: { name: string; amount: number }[];
-  budgetAmount: number;
 };
 
 export type AnnualExpense = {
@@ -26,9 +25,8 @@ export type AnnualBudget = {
 
 export const ANNUAL_OWNERS: { id: AnnualOwner; label: string }[] = [
   { id: 'all', label: '전체 구성원' },
-  { id: 'me', label: '나' },
-  { id: 'family', label: '가족' },
-  { id: 'unknown', label: '소유자 확인 필요' }
+  { id: 'me', label: '민지(나)' },
+  { id: 'family', label: '지은' }
 ];
 
 export const ANNUAL_CATEGORIES: { id: AnnualCategory; name: string }[] = [
@@ -52,9 +50,8 @@ const monthlyIncomes: AnnualIncome[] = Array.from({ length: 11 }, (_, index) => 
         { name: '소득세', amount: 110000 },
         { name: '건강보험', amount: 160000 },
         { name: '국민연금', amount: 220000 },
-        { name: '기타 공제', amount: 60000 }
-      ],
-      budgetAmount: 3200000
+        { name: '장기요양보험료', amount: 60000 }
+      ]
     },
     {
       month,
@@ -66,8 +63,7 @@ const monthlyIncomes: AnnualIncome[] = Array.from({ length: 11 }, (_, index) => 
         { name: '소득세', amount: 90000 },
         { name: '건강보험', amount: 100000 },
         { name: '국민연금', amount: 160000 }
-      ],
-      budgetAmount: 2750000
+      ]
     }
   ];
 }).flat();
@@ -109,15 +105,10 @@ export const getAnnualExample = (year: number) => {
         kind: '자산 처분',
         status: 'completed' as const,
         payments: [{ name: '처분대금', amount: 1000000 }],
-        deductions: [{ name: '수수료', amount: 10000 }],
-        budgetAmount: 200000
+        deductions: [{ name: '수수료', amount: 10000 }]
       }
     ],
-    expenses: [
-      ...monthlyExpenses,
-      { month: 11, owner: 'unknown' as const, category: 'other' as const, amount: 16000 },
-      { month: 12, owner: 'family' as const, category: 'other' as const, amount: 200000 }
-    ],
+    expenses: [...monthlyExpenses, { month: 12, owner: 'family' as const, category: 'other' as const, amount: 200000 }],
     budgets: monthlyBudgets,
     createdMonths: Array.from({ length: 11 }, (_, index) => index + 1),
     remainingAsOfMonth: 11

@@ -24,7 +24,7 @@ export const MONTHLY_CARDS: MonthlyCard[] = [
   {
     id: 'card-a',
     name: '예시 카드 A',
-    owner: '나',
+    owner: '민지(나)',
     company: '예시 카드사 A',
     last4: '1234',
     bills: {
@@ -38,7 +38,7 @@ export const MONTHLY_CARDS: MonthlyCard[] = [
   {
     id: 'card-b',
     name: '예시 카드 B',
-    owner: '가족',
+    owner: '지은',
     company: '예시 카드사 B',
     last4: '5678',
     bills: {
