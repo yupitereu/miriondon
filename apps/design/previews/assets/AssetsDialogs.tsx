@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, NoticeBox, NumberInput, cn } from '@repo/ui-core';
+import { Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, NoticeBox, NumberInput, cn } from '@repo/ui-core';
 import { ArrowRight } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 
@@ -14,6 +14,7 @@ import {
   type AssetDetailItem,
   type AssetValuationMode
 } from '@/previews/assets/assets-model';
+import { MarketQuoteValuationFields, calculateQuoteValuation } from '@/shared/MarketQuoteValuationFields';
 import { MemberAvatar } from '@/shared/MemberAvatar';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 
@@ -38,29 +39,25 @@ export const AssetBalanceEditDialog = ({
   const quote = asset.marketQuote;
   const isDebt = asset.group === 'debt';
 
-  const [valuationMode, setValuationMode] = useState<AssetValuationMode>(() => quote?.valuationMode ?? 'manual');
   const [quantityText, setQuantityText] = useState<string>(() => (quote ? String(quote.quantity) : ''));
   const [manualAmount, setManualAmount] = useState<number | null>(() => getAssetCurrentValuation(asset));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const parsedQty = Number(quantityText.replace(/,/g, '').trim());
-  const isValidQty = Number.isFinite(parsedQty) && parsedQty >= 0 && quantityText.trim().length > 0;
-  const computedQuoteKrw = quote && isValidQty ? Math.round(parsedQty * quote.ratePerUnit) : null;
-
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (quote && valuationMode === 'reference-rate') {
-      if (!isValidQty || computedQuoteKrw === null) {
+    if (quote) {
+      const { isValid, quantity, computedKrw } = calculateQuoteValuation(quantityText, quote.ratePerUnit);
+      if (!isValid || computedKrw === null) {
         setErrorMessage(`0 이상의 보유량(${quote.unitLabel})을 입력해 주세요.`);
         return;
       }
       setErrorMessage(null);
       onSave({
         assetId: asset.id,
-        currentBalance: computedQuoteKrw,
+        currentBalance: computedKrw,
         valuationMode: 'reference-rate',
-        quantity: parsedQty
+        quantity
       });
       onOpenChange(false);
       return;
@@ -74,9 +71,7 @@ export const AssetBalanceEditDialog = ({
     setErrorMessage(null);
     onSave({
       assetId: asset.id,
-      currentBalance: manualAmount,
-      valuationMode: quote ? 'manual' : undefined,
-      quantity: quote && isValidQty ? parsedQty : quote?.quantity
+      currentBalance: manualAmount
     });
     onOpenChange(false);
   };
@@ -103,90 +98,21 @@ export const AssetBalanceEditDialog = ({
 
           <DialogBody className="flex flex-col gap-3.5 pt-4">
             {quote ? (
-              <>
-                <div role="tablist" aria-label="평가 방식" className="grid grid-cols-2 rounded-xl bg-muted p-1">
-                  {(
-                    [
-                      { key: 'reference-rate', label: '공통 시세 적용' },
-                      { key: 'manual', label: '평가액 직접 입력' }
-                    ] as const
-                  ).map((modeTab) => {
-                    const active = valuationMode === modeTab.key;
-                    return (
-                      <button
-                        key={modeTab.key}
-                        type="button"
-                        role="tab"
-                        aria-selected={active}
-                        onClick={() => {
-                          setValuationMode(modeTab.key);
-                          setErrorMessage(null);
-                        }}
-                        className={cn(
-                          'flex min-h-control-sm cursor-pointer items-center justify-center rounded-lg px-2 text-xs font-bold transition-colors',
-                          active ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                        )}
-                      >
-                        {modeTab.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {valuationMode === 'reference-rate' ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="asset-quote-qty" className="text-xs font-semibold text-foreground">
-                        보유량 ({quote.unitLabel})
-                      </label>
-                      <Input
-                        id="asset-quote-qty"
-                        size="md"
-                        inputMode="decimal"
-                        value={quantityText}
-                        onChange={(e) => {
-                          setQuantityText(e.target.value);
-                          if (errorMessage) {
-                            setErrorMessage(null);
-                          }
-                        }}
-                        suffix={quote.unitLabel}
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1 rounded-xl border border-border bg-muted/40 p-3 text-xs tabular-nums">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-muted-foreground">원화 참고 평가액 (읽기 전용)</span>
-                        <span className="text-sm font-extrabold text-primary">{computedQuoteKrw !== null ? formatWon(computedQuoteKrw) : '미확인'}</span>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">
-                        {quote.rateSource} · 1{quote.unitLabel} = {formatWon(quote.ratePerUnit)} ({quote.rateUpdatedAt} 기준)
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="asset-manual-valuation" className="text-xs font-semibold text-foreground">
-                        직접 입력 원화 평가액
-                      </label>
-                      <NumberInput
-                        id="asset-manual-valuation"
-                        size="md"
-                        value={manualAmount}
-                        onValueChange={(next) => {
-                          setManualAmount(next);
-                          if (errorMessage) {
-                            setErrorMessage(null);
-                          }
-                        }}
-                        suffix="원"
-                      />
-                    </div>
-                    <p className="text-[11px] text-muted-foreground break-keep">직접 입력한 평가액은 이후 공통 참고 시세가 갱신되어도 덮어쓰지 않아요.</p>
-                  </div>
-                )}
-              </>
+              <MarketQuoteValuationFields
+                assetKind={quote.assetKind}
+                unitLabel={quote.unitLabel}
+                ratePerUnit={quote.ratePerUnit}
+                rateSource={quote.rateSource}
+                rateUpdatedAt={quote.rateUpdatedAt}
+                quantityText={quantityText}
+                invalid={Boolean(errorMessage)}
+                onQuantityTextChange={(next) => {
+                  setQuantityText(next);
+                  if (errorMessage) {
+                    setErrorMessage(null);
+                  }
+                }}
+              />
             ) : (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="asset-balance-input" className="text-xs font-semibold text-foreground">
@@ -208,9 +134,11 @@ export const AssetBalanceEditDialog = ({
             )}
 
             <NoticeBox variant="info">
-              {isDebt
-                ? '남은 대출 원금을 직접 갱신해요. 단순 금액 수정은 새 지출이나 상환 거래를 만들지 않아요.'
-                : '마지막 확인 기준 실제 잔액·평가액을 저장해요. 단순 잔액 수정은 새 수입·지출을 만들지 않아요.'}
+              {quote
+                ? '보유량을 저장하면 공통 참고 시세로 원화 평가액이 자동 계산돼요. 단순 수량 수정은 새 수입·지출을 만들지 않아요.'
+                : isDebt
+                  ? '남은 대출 원금을 직접 갱신해요. 단순 금액 수정은 새 지출이나 상환 거래를 만들지 않아요.'
+                  : '마지막 확인 기준 실제 잔액·평가액을 저장해요. 단순 잔액 수정은 새 수입·지출을 만들지 않아요.'}
             </NoticeBox>
 
             {errorMessage ? (

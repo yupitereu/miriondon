@@ -666,7 +666,7 @@ export const AssetsPreview = () => {
                     const hasExpected = isLiquid && (inflow > 0 || outflow > 0);
                     const projectedVal = getAssetProjectedBalance(item);
                     const isFxAsset = item.marketQuote?.assetKind === 'fx';
-                    const isRefRate = item.marketQuote?.valuationMode === 'reference-rate';
+                    const isQuoteAsset = Boolean(item.marketQuote);
 
                     return (
                       <div key={item.id} className="flex flex-col gap-2 px-3.5 py-3">
@@ -674,14 +674,14 @@ export const AssetsPreview = () => {
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-sm font-bold text-foreground break-keep">{item.name}</span>
                             {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
-                            {item.marketQuote ? <Badge variant={isRefRate ? 'neutral' : 'positive'}>{isRefRate ? '공통 시세' : '직접 입력'}</Badge> : null}
+                            {isQuoteAsset ? <Badge variant="neutral">공통 시세</Badge> : null}
                           </div>
                           <AssetOwnerDescription
                             owner={item.owner}
                             profile={ownerProfiles[item.owner]}
                             onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
                             onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
-                            description={[item.institution, item.typeLabel].filter(Boolean).join(' · ')}
+                            description={item.typeLabel}
                             multiline
                             className="text-[11px]"
                           />
@@ -705,10 +705,12 @@ export const AssetsPreview = () => {
                             {isFxAsset && item.marketQuote ? (
                               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                 <span className="text-sm font-bold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
-                                <span className="text-[11px] font-medium text-muted-foreground">{isRefRate ? `≈ ${formatWon(currentVal)}` : `${formatWon(currentVal)} (직접 입력)`}</span>
+                                <span className="text-[11px] font-medium text-muted-foreground">≈ {formatWon(currentVal)}</span>
                               </div>
                             ) : (
-                              <span className={cn('text-sm font-bold', isDebtGroup ? 'text-destructive' : 'text-foreground')}>{isRefRate ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}</span>
+                              <span className={cn('text-sm font-bold', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
+                                {isQuoteAsset ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}
+                              </span>
                             )}
                             <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
                           </div>
@@ -769,7 +771,7 @@ export const AssetsPreview = () => {
                           const { inflow, outflow } = getAssetExpectedTotals(item);
                           const hasExpected = inflow > 0 || outflow > 0;
                           const projectedVal = getAssetProjectedBalance(item);
-                          const description = [item.institution, item.typeLabel].filter(Boolean).join(' · ');
+                          const description = item.typeLabel;
 
                           return (
                             <tr key={item.id} className="transition-colors hover:bg-muted/25">
@@ -847,8 +849,8 @@ export const AssetsPreview = () => {
                       <tbody className="divide-y divide-border/80">
                         {items.map((item) => {
                           const currentVal = getAssetCurrentValuation(item);
-                          const isRefRate = item.marketQuote?.valuationMode === 'reference-rate';
-                          const description = [item.institution, item.typeLabel].filter(Boolean).join(' · ');
+                          const isQuoteAsset = Boolean(item.marketQuote);
+                          const description = item.typeLabel;
                           return (
                             <tr key={item.id} className="transition-colors hover:bg-muted/25">
                               <td className="min-w-0 py-3 pl-4 pr-2">
@@ -881,7 +883,7 @@ export const AssetsPreview = () => {
                                   <div className="flex flex-col gap-0.5 tabular-nums">
                                     <div className="flex flex-wrap items-center gap-1.5">
                                       <span className="font-semibold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
-                                      <Badge variant={isRefRate ? 'neutral' : 'positive'}>{isRefRate ? '공통 시세' : '직접 입력'}</Badge>
+                                      <Badge variant="neutral">공통 시세</Badge>
                                     </div>
                                     <span className="text-[11px] text-muted-foreground">
                                       1{item.marketQuote.assetKind === 'fx' ? ` ${item.marketQuote.unitLabel}` : item.marketQuote.unitLabel} = {formatWon(item.marketQuote.ratePerUnit)}
@@ -895,7 +897,7 @@ export const AssetsPreview = () => {
                               </td>
                               <td className={cn('py-3 pl-2 pr-4 text-right font-bold tabular-nums whitespace-nowrap lg:pr-2', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
                                 <div className="inline-flex items-center justify-end gap-1">
-                                  <span>{isRefRate ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}</span>
+                                  <span>{isQuoteAsset ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}</span>
                                   <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
                                 </div>
                               </td>

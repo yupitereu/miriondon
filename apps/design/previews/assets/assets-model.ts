@@ -9,7 +9,7 @@ export const INITIAL_OWNER_PROFILES: Record<AssetOwnerKey, { color: ProfileAvata
 
 export type AssetGroupKey = 'cash-liquid' | 'savings-invest' | 'loan-deposit' | 'debt';
 
-export type AssetValuationMode = 'reference-rate' | 'manual';
+export type AssetValuationMode = 'reference-rate';
 
 export type ExpectedFlowEntry = {
   id: string;
@@ -103,9 +103,9 @@ export const ASSET_RECEIVABLES_BY_PERSON: readonly AssetReceivablePersonSummary[
 
 export const getTotalUncollectedReceivables = (): number => ASSET_RECEIVABLES_BY_PERSON.reduce((sum, item) => sum + item.amount, 0);
 
-/** 자산의 현재 원화 평가액(공통 시세 모드면 보유량×단가 정수 환산) */
+/** 자산의 현재 원화 평가액(시세 연동 자산은 보유량×단가 정수 환산) */
 export const getAssetCurrentValuation = (asset: AssetDetailItem): number => {
-  if (asset.marketQuote && asset.marketQuote.valuationMode === 'reference-rate') {
+  if (asset.marketQuote) {
     return Math.round(asset.marketQuote.quantity * asset.marketQuote.ratePerUnit);
   }
   return asset.currentBalance;
@@ -264,7 +264,7 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     id: 'asset-minji-gold',
     name: '순금 골드바 (실물)',
     group: 'savings-invest',
-    typeLabel: '금 · 실물',
+    typeLabel: '금',
     owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 4650000,
