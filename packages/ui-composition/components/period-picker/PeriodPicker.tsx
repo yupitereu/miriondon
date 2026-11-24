@@ -16,6 +16,7 @@ export type PeriodMonthValue = {
 type PeriodPickerBaseProps = {
   id?: string;
   size?: 'compact' | 'default';
+  variant?: 'ghost' | 'outlined';
   disabled?: boolean;
   invalid?: boolean;
   minYear?: number;
@@ -63,7 +64,8 @@ const PeriodPicker = (
         onNext?: () => void;
       })
 ) => {
-  const { id, size = 'compact', disabled = false, invalid = false, minYear = 1970, maxYear = 2100, getCellStatus, footer, className, sheetTitle, 'aria-label': ariaLabel } = props;
+  const { id, size = 'compact', variant, disabled = false, invalid = false, minYear = 1970, maxYear = 2100, getCellStatus, footer, className, sheetTitle, 'aria-label': ariaLabel } = props;
+  const resolvedVariant = variant ?? (size === 'default' ? 'outlined' : 'ghost');
 
   const isMobile = useIsMobileView();
   const now = useMemo(() => new Date(), []);
@@ -214,6 +216,11 @@ const PeriodPicker = (
     </div>
   );
 
+  const stepButtonClassName = cn(
+    'inline-flex cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-35',
+    resolvedVariant === 'ghost' && size === 'compact' ? 'h-8 w-7' : 'size-7'
+  );
+
   const centerTrigger = (
     <button
       type="button"
@@ -225,8 +232,11 @@ const PeriodPicker = (
         }
       }}
       className={cn(
-        'inline-flex flex-1 cursor-pointer items-center justify-center whitespace-nowrap px-2 text-sm font-bold text-foreground tabular-nums transition-colors',
-        'hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none'
+        'inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md text-sm tabular-nums transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none',
+        resolvedVariant === 'ghost'
+          ? cn('font-semibold text-foreground hover:bg-accent hover:text-primary', size === 'compact' ? 'h-8 px-1' : 'h-8 flex-1 px-2')
+          : 'flex-1 px-2 font-bold text-foreground hover:text-primary'
       )}
     >
       <span>{centerText}</span>
@@ -238,20 +248,16 @@ const PeriodPicker = (
       id={id}
       aria-invalid={invalid ? true : undefined}
       className={cn(
-        'inline-flex items-center justify-between rounded-md border border-border-strong bg-card px-1.5 text-foreground',
-        size === 'compact' ? 'min-h-[34px] min-w-[144px]' : 'min-h-tab w-full',
+        'inline-flex items-center rounded-md border text-foreground',
+        resolvedVariant === 'outlined'
+          ? cn('justify-between border-border-strong bg-card px-1.5', size === 'compact' ? 'min-h-[34px] gap-0.5' : 'min-h-tab w-full')
+          : cn('border-transparent bg-transparent', size === 'compact' ? 'min-h-8 gap-0' : 'min-h-tab w-full justify-between px-1'),
         invalid && 'border-destructive ring-1 ring-destructive/25',
-        disabled && 'bg-muted opacity-60',
+        disabled && (resolvedVariant === 'outlined' ? 'bg-muted opacity-60' : 'opacity-50'),
         className
       )}
     >
-      <button
-        type="button"
-        disabled={prevDisabled}
-        aria-label={props.mode === 'month' ? '이전 월' : '이전 연도'}
-        onClick={() => stepPeriod(-1)}
-        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-35"
-      >
+      <button type="button" disabled={prevDisabled} aria-label={props.mode === 'month' ? '이전 월' : '이전 연도'} onClick={() => stepPeriod(-1)} className={stepButtonClassName}>
         <Icon icon={ChevronLeft} size="sm" />
       </button>
 
@@ -278,13 +284,7 @@ const PeriodPicker = (
         </Popover>
       )}
 
-      <button
-        type="button"
-        disabled={nextDisabled}
-        aria-label={props.mode === 'month' ? '다음 월' : '다음 연도'}
-        onClick={() => stepPeriod(1)}
-        className="inline-flex size-7 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-35"
-      >
+      <button type="button" disabled={nextDisabled} aria-label={props.mode === 'month' ? '다음 월' : '다음 연도'} onClick={() => stepPeriod(1)} className={stepButtonClassName}>
         <Icon icon={ChevronRight} size="sm" />
       </button>
     </div>

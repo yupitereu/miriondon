@@ -13,7 +13,7 @@ export {
 } from './components/common-dialog/common-dialog-store';
 export { DatePicker, type DatePreset } from './components/date-picker/DatePicker';
 export { EmptyState } from './components/empty-state/EmptyState';
-export { FilterChipGroup, FilterMultiSelect, FilterSingleSelect, mergeFilterOptions, type FilterSingleOption } from './components/filter-select/FilterSelect';
+export { FilterChipGroup, FilterMultiSelect, FilterSingleSelect, mergeFilterOptions, type FilterSelectVariant, type FilterSingleOption } from './components/filter-select/FilterSelect';
 export { PeriodPicker, type PeriodCellStatus, type PeriodMonthValue } from './components/period-picker/PeriodPicker';
 export {
   PROFILE_AVATAR_COLORS,

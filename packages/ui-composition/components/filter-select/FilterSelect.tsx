@@ -16,10 +16,18 @@ export const mergeFilterOptions = (base: readonly string[], extras: string[]): s
   return result;
 };
 
-const getFilterTriggerClassName = (active: boolean, className?: string) =>
+export type FilterSelectVariant = 'outlined' | 'ghost';
+
+const getFilterTriggerClassName = (active: boolean, variant: FilterSelectVariant, className?: string) =>
   cn(
-    'inline-flex min-h-control-md max-w-full shrink-0 items-center justify-between gap-1.5 rounded-lg border px-2.5 text-xs transition-colors',
-    active ? 'border-primary bg-primary-tint font-bold text-primary' : 'border-border-strong bg-card font-medium text-foreground hover:bg-accent/40',
+    'inline-flex min-h-control-md max-w-full shrink-0 cursor-pointer items-center justify-between gap-1.5 rounded-lg border px-2.5 text-xs transition-colors',
+    variant === 'ghost'
+      ? active
+        ? 'border-transparent bg-primary-tint font-bold text-primary hover:bg-primary-tint/80'
+        : 'border-transparent bg-transparent font-medium text-muted-foreground hover:bg-accent hover:text-foreground'
+      : active
+        ? 'border-primary bg-primary-tint font-bold text-primary'
+        : 'border-border-strong bg-card font-medium text-foreground hover:bg-accent/40',
     className
   );
 
@@ -35,6 +43,7 @@ export const FilterSingleSelect = <T extends string = string>({
   defaultValue,
   allValue,
   onChange,
+  variant = 'outlined',
   className
 }: {
   label: string;
@@ -43,6 +52,7 @@ export const FilterSingleSelect = <T extends string = string>({
   defaultValue?: T;
   allValue?: T;
   onChange: (value: T) => void;
+  variant?: FilterSelectVariant;
   className?: string;
 }) => {
   const [open, setOpen] = useState(false);
@@ -56,7 +66,7 @@ export const FilterSingleSelect = <T extends string = string>({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label={`${label} 필터`} aria-expanded={open} className={getFilterTriggerClassName(isFiltered, className)}>
+        <button type="button" aria-label={`${label} 필터`} aria-expanded={open} className={getFilterTriggerClassName(isFiltered, variant, className)}>
           <span className="truncate">{summaryText}</span>
           <ChevronDown className={cn('size-3.5 shrink-0 transition-transform', isFiltered ? 'text-primary' : 'text-muted-foreground', open && 'rotate-180')} />
         </button>
@@ -106,6 +116,7 @@ export const FilterMultiSelect = ({
   allLabel = '전체',
   align = 'start',
   renderOption,
+  variant = 'outlined',
   className
 }: {
   label: string;
@@ -115,6 +126,7 @@ export const FilterMultiSelect = ({
   allLabel?: string;
   align?: 'start' | 'end';
   renderOption?: (option: string) => ReactNode;
+  variant?: FilterSelectVariant;
   className?: string;
 }) => {
   const [open, setOpen] = useState(false);
@@ -178,7 +190,7 @@ export const FilterMultiSelect = ({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button type="button" aria-label={`${label} 필터`} aria-expanded={open} className={getFilterTriggerClassName(isFiltered, className)}>
+        <button type="button" aria-label={`${label} 필터`} aria-expanded={open} className={getFilterTriggerClassName(isFiltered, variant, className)}>
           <span className="truncate">{summaryText}</span>
           <ChevronDown className={cn('size-3.5 shrink-0 transition-transform', isFiltered ? 'text-primary' : 'text-muted-foreground', open && 'rotate-180')} />
         </button>
