@@ -26,7 +26,7 @@ export const PREVIEW_ROUTES: PreviewRoute[] = [
     id: 'expenses',
     label: '지출 내역',
     path: '/preview/expenses',
-    description: '지출 내역 조회 · 필터 · 지출 입력/수정 시트 시안'
+    description: '지출 내역 조회 · 필터 · 지출 추가/수정 시트 시안'
   },
   {
     id: 'income',
@@ -60,9 +60,9 @@ export const PREVIEW_ROUTES: PreviewRoute[] = [
   },
   {
     id: 'expense-edit',
-    label: '지출 입력 · 할부',
+    label: '지출 추가 · 할부',
     path: '/preview/expense-edit',
-    description: '지출 입력(분할 · 회수 · 유이자 할부) 반응형 시트/모달 시안'
+    description: '지출 추가(분할 · 회수 · 유이자 할부) 반응형 시트/모달 시안'
   },
   {
     id: 'design-system',

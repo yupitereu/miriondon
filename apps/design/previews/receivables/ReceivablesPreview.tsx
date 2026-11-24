@@ -19,7 +19,7 @@ import {
   SheetTitle,
   cn
 } from '@repo/ui-core';
-import { ArrowLeft, CalendarRange, ChevronDown, ChevronRight, Landmark, SlidersHorizontal } from 'lucide-react';
+import { CalendarRange, ChevronDown, ChevronRight, Landmark, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 
@@ -406,36 +406,16 @@ export const ReceivablesPreview = ({ initialMonth, initialTab }: { initialMonth?
   return (
     <DesignAppShell
       activeNav="expenses"
+      title="회수금 현황"
+      back={{ label: '지출 내역', ariaLabel: '지출 내역으로 돌아가기', onClick: () => navigateWithQuery('/preview/expenses') }}
       onAddExpense={handleOpenCreateExpense}
-      mobileHeaderLeft={
-        <div className="flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
-            aria-label="지출 내역으로 돌아가기"
-            onClick={() => navigateWithQuery('/preview/expenses')}
-            className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
-          <h1 className="truncate text-base font-bold tracking-tight text-foreground">회수금 현황</h1>
-        </div>
-      }
-      mobileHeaderRight={
-        <Button type="button" variant="outline" size="sm" onClick={() => navigateWithQuery('/preview/assets')} className="shrink-0 gap-1 px-2 text-xs">
+      mobileActions={
+        <Button type="button" variant="ghost" size="sm" onClick={() => navigateWithQuery('/preview/assets')} className="-mr-2 shrink-0 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
           <Landmark className="size-3.5" />
           <span>자산</span>
         </Button>
       }
-      desktopHeaderLeft={
-        <div className="flex items-center gap-2.5">
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigateWithQuery('/preview/expenses')} className="gap-1 px-2 text-muted-foreground">
-            <ArrowLeft className="size-4" />
-            <span>지출 내역</span>
-          </Button>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">회수금 현황</h1>
-        </div>
-      }
-      desktopHeaderRight={
+      desktopActions={
         <Button type="button" variant="outline" size="md" onClick={() => navigateWithQuery('/preview/assets')} className="gap-1.5">
           <Landmark className="size-4" />
           <span>자산 현황 보기</span>

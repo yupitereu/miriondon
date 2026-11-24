@@ -49,20 +49,20 @@ export const TransactionConfirmationPreview = () => {
       confirmText: '확인하기'
     });
   };
-  const promptPreviewButton =
+  const renderPromptPreviewButton = (mobile: boolean) =>
     items.length > 0 ? (
-      <Button type="button" variant="outline" size="sm" onClick={() => void handlePreviewEntryConfirm()}>
+      <Button
+        type="button"
+        variant={mobile ? 'ghost' : 'outline'}
+        size="sm"
+        className={mobile ? '-mr-2 min-h-11 text-muted-foreground hover:text-foreground' : undefined}
+        onClick={() => void handlePreviewEntryConfirm()}
+      >
         <Bell className="size-4" /> 진입 알림 보기
       </Button>
     ) : null;
   return (
-    <DesignAppShell
-      activeNav="confirmation"
-      mobileHeaderLeft={<h1 className="text-base font-bold tracking-tight text-foreground">입출금 확인</h1>}
-      mobileHeaderRight={promptPreviewButton}
-      desktopHeaderLeft={<h1 className="text-lg font-bold tracking-tight text-foreground">입출금 확인</h1>}
-      desktopHeaderRight={promptPreviewButton}
-    >
+    <DesignAppShell activeNav="confirmation" title="입출금 확인" mobileActions={renderPromptPreviewButton(true)} desktopActions={renderPromptPreviewButton(false)}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 pb-20 md:pb-0">
         {items.length ? (
           <>

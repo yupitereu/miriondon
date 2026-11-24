@@ -2,7 +2,7 @@
 
 import { EmptyState, FilterChipGroup, FilterMultiSelect, PeriodPicker, SummaryHeroCard, dialog, mergeFilterOptions, type PeriodCellStatus, type PeriodMonthValue } from '@repo/ui-composition';
 import { Badge, Button, Card, CardHeader, CardTitle, SearchInput, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
-import { CalendarRange, ChevronRight, HandCoins, MoreHorizontal, Plus, Repeat, SlidersHorizontal, Upload, WalletCards } from 'lucide-react';
+import { CalendarRange, ChevronRight, HandCoins, Plus, Repeat, Settings, SlidersHorizontal, Upload, WalletCards } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 
@@ -35,10 +35,10 @@ type ExpenseRecord = {
   draft: ExpenseDraft;
 };
 
-const EXPENSE_SECTIONS: ReadonlyArray<{ kind: ExpenseKind; title: string; emptyCopy: string }> = [
-  { kind: 'regular', title: '일반 지출', emptyCopy: '일반 지출 내역이 없어요.' },
-  { kind: 'fixed', title: '고정 지출', emptyCopy: '고정 지출 내역이 없어요.' },
-  { kind: 'installment', title: '할부 지출', emptyCopy: '할부 지출 내역이 없어요.' }
+const EXPENSE_SECTIONS: ReadonlyArray<{ kind: ExpenseKind; title: string }> = [
+  { kind: 'regular', title: '일반 지출' },
+  { kind: 'installment', title: '할부 지출' },
+  { kind: 'fixed', title: '고정 지출' }
 ];
 
 const getExpenseKind = (draft: ExpenseDraft): ExpenseKind => {
@@ -308,13 +308,11 @@ export const ExpensesPreview = () => {
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(() => new Set());
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(INITIAL_EXPENSES);
   const [balances, setBalances] = useState<Record<string, number>>(getInitialAssetBalancesMap);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formDraft, setFormDraft] = useState<ExpenseDraft>(createEmptyExpensePreset);
 
   const handleOpenFixedExpenses = () => {
-    setMobileMenuOpen(false);
     void dialog.alert({
       title: '고정 지출 설정',
       description: '매월 반복되는 구독·고정 지출 템플릿을 관리합니다.'
@@ -322,25 +320,21 @@ export const ExpensesPreview = () => {
   };
 
   const handleGoFunds = () => {
-    setMobileMenuOpen(false);
     const query = new URLSearchParams(window.location.search).toString();
     router.push(query ? `/preview/funds?${query}` : '/preview/funds');
   };
 
   const handleGoInstallments = () => {
-    setMobileMenuOpen(false);
     const query = new URLSearchParams(window.location.search).toString();
     router.push(query ? `/preview/installments?${query}` : '/preview/installments');
   };
 
   const handleGoReceivables = () => {
-    setMobileMenuOpen(false);
     const query = new URLSearchParams(window.location.search).toString();
     router.push(query ? `/preview/receivables?${query}` : '/preview/receivables');
   };
 
   const handleOpenImport = () => {
-    setMobileMenuOpen(false);
     void dialog.alert({
       title: '카드 내역 가져오기',
       description: 'CSV 또는 엑셀(.xlsx) 카드 이용 내역을 업로드해 일괄 등록합니다.'
@@ -362,7 +356,6 @@ export const ExpensesPreview = () => {
   };
 
   const handleOpenCreate = () => {
-    setMobileMenuOpen(false);
     setFormDraft(createEmptyExpensePreset(periodMonth));
     setFormOpen(true);
   };
@@ -578,25 +571,11 @@ export const ExpensesPreview = () => {
   return (
     <DesignAppShell
       activeNav="expenses"
+      title="지출 내역"
+      periodControl={<PeriodPicker mode="month" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />}
+      mobilePeriodInTitle
       onAddExpense={handleOpenCreate}
-      mobileHeaderLeft={
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="shrink-0 whitespace-nowrap text-base font-bold tracking-tight text-foreground">지출 내역</h1>
-          <PeriodPicker mode="month" size="compact" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />
-        </div>
-      }
-      mobileHeaderRight={
-        <Button variant="outline" size="icon" aria-label="지출 관리 메뉴 더보기" onClick={() => setMobileMenuOpen(true)}>
-          <MoreHorizontal className="size-4" />
-        </Button>
-      }
-      desktopHeaderLeft={
-        <div className="flex items-center gap-2 lg:gap-3">
-          <h1 className="shrink-0 whitespace-nowrap text-lg font-bold tracking-tight text-foreground">지출 내역</h1>
-          <PeriodPicker mode="month" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />
-        </div>
-      }
-      desktopHeaderRight={
+      desktopActions={
         <>
           <Button variant="outline" size="md" className="px-2.5 lg:px-3" onClick={handleOpenFixedExpenses}>
             <Repeat className="size-4" />
@@ -766,7 +745,7 @@ export const ExpensesPreview = () => {
         </div>
       </section>
 
-      {/* Expense Sections (일반 지출 · 고정 지출 · 할부 지출) */}
+      {/* Expense Sections (일반 지출 · 할부 지출 · 고정 지출) */}
       <section aria-label="지출 내역 목록" className="flex flex-col gap-3 md:gap-4">
         {filteredExpenses.length === 0 ? (
           <Card padding="none">
@@ -792,39 +771,56 @@ export const ExpensesPreview = () => {
               }
               className="p-6 md:py-10"
             />
+            <div className="flex justify-end px-3.5 pb-3 md:hidden">
+              <Button variant="outline" size="sm" className="relative after:absolute after:-inset-y-1.5 after:inset-x-0" onClick={handleOpenFixedExpenses}>
+                고정 지출 설정
+              </Button>
+            </div>
           </Card>
         ) : (
-          EXPENSE_SECTIONS.map((section) => {
-            const items = filteredExpenses.filter((item) => item.kind === section.kind);
-            const actualSum = items.reduce((sum, item) => sum + item.actualAmount, 0);
-            const livingSum = items.reduce((sum, item) => sum + item.livingAmount, 0);
+          <>
+            {EXPENSE_SECTIONS.map((section) => {
+              const items = filteredExpenses.filter((item) => item.kind === section.kind);
+              if (items.length === 0) {
+                return null;
+              }
+              const actualSum = items.reduce((sum, item) => sum + item.actualAmount, 0);
+              const livingSum = items.reduce((sum, item) => sum + item.livingAmount, 0);
 
-            return (
-              <Card key={section.kind} padding="none" className="gap-0 overflow-hidden">
-                <CardHeader className="flex flex-col gap-1 border-b border-border px-3.5 py-2.5 md:flex-row md:items-center md:justify-between md:gap-2 md:px-4 md:py-3">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-sm font-bold text-foreground md:text-base">{section.title}</CardTitle>
-                    <Badge variant="neutral" className="tabular-nums">
-                      {items.length}건
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium text-muted-foreground tabular-nums md:text-xs">
-                    <span>
-                      실결제 <strong className="font-bold text-expense">{formatWon(actualSum)}</strong>
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span>
-                      생활비 <strong className="font-bold text-expense">{formatWon(livingSum)}</strong>
-                    </span>
-                  </div>
-                </CardHeader>
+              return (
+                <Card key={section.kind} padding="none" className="gap-0 overflow-hidden">
+                  <CardHeader className="flex flex-col gap-1 border-b border-border px-3.5 py-2.5 md:flex-row md:items-center md:justify-between md:gap-2 md:px-4 md:py-3">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-sm font-bold text-foreground md:text-base">{section.title}</CardTitle>
+                      <Badge variant="neutral" className="tabular-nums">
+                        {items.length}건
+                      </Badge>
+                      {section.kind === 'fixed' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label="고정 지출 설정"
+                          className="relative ml-auto px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0 md:hidden"
+                          onClick={handleOpenFixedExpenses}
+                        >
+                          <Settings /> 설정
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium text-muted-foreground tabular-nums md:text-xs">
+                      <span>
+                        실결제 <strong className="font-bold text-expense">{formatWon(actualSum)}</strong>
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        생활비 <strong className="font-bold text-expense">{formatWon(livingSum)}</strong>
+                      </span>
+                    </div>
+                  </CardHeader>
 
-                {/* Mobile Rows (< 768px) */}
-                <div className="divide-y divide-border md:hidden">
-                  {items.length === 0 ? (
-                    <p className="px-3.5 py-5 text-center text-xs text-muted-foreground">{section.emptyCopy}</p>
-                  ) : (
-                    items.map((item) => (
+                  {/* Mobile Rows (< 768px) */}
+                  <div className="divide-y divide-border md:hidden">
+                    {items.map((item) => (
                       <button key={item.id} type="button" onClick={() => handleOpenEdit(item)} className="flex w-full flex-col gap-1.5 p-3.5 text-left transition-colors hover:bg-muted/35">
                         <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
                           {item.dateLabel} · {item.categoryLabel}
@@ -856,36 +852,28 @@ export const ExpensesPreview = () => {
                           <Badge {...STATUS_BADGE_PROPS[item.status]}>{item.status}</Badge>
                         </div>
                       </button>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
 
-                {/* Tablet / PC Table (>= 768px) */}
-                <div className="hidden overflow-x-auto md:block">
-                  <table className="w-full table-fixed border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-xs font-medium text-muted-foreground">
-                        <th className="w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:w-16">
-                          <span className="lg:hidden">날짜 · 분류</span>
-                          <span className="hidden lg:inline">날짜</span>
-                        </th>
-                        <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">분류</th>
-                        <th className="px-3 py-3 text-left font-medium">내역</th>
-                        <th className="w-40 px-3 py-3 text-left font-medium whitespace-nowrap lg:w-44">결제 수단</th>
-                        <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">실사용자</th>
-                        <th className="w-24 px-3 py-3 text-center font-medium whitespace-nowrap">지불 상태</th>
-                        <th className="w-28 py-3 pl-3 pr-4 text-right font-medium whitespace-nowrap">금액</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {items.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-6 text-center text-xs text-muted-foreground">
-                            {section.emptyCopy}
-                          </td>
+                  {/* Tablet / PC Table (>= 768px) */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full table-fixed border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-border text-xs font-medium text-muted-foreground">
+                          <th className="w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:w-16">
+                            <span className="lg:hidden">날짜 · 분류</span>
+                            <span className="hidden lg:inline">날짜</span>
+                          </th>
+                          <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">분류</th>
+                          <th className="px-3 py-3 text-left font-medium">내역</th>
+                          <th className="w-40 px-3 py-3 text-left font-medium whitespace-nowrap lg:w-44">결제 수단</th>
+                          <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">실사용자</th>
+                          <th className="w-24 px-3 py-3 text-center font-medium whitespace-nowrap">지불 상태</th>
+                          <th className="w-28 py-3 pl-3 pr-4 text-right font-medium whitespace-nowrap">금액</th>
                         </tr>
-                      ) : (
-                        items.map((item) => (
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {items.map((item) => (
                           <tr key={item.id} onClick={() => handleOpenEdit(item)} className="cursor-pointer transition-colors hover:bg-muted/40">
                             <td className="px-3 py-3.5 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                               <div className="flex flex-col items-center gap-0.5">
@@ -928,74 +916,23 @@ export const ExpensesPreview = () => {
                               </div>
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            );
-          })
-        )}
-      </section>
-
-      {/* Mobile Utility Action Sheet */}
-      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="bottom">
-          <SheetHeader>
-            <SheetTitle>지출 관리</SheetTitle>
-            <SheetDescription>지출 추가, 내역 가져오기, 고정 지출을 바로 실행해요.</SheetDescription>
-          </SheetHeader>
-          <SheetBody className="gap-2 pb-1">
-            {(
-              [
-                {
-                  label: '지출 추가',
-                  description: '일시불·할부·분류 분할 지출 등록',
-                  icon: Plus,
-                  iconClass: 'bg-expense text-expense-foreground',
-                  onClick: handleOpenCreate
-                },
-                {
-                  label: '카드 내역 가져오기',
-                  description: '명세서·엑셀 파일로 한 번에 등록',
-                  icon: Upload,
-                  iconClass: 'bg-primary-tint text-primary',
-                  onClick: handleOpenImport
-                },
-                {
-                  label: '고정 지출 설정',
-                  description: '매달 반복되는 월세·구독·공과금 관리',
-                  icon: Repeat,
-                  iconClass: 'bg-muted text-foreground',
-                  onClick: handleOpenFixedExpenses
-                }
-              ] as const
-            ).map((action) => {
-              const ActionIcon = action.icon;
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={action.onClick}
-                  className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-accent/40"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-lg', action.iconClass)}>
-                      <ActionIcon className="size-4" />
-                    </span>
-                    <div className="min-w-0 flex flex-col gap-0.5">
-                      <span className="text-sm font-bold text-foreground">{action.label}</span>
-                      <span className="text-xs text-muted-foreground break-keep">{action.description}</span>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </button>
+                </Card>
               );
             })}
-          </SheetBody>
-        </SheetContent>
-      </Sheet>
+            {!filteredExpenses.some((item) => item.kind === 'fixed') ? (
+              <div className="flex justify-end md:hidden">
+                <Button variant="outline" size="sm" className="relative gap-1.5 px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0" onClick={handleOpenFixedExpenses}>
+                  <Settings /> 고정 지출 설정
+                </Button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
 
       {/* Mobile Detail Search Sheet */}
       <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
@@ -1034,6 +971,7 @@ export const ExpensesPreview = () => {
         onDraftChange={setFormDraft}
         onSave={(draft) => void handleSaveExpense(draft)}
         onDelete={(draft) => void handleDeleteExpense(draft)}
+        onOpenImport={handleOpenImport}
       />
     </DesignAppShell>
   );

@@ -538,24 +538,22 @@ export const SettingsPreview = () => {
       </div>
     );
   };
-  const header = <h1 className="text-base font-bold tracking-tight text-foreground md:text-lg">가계부 설정</h1>;
   return (
     <DesignAppShell
       activeNav="settings"
-      mobileHeaderLeft={header}
-      mobileHeaderRight={
+      title="가계부 설정"
+      mobileActions={
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
           aria-label={`설정 메뉴 선택, 현재 ${settingMenus.find((menu) => menu.value === tab)?.label}`}
           aria-haspopup="dialog"
-          className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-md border border-primary/40 bg-primary-tint px-3 text-sm font-semibold text-primary hover:bg-primary-tint/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          className="-mr-2 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-md px-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary-tint/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         >
           {settingMenus.find((menu) => menu.value === tab)?.label}
           <ChevronDown className="size-4 text-primary" />
         </button>
       }
-      desktopHeaderLeft={header}
     >
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
         <Tabs variant="underline" value={tab} onValueChange={setTab} className="hidden md:block">

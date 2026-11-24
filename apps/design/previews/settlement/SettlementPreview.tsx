@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type CSSProperties, type SubmitEvent } from 'react';
 
 import { IncomeDetails } from '@/previews/settlement/AnnualIncomeTable';
-import { AnnualSettlementView } from '@/previews/settlement/AnnualSettlementView';
+import { AnnualSettlementNotice, AnnualSettlementView } from '@/previews/settlement/AnnualSettlementView';
 import { BudgetEditOverlay } from '@/previews/settlement/BudgetEditOverlay';
 import { MonthlyCardPayments } from '@/previews/settlement/MonthlyCardPayments';
 import { MONTHLY_CHART_COLORS, MonthlySpendingChart } from '@/previews/settlement/MonthlySpendingChart';
@@ -267,13 +267,13 @@ export const SettlementPreview = () => {
     setBudgetEditOpen(false);
   };
 
-  const settlementTabsControl = (fullWidth: boolean) => (
-    <Tabs variant="segment" value={activeTab} onValueChange={(val) => setActiveTab(val as SettlementTab)} className={fullWidth ? 'w-full' : 'w-auto'}>
-      <TabsList className={fullWidth ? 'w-full' : 'w-auto'}>
-        <TabsTrigger value="monthly" className={fullWidth ? 'flex-1' : 'px-4'}>
+  const settlementTabsControl = (
+    <Tabs variant="segment" value={activeTab} onValueChange={(val) => setActiveTab(val as SettlementTab)} className="w-auto">
+      <TabsList className="w-auto">
+        <TabsTrigger value="monthly" className="px-3.5 md:px-4">
           월별
         </TabsTrigger>
-        <TabsTrigger value="yearly" className={fullWidth ? 'flex-1' : 'px-4'}>
+        <TabsTrigger value="yearly" className="px-3.5 md:px-4">
           연간
         </TabsTrigger>
       </TabsList>
@@ -282,52 +282,54 @@ export const SettlementPreview = () => {
 
   const headerTitle = activeTab === 'yearly' ? '연간 결산' : '월별 결산';
 
+  const ownerFilter = (mobile: boolean) => (
+    <FilterMultiSelect
+      label="구성원"
+      options={settlementOwnerOptions}
+      selected={selectedOwners}
+      onChange={setSelectedOwners}
+      renderOption={(option) => <MemberAvatar name={option} size="xs" />}
+      align="end"
+      variant={mobile ? 'ghost' : 'outlined'}
+      className={mobile ? '-mr-2 min-h-9 max-w-none' : undefined}
+    />
+  );
+
+  const topNotice =
+    activeTab === 'yearly' ? (
+      <AnnualSettlementNotice year={periodYear} />
+    ) : monthBudgets.length > 0 && monthIncomes.length > 0 && budgetIncome !== totals.budget ? (
+      <NoticeBox variant="warning" icon={null}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-2">
+            <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <p className="font-bold">{budgetDifferenceSummary(budgetIncome - totals.budget)}</p>
+          </div>
+          <button type="button" onClick={handleEditBudget} className="-my-2.5 inline-flex min-h-11 shrink-0 cursor-pointer items-center font-bold underline underline-offset-2">
+            예산 관리
+          </button>
+        </div>
+      </NoticeBox>
+    ) : null;
+
   return (
     <DesignAppShell
       activeNav="settlement"
-      mobileHeaderLeft={
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="shrink-0 whitespace-nowrap text-base font-bold tracking-tight text-foreground">결산</h1>
-          {activeTab === 'yearly' ? (
-            <PeriodPicker mode="year" size="compact" value={periodYear} onChange={setPeriodYear} />
-          ) : (
-            <PeriodPicker mode="month" size="compact" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />
-          )}
-        </div>
+      title={headerTitle}
+      topNotice={topNotice}
+      periodControl={
+        activeTab === 'yearly' ? (
+          <PeriodPicker mode="year" value={periodYear} onChange={setPeriodYear} />
+        ) : (
+          <PeriodPicker mode="month" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />
+        )
       }
-      mobileHeaderRight={
-        <FilterMultiSelect
-          label="구성원"
-          options={settlementOwnerOptions}
-          selected={selectedOwners}
-          onChange={setSelectedOwners}
-          renderOption={(option) => <MemberAvatar name={option} size="xs" />}
-          align="end"
-          className="min-h-11"
-        />
-      }
-      mobileHeaderBottom={settlementTabsControl(true)}
-      desktopHeaderLeft={
-        <div className="flex items-center gap-2 lg:gap-3">
-          <h1 className="shrink-0 whitespace-nowrap text-lg font-bold tracking-tight text-foreground">{headerTitle}</h1>
-          {activeTab === 'yearly' ? (
-            <PeriodPicker mode="year" value={periodYear} onChange={setPeriodYear} />
-          ) : (
-            <PeriodPicker mode="month" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={getMonthCellStatus} />
-          )}
-        </div>
-      }
-      desktopHeaderRight={
+      mobileActions={settlementTabsControl}
+      mobilePeriodRight={ownerFilter(true)}
+      desktopActions={
         <>
-          <FilterMultiSelect
-            label="구성원"
-            options={settlementOwnerOptions}
-            selected={selectedOwners}
-            onChange={setSelectedOwners}
-            renderOption={(option) => <MemberAvatar name={option} size="xs" />}
-            align="end"
-          />
-          {settlementTabsControl(false)}
+          {ownerFilter(false)}
+          {settlementTabsControl}
         </>
       }
     >
@@ -335,20 +337,6 @@ export const SettlementPreview = () => {
         <TabsContent value="monthly" className="mt-0 flex flex-col gap-stack-mobile lg:gap-stack-desktop">
           {monthBudgets.length ? (
             <>
-              {monthIncomes.length > 0 && budgetIncome !== totals.budget ? (
-                <NoticeBox variant="warning" icon={null}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-2">
-                      <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <p className="font-bold">{budgetDifferenceSummary(budgetIncome - totals.budget)}</p>
-                    </div>
-                    <button type="button" onClick={handleEditBudget} className="-my-2.5 inline-flex min-h-11 shrink-0 cursor-pointer items-center font-bold underline underline-offset-2">
-                      예산 관리
-                    </button>
-                  </div>
-                </NoticeBox>
-              ) : null}
-
               <section aria-label="월별 예산 요약">
                 <SummaryHeroCard
                   variant="hero"

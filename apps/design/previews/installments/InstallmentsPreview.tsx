@@ -24,7 +24,7 @@ import {
   TooltipTrigger,
   cn
 } from '@repo/ui-core';
-import { ArrowLeft, CalendarRange, ChevronDown, ChevronRight, HelpCircle, SlidersHorizontal } from 'lucide-react';
+import { CalendarRange, ChevronDown, ChevronRight, HelpCircle, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -660,29 +660,9 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
   return (
     <DesignAppShell
       activeNav="expenses"
+      title="할부 현황"
+      back={{ label: '지출 내역', ariaLabel: '지출 내역으로 돌아가기', onClick: () => navigateWithQuery('/preview/expenses') }}
       onAddExpense={handleOpenAddExpense}
-      mobileHeaderLeft={
-        <div className="flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
-            aria-label="지출 내역으로 돌아가기"
-            onClick={() => navigateWithQuery('/preview/expenses')}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
-          <h1 className="truncate text-base font-bold tracking-tight text-foreground">할부 현황</h1>
-        </div>
-      }
-      desktopHeaderLeft={
-        <div className="flex items-center gap-2.5">
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigateWithQuery('/preview/expenses')} className="gap-1 px-2 text-muted-foreground">
-            <ArrowLeft className="size-4" />
-            <span>지출 내역</span>
-          </Button>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">할부 현황</h1>
-        </div>
-      }
     >
       {/* Top Hero Summary Card */}
       <SummaryHeroCard

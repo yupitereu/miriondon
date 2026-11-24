@@ -1,8 +1,8 @@
 'use client';
 
 import { ProfileAvatar, dialog } from '@repo/ui-composition';
-import { Popover, PopoverContent, PopoverTrigger, Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
-import { BookOpen, Check, ClipboardCheck, ChevronDown, ChevronRight, ChevronsUpDown, Landmark, LayoutGrid, List, Menu, Plus, Settings, Wallet } from 'lucide-react';
+import { Button, Popover, PopoverContent, PopoverTrigger, Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
+import { ArrowLeft, BookOpen, Check, ClipboardCheck, ChevronDown, ChevronRight, ChevronsUpDown, Landmark, LayoutGrid, List, Menu, Plus, Settings, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 
@@ -74,34 +74,48 @@ const ConfirmationCountBadge = ({ count, compact = false }: { count: number; com
     </span>
   ) : null;
 
+export type DesignAppShellBackAction = {
+  label: string;
+  ariaLabel?: string;
+  onClick: () => void;
+};
+
 type DesignAppShellProps = {
   activeNav: AppNavKey;
+  title: string;
+  back?: DesignAppShellBackAction;
+  topNotice?: ReactNode;
+  periodControl?: ReactNode;
+  mobilePeriodInTitle?: boolean;
+  mobilePeriodRight?: ReactNode;
+  actions?: ReactNode;
+  mobileActions?: ReactNode;
+  desktopActions?: ReactNode;
   onAddExpense?: () => void;
   onAddIncome?: () => void;
   mobilePrimaryAction?: DesignAppShellMobilePrimaryAction;
   ledgerId?: string;
   onLedgerChange?: (ledgerId: string) => void;
-  mobileHeaderLeft?: ReactNode;
-  mobileHeaderRight?: ReactNode;
-  mobileHeaderBottom?: ReactNode;
-  desktopHeaderLeft?: ReactNode;
-  desktopHeaderRight?: ReactNode;
   mainClassName?: string;
   children: ReactNode;
 };
 
 export const DesignAppShell = ({
   activeNav,
+  title,
+  back,
+  topNotice,
+  periodControl,
+  mobilePeriodInTitle = false,
+  mobilePeriodRight,
+  actions,
+  mobileActions,
+  desktopActions,
   onAddExpense,
   onAddIncome,
   mobilePrimaryAction,
   ledgerId: controlledLedgerId,
   onLedgerChange,
-  mobileHeaderLeft,
-  mobileHeaderRight,
-  mobileHeaderBottom,
-  desktopHeaderLeft,
-  desktopHeaderRight,
   mainClassName,
   children
 }: DesignAppShellProps) => {
@@ -109,6 +123,7 @@ export const DesignAppShell = ({
   const [internalLedgerId, setInternalLedgerId] = useState<string>('home');
   const [railLedgerMenuOpen, setRailLedgerMenuOpen] = useState(false);
   const [sidebarLedgerMenuOpen, setSidebarLedgerMenuOpen] = useState(false);
+  const [mobileLedgerMenuOpen, setMobileLedgerMenuOpen] = useState(false);
   const [sheetLedgerMenuOpen, setSheetLedgerMenuOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -140,6 +155,7 @@ export const DesignAppShell = ({
     }
     setRailLedgerMenuOpen(false);
     setSidebarLedgerMenuOpen(false);
+    setMobileLedgerMenuOpen(false);
     setSheetLedgerMenuOpen(false);
   };
 
@@ -185,9 +201,9 @@ export const DesignAppShell = ({
     </div>
   );
 
-  const renderLedgerSwitcher = (mode: 'rail' | 'full') => {
-    const open = mode === 'rail' ? railLedgerMenuOpen : sidebarLedgerMenuOpen;
-    const setOpen = mode === 'rail' ? setRailLedgerMenuOpen : setSidebarLedgerMenuOpen;
+  const renderLedgerSwitcher = (mode: 'rail' | 'full' | 'mobile') => {
+    const open = mode === 'rail' ? railLedgerMenuOpen : mode === 'mobile' ? mobileLedgerMenuOpen : sidebarLedgerMenuOpen;
+    const setOpen = mode === 'rail' ? setRailLedgerMenuOpen : mode === 'mobile' ? setMobileLedgerMenuOpen : setSidebarLedgerMenuOpen;
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
@@ -205,6 +221,15 @@ export const DesignAppShell = ({
                 <ChevronsUpDown className="size-2.5 shrink-0 text-muted-foreground" />
               </span>
             </button>
+          ) : mode === 'mobile' ? (
+            <button
+              type="button"
+              aria-label={`가계부 변경 (${currentLedger.name})`}
+              className="inline-flex h-8 max-w-[144px] cursor-pointer items-center gap-1 rounded-full border border-border-strong bg-background/80 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            >
+              <span className="truncate">{currentLedger.name}</span>
+              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+            </button>
           ) : (
             <button
               type="button"
@@ -216,7 +241,7 @@ export const DesignAppShell = ({
             </button>
           )}
         </PopoverTrigger>
-        <PopoverContent side={mode === 'rail' ? 'right' : 'bottom'} align="start" sideOffset={mode === 'rail' ? 8 : 4} className="w-56 p-1.5">
+        <PopoverContent side={mode === 'rail' ? 'right' : 'bottom'} align={mode === 'mobile' ? 'end' : 'start'} sideOffset={mode === 'rail' ? 8 : 4} className="w-56 p-1.5">
           {renderLedgerOptions()}
         </PopoverContent>
       </Popover>
@@ -265,6 +290,46 @@ export const DesignAppShell = ({
         : null
       : { label: '내역 추가', tone: 'primary' as const, chooseOnPrimary: true, onClick: handleAddExpense });
   const primaryActionTone = MOBILE_PRIMARY_ACTION_TONE_CLASSES[primaryAction?.tone ?? 'primary'];
+  const isSubPage = Boolean(back);
+  const resolvedMobileActions = mobileActions ?? actions;
+  const resolvedDesktopActions = desktopActions ?? actions;
+
+  const mobileSubPageTitleGroup = (
+    <div className="flex min-w-0 items-center gap-1.5">
+      {back ? (
+        <button
+          type="button"
+          aria-label={back.ariaLabel ?? `${back.label} 화면으로 돌아가기`}
+          onClick={back.onClick}
+          className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+      ) : null}
+      <h1 className="truncate text-base font-bold tracking-tight text-foreground">{title}</h1>
+    </div>
+  );
+
+  const mobilePeriodRow =
+    periodControl || mobilePeriodRight ? (
+      <div className="flex min-h-8 items-center justify-between gap-2">
+        <div className="-ml-1.5 flex min-w-0 items-center">{periodControl}</div>
+        {mobilePeriodRight ? <div className="flex shrink-0 items-center gap-1.5">{mobilePeriodRight}</div> : null}
+      </div>
+    ) : null;
+
+  const desktopTitleGroup = (
+    <div className={cn('flex min-w-0 items-center', isSubPage ? 'gap-2.5' : 'gap-2 lg:gap-3')}>
+      {back ? (
+        <Button type="button" variant="ghost" size="sm" onClick={back.onClick} className="gap-1 px-2 text-muted-foreground">
+          <ArrowLeft className="size-4" />
+          <span>{back.label}</span>
+        </Button>
+      ) : null}
+      <h1 className={cn('text-lg font-bold tracking-tight text-foreground', periodControl ? 'shrink-0 whitespace-nowrap' : 'truncate')}>{title}</h1>
+      {periodControl}
+    </div>
+  );
 
   return (
     <div className="flex min-h-dvh bg-background text-foreground">
@@ -315,7 +380,8 @@ export const DesignAppShell = ({
       {/* PC Full Sidebar (>= 1024px): full descriptive labels */}
       <aside className="sticky top-0 hidden h-dvh w-sidebar-full shrink-0 flex-col justify-between border-r border-sidebar-border bg-sidebar p-4 lg:flex">
         <div className="flex flex-col gap-3">
-          <div className="flex items-center px-1 py-1.5">
+          <div className="flex items-center gap-2 px-1 py-1">
+            <MiriondonSymbol className="size-7 shrink-0" />
             <MiriondonWordmark size="md" />
           </div>
 
@@ -366,23 +432,70 @@ export const DesignAppShell = ({
       {/* Main Content Area */}
       <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
         {/* Mobile Header (< 768px) */}
-        <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur md:hidden">
-          <div className="flex h-header-mobile items-center justify-between gap-1.5 px-page-mobile">
-            <div className="min-w-0 flex-1">{mobileHeaderLeft}</div>
-            {mobileHeaderRight ? <div className="flex shrink-0 items-center gap-1.5">{mobileHeaderRight}</div> : null}
-          </div>
-          {mobileHeaderBottom ? <div className="px-page-mobile pb-2.5">{mobileHeaderBottom}</div> : null}
-        </header>
+        {isSubPage ? (
+          <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur md:hidden">
+            <div className="flex h-header-mobile items-center justify-between gap-1.5 px-page-mobile">
+              <div className="min-w-0 flex-1">{mobileSubPageTitleGroup}</div>
+              {(mobilePeriodInTitle && periodControl) || resolvedMobileActions ? (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {mobilePeriodInTitle && periodControl ? <div className={cn(!resolvedMobileActions && '-mr-1.5')}>{periodControl}</div> : null}
+                  {resolvedMobileActions}
+                </div>
+              ) : null}
+            </div>
+          </header>
+        ) : (
+          <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur md:hidden">
+            <div className="flex h-12 items-center justify-between gap-2 px-page-mobile">
+              <MiriondonWordmark size="sm" />
+              <div className="flex min-w-0 items-center gap-1.5">
+                {renderLedgerSwitcher('mobile')}
+                <button
+                  type="button"
+                  aria-label="내 정보"
+                  onClick={() => setProfileOpen(true)}
+                  className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  <ProfileAvatar name={profile.name} src={profile.avatarSrc} color={profile.avatarColor} className="size-7 text-[11px]" />
+                </button>
+              </div>
+            </div>
+          </header>
+        )}
 
         {/* Tablet & PC Header (>= 768px) — 사이드바(236px) + 본문(1684px) = 1920px(FHD 100% · UHD 50%) */}
         <header className="sticky top-0 z-30 hidden h-header-desktop border-b border-border bg-card/95 backdrop-blur md:block">
           <div className="flex h-full w-full max-w-[1684px] items-center justify-between gap-4 px-page-tablet lg:px-page-desktop">
-            <div className="flex min-w-0 items-center gap-4">{desktopHeaderLeft}</div>
-            {desktopHeaderRight ? <div className="flex shrink-0 items-center gap-2">{desktopHeaderRight}</div> : null}
+            <div className="flex min-w-0 items-center gap-4">{desktopTitleGroup}</div>
+            {resolvedDesktopActions ? <div className="flex shrink-0 items-center gap-2">{resolvedDesktopActions}</div> : null}
           </div>
         </header>
 
-        <main className={cn('flex w-full max-w-[1684px] flex-1 flex-col gap-stack-mobile p-page-mobile md:p-page-tablet lg:gap-stack-desktop lg:p-page-desktop', mainClassName)}>{children}</main>
+        <main className={cn('flex w-full max-w-[1684px] flex-1 flex-col gap-stack-mobile p-page-mobile md:p-page-tablet lg:gap-stack-desktop lg:p-page-desktop', mainClassName)}>
+          {topNotice}
+          {isSubPage ? (
+            !mobilePeriodInTitle && mobilePeriodRow ? (
+              <div className="-mb-1.5 md:hidden">{mobilePeriodRow}</div>
+            ) : null
+          ) : mobilePeriodInTitle ? (
+            <div className="-mb-1 flex flex-col gap-2 md:hidden">
+              <div className="flex min-h-9 items-center justify-between gap-2">
+                <h1 className="min-w-0 truncate text-lg font-bold tracking-tight text-foreground">{title}</h1>
+                {periodControl ? <div className="-mr-1.5 flex shrink-0 items-center">{periodControl}</div> : null}
+              </div>
+              {resolvedMobileActions ? <div className="flex flex-wrap items-center justify-end gap-2">{resolvedMobileActions}</div> : null}
+            </div>
+          ) : (
+            <div className="-mb-1.5 flex flex-col gap-1 md:hidden">
+              <div className="flex min-h-9 items-center justify-between gap-2">
+                <h1 className="min-w-0 truncate text-lg font-bold tracking-tight text-foreground">{title}</h1>
+                {resolvedMobileActions ? <div className="flex shrink-0 items-center gap-1.5">{resolvedMobileActions}</div> : null}
+              </div>
+              {mobilePeriodRow}
+            </div>
+          )}
+          {children}
+        </main>
       </div>
 
       {primaryAction && 'chooseOnPrimary' in primaryAction && primaryAction.chooseOnPrimary ? (
@@ -397,7 +510,10 @@ export const DesignAppShell = ({
       ) : null}
 
       {/* Mobile Bottom Navigation (< 768px): 결산 · 지출 · [+ 지출/내역/수입 추가] · 수입 · 전체 */}
-      <nav aria-label="하단 탭바" className="fixed inset-x-0 bottom-0 z-40 flex h-bottom-nav items-center justify-around gap-0.5 border-t border-border bg-card/95 px-1.5 backdrop-blur md:hidden">
+      <nav
+        aria-label="하단 탭바"
+        className="fixed inset-x-0 bottom-0 z-40 flex h-bottom-nav items-center justify-around gap-0.5 border-t border-border bg-card/95 px-1.5 shadow-[0_-4px_12px_rgb(0_0_0/0.12)] backdrop-blur md:hidden dark:shadow-[0_-4px_12px_rgb(0_0_0/0.35)]"
+      >
         {mobileLeftItems.map((item) => {
           const NavIcon = item.icon;
           const active = activeNav === item.key;
@@ -480,14 +596,19 @@ export const DesignAppShell = ({
                 aria-label={addMenuOpen ? '내역 추가 닫기' : '내역 추가 종류 선택'}
                 onClick={() => setAddMenuOpen((prev) => !prev)}
                 className={cn(
-                  'group relative z-10 flex min-h-control-lg min-w-12 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+                  'group relative z-10 flex min-h-control-lg min-w-12 -translate-y-3 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
                   primaryActionTone.text
                 )}
               >
-                <span className={cn('inline-flex size-8 items-center justify-center rounded-full shadow-sm transition-colors', primaryActionTone.circle)}>
-                  <Plus className={cn('size-4 transition-transform duration-150', addMenuOpen && 'rotate-45')} />
+                <span
+                  className={cn(
+                    'inline-flex size-10 items-center justify-center rounded-full bg-linear-to-b from-white/15 to-black/15 shadow-lg ring-2 ring-card transition-colors',
+                    primaryActionTone.circle
+                  )}
+                >
+                  <Plus className={cn('size-5 transition-transform duration-150', addMenuOpen && 'rotate-45')} />
                 </span>
-                <span className="whitespace-nowrap">{addMenuOpen ? '닫기' : primaryAction.label}</span>
+                <span className="translate-y-0.5 whitespace-nowrap">{addMenuOpen ? '닫기' : primaryAction.label}</span>
               </button>
             </div>
           ) : (
@@ -495,14 +616,19 @@ export const DesignAppShell = ({
               type="button"
               onClick={primaryAction.onClick}
               className={cn(
-                'group flex min-h-control-lg min-w-12 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+                'group flex min-h-control-lg min-w-12 -translate-y-3 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
                 primaryActionTone.text
               )}
             >
-              <span className={cn('inline-flex size-8 items-center justify-center rounded-full shadow-sm transition-colors', primaryActionTone.circle)}>
-                <Plus className="size-4" />
+              <span
+                className={cn(
+                  'inline-flex size-10 items-center justify-center rounded-full bg-linear-to-b from-white/15 to-black/15 shadow-lg ring-2 ring-card transition-colors',
+                  primaryActionTone.circle
+                )}
+              >
+                <Plus className="size-5" />
               </span>
-              <span className="whitespace-nowrap">{primaryAction.label}</span>
+              <span className="translate-y-0.5 whitespace-nowrap">{primaryAction.label}</span>
             </button>
           )
         ) : null}

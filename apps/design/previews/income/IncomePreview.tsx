@@ -2,7 +2,7 @@
 
 import { EmptyState, FilterChipGroup, FilterMultiSelect, PeriodPicker, SummaryHeroCard, dialog, type PeriodMonthValue } from '@repo/ui-composition';
 import { Badge, Button, Card, SearchInput, Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader, SheetTitle, Tooltip, TooltipContent, TooltipTrigger, cn } from '@repo/ui-core';
-import { ChevronRight, Ellipsis, Plus, Repeat, SlidersHorizontal } from 'lucide-react';
+import { ChevronRight, Plus, Repeat, Settings, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode, type SubmitEvent } from 'react';
 
@@ -41,7 +41,6 @@ export const IncomePreview = () => {
   const [owners, setOwners] = useState<Set<string>>(new Set());
   const [statuses, setStatuses] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [budgetOverrides, setBudgetOverrides] = useState<Record<string, number>>({});
   const [budgetTargets, setBudgetTargets] = useState<PeriodMonthValue[]>([]);
   const [activeBudgetKey, setActiveBudgetKey] = useState('');
@@ -255,30 +254,49 @@ export const IncomePreview = () => {
       }
     }
   };
+  const deleteIncome = async (record: IncomeRecord) => {
+    const label = record.title.trim() || '이 수입';
+    const notices: string[] = [];
+    if (record.recurring) notices.push('이 달 내역만 삭제되고 고정 수입 설정은 유지돼요.');
+    if (record.status === '입금 완료') notices.push('실제 계좌 잔액은 자동으로 차감되지 않아요.');
+
+    const confirmed = await dialog.confirm({
+      title: `${label} 내역을 삭제할까요?`,
+      description: notices.join('\n'),
+      cancelText: '취소',
+      confirmText: '삭제',
+      variant: 'destructive'
+    });
+    if (!confirmed) return;
+
+    const nextIncomes = incomes.filter((item) => item.id !== record.id);
+    setIncomes(nextIncomes);
+    setEditing(null);
+
+    if (netIncome(record) > 0) {
+      const targetPeriod = parseMonthKey(record.month);
+      const nextMonthIncomeTotal = nextIncomes.filter((item) => item.month === record.month).reduce((sum, item) => sum + netIncome(item), 0);
+      const adjustBudget = await dialog.confirm({
+        title: '예산을 변경해 주세요',
+        description: `${targetPeriod.year}년 ${targetPeriod.month}월 수입이 ${formatWon(nextMonthIncomeTotal)}으로 변경되었어요. 바뀐 수입에 맞춰 월 예산을 조정할까요?`,
+        confirmText: '예산 관리',
+        cancelText: '나중에'
+      });
+      if (adjustBudget) {
+        openBudgetModal([targetPeriod], record.month);
+      }
+    }
+  };
   const openFixedSettings = () => void dialog.alert({ title: '고정 수입 설정', description: '가계부 설정의 고정 수입 · 지출에서 관리해요.' });
 
   return (
     <DesignAppShell
       activeNav="income"
+      title="수입 내역"
+      periodControl={<PeriodPicker mode="month" value={month} onChange={setMonth} />}
+      mobilePeriodInTitle
       mobilePrimaryAction={{ label: '수입 추가', tone: 'income', onClick: addIncome }}
-      mobileHeaderLeft={
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="shrink-0 whitespace-nowrap text-base font-bold tracking-tight text-foreground">수입 내역</h1>
-          <PeriodPicker mode="month" size="compact" value={month} onChange={setMonth} />
-        </div>
-      }
-      mobileHeaderRight={
-        <Button variant="outline" size="icon" aria-label="수입 관리 메뉴" onClick={() => setMenuOpen(true)}>
-          <Ellipsis className="size-4" />
-        </Button>
-      }
-      desktopHeaderLeft={
-        <div className="flex items-center gap-2 lg:gap-3">
-          <h1 className="shrink-0 whitespace-nowrap text-lg font-bold tracking-tight text-foreground">수입 내역</h1>
-          <PeriodPicker mode="month" value={month} onChange={setMonth} />
-        </div>
-      }
-      desktopHeaderRight={
+      desktopActions={
         <>
           <Button variant="outline" size="md" className="shrink-0 whitespace-nowrap" onClick={openFixedSettings}>
             <Repeat className="size-4" /> 고정 수입 설정
@@ -328,11 +346,14 @@ export const IncomePreview = () => {
       </section>
 
       <Card padding="none" className="gap-0 overflow-hidden" aria-label="수입 목록">
-        <div className="flex items-center gap-2 border-b border-border px-3.5 py-3 md:px-4">
+        <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5 md:px-4 md:py-3">
           <h2 className="text-sm font-bold">수입 목록</h2>
           <Badge variant="count" className="tabular-nums">
             {visibleIncomes.length}건
           </Badge>
+          <Button variant="outline" size="sm" aria-label="고정 수입 설정" className="relative ml-auto px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0 md:hidden" onClick={openFixedSettings}>
+            <Settings /> 고정 수입
+          </Button>
         </div>
         {visibleIncomes.length ? (
           <>
@@ -475,38 +496,6 @@ export const IncomePreview = () => {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="bottom" aria-describedby={undefined}>
-          <SheetHeader>
-            <SheetTitle>수입 관리</SheetTitle>
-          </SheetHeader>
-          <SheetBody className="gap-2">
-            <Button
-              variant="income"
-              className="justify-start"
-              size="lg"
-              onClick={() => {
-                setMenuOpen(false);
-                addIncome();
-              }}
-            >
-              <Plus className="size-4" /> 수입 추가
-            </Button>
-            <Button
-              className="justify-start"
-              variant="outline"
-              size="lg"
-              onClick={() => {
-                setMenuOpen(false);
-                openFixedSettings();
-              }}
-            >
-              <Repeat className="size-4" /> 고정 수입 설정
-            </Button>
-          </SheetBody>
-        </SheetContent>
-      </Sheet>
-
       {editing ? (
         <IncomeEditor
           key={editing.id}
@@ -514,6 +503,7 @@ export const IncomePreview = () => {
           existing={incomes.some((item) => item.id === editing.id)}
           onClose={() => setEditing(null)}
           onSave={saveIncome}
+          onDelete={(target) => void deleteIncome(target)}
           onViewAssets={() => router.push(`/preview/assets${window.location.search}`)}
         />
       ) : null}

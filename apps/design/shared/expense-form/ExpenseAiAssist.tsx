@@ -341,8 +341,8 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
     setErrorMessage('');
     setStage('input');
     const summaryText = discountAllowedAfterApply
-      ? 'AI 초안을 폼에 반영했어요. 분류·할인을 확인한 뒤 지출 저장을 눌러 확정하세요.'
-      : 'AI 초안을 폼에 반영했어요. 분류·금액을 확인한 뒤 지출 저장을 눌러 확정하세요.';
+      ? 'AI 초안을 폼에 반영했어요. 분류·할인을 확인한 뒤 저장을 눌러 확정하세요.'
+      : 'AI 초안을 폼에 반영했어요. 분류·금액을 확인한 뒤 저장을 눌러 확정하세요.';
     onApplyCandidate(nextDraft, summaryText);
   };
 

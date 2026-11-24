@@ -155,12 +155,14 @@ export const IncomeEditor = ({
   existing,
   onClose,
   onSave,
+  onDelete,
   onViewAssets
 }: {
   record: IncomeRecord;
   existing: boolean;
   onClose: () => void;
   onSave: (record: IncomeRecord) => void;
+  onDelete?: (record: IncomeRecord) => void;
   onViewAssets: () => void;
 }) => {
   const isMobile = useIsMobileView();
@@ -203,6 +205,7 @@ export const IncomeEditor = ({
   const [deductionsOpen, setDeductionsOpen] = useState(() => hasPositiveLine(record.deductions));
   const [draftsByKind, setDraftsByKind] = useState<Partial<Record<IncomeRecord['kind'], Pick<IncomeRecord, 'payments' | 'deductions' | 'details'>>>>({});
   const title = existing ? '수입 수정' : '수입 추가';
+  const showDeleteButton = existing && Boolean(onDelete);
   const net = netIncome(draft);
   const hasPositivePayment = draft.payments.some((row) => row.amount !== '' && validAmount(row.amount) && Number(row.amount) > 0);
   const hasAmounts = hasPositivePayment && validLines(draft.payments, 'payments', taxRecordingEnabled) && validLines(draft.deductions, 'deductions', taxRecordingEnabled) && net >= 0;
@@ -709,10 +712,15 @@ export const IncomeEditor = ({
 
   const footer = (
     <div className="flex w-full flex-wrap items-center justify-end gap-2">
-      <Button type="button" variant="outline" onClick={() => finishWithExit(onClose)}>
+      {showDeleteButton ? (
+        <Button type="button" variant="ghost" size="md" className="mr-auto shrink-0 text-destructive hover:bg-destructive-tint hover:text-destructive" onClick={() => onDelete?.(record)}>
+          삭제
+        </Button>
+      ) : null}
+      <Button type="button" variant="outline" size="md" onClick={() => finishWithExit(onClose)}>
         취소
       </Button>
-      <Button type="button" onClick={() => void save(existing && record.status === '입금 예정' && draft.status === '입금 완료')}>
+      <Button type="button" size="md" onClick={() => void save(existing && record.status === '입금 예정' && draft.status === '입금 완료')}>
         {existing && record.status === '입금 예정' && draft.status === '입금 완료' ? '입금 완료' : '저장'}
       </Button>
     </div>

@@ -33,7 +33,7 @@ import {
   cn,
   useIsMobileView
 } from '@repo/ui-core';
-import { ArrowLeft, ChevronDown, CircleHelp, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CircleHelp, Plus, Sparkles, Upload, X } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 
 import { MemberAvatar } from '@/shared/MemberAvatar';
@@ -1202,7 +1202,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
           {recoveryLockedByInstallment ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span tabIndex={0} className="inline-flex shrink-0 cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
+                <span tabIndex={0} className="mr-auto inline-flex shrink-0 cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
                   <Button type="button" variant="outline" size="sm" disabled className="gap-1">
                     <Plus className="size-3.5" />
                     <span>회수 상대 추가</span>
@@ -1429,12 +1429,6 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
           ) : null}
         </div>
       </section>
-
-      {draft.isFixedExpenseGenerated ? (
-        <NoticeBox variant="info" className="text-xs">
-          고정 지출에서 자동 생성된 이 달 내역이에요. 여기서 수정한 내용은 이 달 건에만 반영되며 고정 지출 설정은 바뀌지 않아요.
-        </NoticeBox>
-      ) : null}
     </div>
   );
 };
@@ -1446,9 +1440,10 @@ type ExpenseFormOverlayProps = {
   onDraftChange: (next: ExpenseDraft) => void;
   onSave: (draft: ExpenseDraft) => void;
   onDelete?: (draft: ExpenseDraft) => void;
+  onOpenImport?: () => void;
 };
 
-export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, onSave, onDelete }: ExpenseFormOverlayProps) => {
+export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, onSave, onDelete, onOpenImport }: ExpenseFormOverlayProps) => {
   const isMobile = useIsMobileView();
   const taxRecordingEnabled = useTaxRecordingEnabled();
   const profile = usePersonalProfile();
@@ -1458,7 +1453,7 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
-  const title = aiOpen ? 'AI로 초안 작성' : draft.mode === 'edit' ? '지출 수정' : '지출 입력';
+  const title = aiOpen ? 'AI로 초안 작성' : draft.mode === 'edit' ? '지출 수정' : '지출 추가';
   const showDeleteButton = draft.mode === 'edit' && Boolean(onDelete);
   const currentInitialStatus = draft.initialPaymentStatus ?? draft.paymentStatus;
   const deleteDisabledReason =
@@ -1475,11 +1470,11 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
       return null;
     }
 
-    const buttonClassName = cn('border-destructive/40 text-destructive hover:bg-destructive-tint hover:text-destructive', size === 'lg' && 'px-3.5');
+    const buttonClassName = cn('text-destructive hover:bg-destructive-tint hover:text-destructive', size === 'lg' && 'px-3.5');
 
     if (!deleteDisabledReason) {
       return (
-        <Button type="button" variant="outline" size={size} className={cn('shrink-0', buttonClassName)} onClick={() => onDelete?.(draft)}>
+        <Button type="button" variant="ghost" size={size} className={cn('mr-auto shrink-0', buttonClassName)} onClick={() => onDelete?.(draft)}>
           삭제
         </Button>
       );
@@ -1491,9 +1486,9 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
           <span
             tabIndex={0}
             aria-label={`삭제 불가: ${deleteDisabledReason}`}
-            className="inline-flex shrink-0 cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            className="mr-auto inline-flex shrink-0 cursor-not-allowed rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
           >
-            <Button type="button" variant="outline" size={size} disabled className={buttonClassName}>
+            <Button type="button" variant="ghost" size={size} disabled className={buttonClassName}>
               삭제
             </Button>
           </span>
@@ -1523,6 +1518,15 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
       return;
     }
     setShowFieldErrors(false);
+    if (draft.mode === 'edit' && draft.isFixedExpenseGenerated) {
+      const confirmed = await dialog.confirm({
+        title: '이 달 내역만 수정할까요?',
+        description: '변경 사항은 이 달 내역에만 반영되고 고정 지출 설정은 바뀌지 않아요.',
+        confirmText: '저장',
+        cancelText: '취소'
+      });
+      if (!confirmed) return;
+    }
     onSave(draft);
   };
 
@@ -1533,6 +1537,16 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
   };
 
   const aiContent = <ExpenseAiAssist draft={draft} onBack={() => setAiOpen(false)} onApplyCandidate={handleApplyAiCandidate} />;
+  const handleOpenImport = () => {
+    if (onOpenImport) {
+      onOpenImport();
+      return;
+    }
+    void dialog.alert({
+      title: '카드 내역 가져오기',
+      description: 'CSV 또는 엑셀(.xlsx) 카드 이용 내역을 업로드해 일괄 등록합니다.'
+    });
+  };
 
   return (
     <ResponsiveOverlay open={open} onOpenChange={handleOpenChange}>
@@ -1543,7 +1557,7 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  aria-label="지출 입력으로 돌아가기"
+                  aria-label={`${draft.mode === 'edit' ? '지출 수정' : '지출 추가'}로 돌아가기`}
                   onClick={() => setAiOpen(false)}
                   className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
@@ -1559,8 +1573,16 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
           </div>
         ) : (
           <form onSubmit={(event) => void handleSubmit(event)} className={cn('flex min-h-0 flex-col gap-3', isMobile && 'flex-1')}>
-            <ResponsiveOverlayHeader>
-              <ResponsiveOverlayTitle>{title}</ResponsiveOverlayTitle>
+            <ResponsiveOverlayHeader className={draft.mode !== 'edit' ? 'pr-9' : undefined}>
+              <div className="flex items-center justify-between gap-2">
+                <ResponsiveOverlayTitle>{title}</ResponsiveOverlayTitle>
+                {draft.mode !== 'edit' ? (
+                  <Button type="button" variant="outline" size="sm" onClick={handleOpenImport} className="shrink-0 gap-1 px-2.5 text-xs">
+                    <Upload className="size-3.5 text-primary" />
+                    <span>카드 내역 가져오기</span>
+                  </Button>
+                ) : null}
+              </div>
               <ResponsiveOverlayDescription className="sr-only">지출 금액, 분류 분할, 납부 방식과 회수 금액을 입력합니다.</ResponsiveOverlayDescription>
             </ResponsiveOverlayHeader>
             <ResponsiveOverlayBody sheetClassName="pr-0.5" dialogClassName="max-h-[calc(100dvh-11rem)] pr-1">
@@ -1573,30 +1595,16 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
                 showFieldErrors={showFieldErrors}
               />
             </ResponsiveOverlayBody>
-            <ResponsiveOverlayFooter sheetClassName="flex-row gap-2" dialogClassName={showDeleteButton ? 'sm:justify-between' : undefined}>
-              {isMobile ? (
-                <>
-                  {renderDeleteButton('lg')}
-                  <Button type="button" variant="outline" size="lg" className="flex-1" onClick={() => handleOpenChange(false)}>
-                    취소
-                  </Button>
-                  <Button type="submit" variant="primary" size="lg" className="flex-1">
-                    지출 저장
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {renderDeleteButton('md')}
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" size="md" onClick={() => handleOpenChange(false)}>
-                      취소
-                    </Button>
-                    <Button type="submit" variant="primary" size="md">
-                      지출 저장
-                    </Button>
-                  </div>
-                </>
-              )}
+            <ResponsiveOverlayFooter sheetClassName="flex-row gap-2">
+              {renderDeleteButton('md')}
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="md" onClick={() => handleOpenChange(false)}>
+                  취소
+                </Button>
+                <Button type="submit" variant="primary" size="md">
+                  저장
+                </Button>
+              </div>
             </ResponsiveOverlayFooter>
           </form>
         )}
@@ -1691,7 +1699,7 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                aria-label="지출 입력으로 돌아가기"
+                aria-label={`${draft.mode === 'edit' ? '지출 수정' : '지출 추가'}로 돌아가기`}
                 onClick={() => setAiOpen(false)}
                 className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
@@ -1704,7 +1712,7 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
               aria-label="시안 닫기 안내"
               onClick={() =>
                 void dialog.alert({
-                  title: '지출 입력 시안',
+                  title: '지출 추가 시안',
                   description: '실제 화면에서는 닫기 버튼을 누르면 지출 내역 화면으로 돌아갑니다.'
                 })
               }
@@ -1734,20 +1742,39 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
           <div className="mx-auto h-1 w-10 rounded-full bg-border-strong md:hidden" />
 
           <div className="flex items-center justify-between gap-2">
-            <h1 className="text-base font-bold tracking-tight text-foreground md:text-lg">{draft.mode === 'edit' ? '지출 수정' : '지출 입력'}</h1>
-            <button
-              type="button"
-              aria-label="시안 닫기 안내"
-              onClick={() =>
-                void dialog.alert({
-                  title: '지출 입력 시안',
-                  description: '실제 화면에서는 닫기 버튼을 누르면 지출 내역 화면으로 돌아갑니다.'
-                })
-              }
-              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <X className="size-4" />
-            </button>
+            <h1 className="text-base font-bold tracking-tight text-foreground md:text-lg">{draft.mode === 'edit' ? '지출 수정' : '지출 추가'}</h1>
+            <div className="flex items-center gap-1.5">
+              {draft.mode !== 'edit' ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    void dialog.alert({
+                      title: '카드 내역 가져오기',
+                      description: 'CSV 또는 엑셀(.xlsx) 카드 이용 내역을 업로드해 일괄 등록합니다.'
+                    })
+                  }
+                  className="shrink-0 gap-1 px-2.5 text-xs"
+                >
+                  <Upload className="size-3.5 text-primary" />
+                  <span>카드 내역 가져오기</span>
+                </Button>
+              ) : null}
+              <button
+                type="button"
+                aria-label="시안 닫기 안내"
+                onClick={() =>
+                  void dialog.alert({
+                    title: '지출 추가 시안',
+                    description: '실제 화면에서는 닫기 버튼을 누르면 지출 내역 화면으로 돌아갑니다.'
+                  })
+                }
+                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
 
           <ExpenseFormFields key={preset} draft={draft} onChange={setDraft} idPrefix="preview-expense" onOpenAi={() => setAiOpen(true)} aiAppliedNotice={aiNotice} showFieldErrors={showFieldErrors} />
@@ -1757,7 +1784,7 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
               취소
             </Button>
             <Button type="submit" variant="primary" size="lg" className="flex-1 md:flex-none">
-              지출 저장
+              저장
             </Button>
           </div>
         </form>

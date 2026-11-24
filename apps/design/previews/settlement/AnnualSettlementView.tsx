@@ -366,6 +366,43 @@ const MobileExpenseAmounts = ({
   </>
 );
 
+export const AnnualSettlementNotice = ({ year }: { year: number }) => {
+  const example = useMemo(() => getAnnualExample(year), [year]);
+  const annualBudgetChecks = months.map((month) => {
+    const incomeItems = example.incomes.filter((income) => income.month === month);
+    const budgetItems = example.budgets.filter((budget) => budget.month === month);
+    if (!incomeItems.length) return { month, difference: null, missingBudget: false };
+    if (!ANNUAL_CATEGORIES.every((category) => budgetItems.some((budget) => budget.category === category.id))) return { month, difference: null, missingBudget: true };
+    return { month, difference: sum(incomeItems.map(annualIncomeNet)) - sum(budgetItems.map((budget) => budget.amount)), missingBudget: false };
+  });
+  const differenceMonths = annualBudgetChecks.flatMap((item) => (item.difference !== null && item.difference !== 0 ? [{ month: item.month, amount: item.difference }] : []));
+  const unverifiedMonths = annualBudgetChecks.filter((item) => item.missingBudget);
+
+  if (!differenceMonths.length && !unverifiedMonths.length) return null;
+
+  return (
+    <NoticeBox variant="warning" className="[&>svg]:mt-1">
+      {differenceMonths.length ? (
+        <details className="group">
+          <summary className="-my-2.5 flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 py-2.5 font-bold [&::-webkit-details-marker]:hidden">
+            <span>수입과 예산 간 {formatSignedWon(sum(differenceMonths.map((item) => item.amount)))} 차이가 있습니다.</span>
+            <ChevronDown aria-hidden="true" className="size-4 shrink-0 group-open:rotate-180" />
+          </summary>
+          <div className="mt-3 space-y-1">
+            {differenceMonths.map((item) => (
+              <div key={item.month} className="flex justify-between gap-3 tabular-nums">
+                <span>{item.month}월</span>
+                <strong>{formatSignedWon(item.amount)}</strong>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+      {unverifiedMonths.length ? <p>예산 미확인 {unverifiedMonths.length}개월</p> : null}
+    </NoticeBox>
+  );
+};
+
 export const AnnualSettlementView = ({ year, ownerSelection }: { year: number; ownerSelection: OwnerId[] | null }) => {
   const [categories, setCategories] = useState<AnnualCategory[]>(() => ANNUAL_CATEGORIES.map((item) => item.id));
   const [categoryChartOpen, setCategoryChartOpen] = useState(false);
@@ -386,15 +423,6 @@ export const AnnualSettlementView = ({ year, ownerSelection }: { year: number; o
   const deductionTotal = incomes.length && incomes.every((income) => income.deductions.length) ? sum(incomes.flatMap((income) => income.deductions.map((item) => item.amount))) : null;
   const expenseTotal = sumOrNull(expenses.map((expense) => expense.amount));
   const annualBalance = annualIncomeExpenseChange(incomes, expenses, example.remainingAsOfMonth);
-  const annualBudgetChecks = months.map((month) => {
-    const incomeItems = example.incomes.filter((income) => income.month === month);
-    const budgetItems = example.budgets.filter((budget) => budget.month === month);
-    if (!incomeItems.length) return { month, difference: null, missingBudget: false };
-    if (!ANNUAL_CATEGORIES.every((category) => budgetItems.some((budget) => budget.category === category.id))) return { month, difference: null, missingBudget: true };
-    return { month, difference: sum(incomeItems.map(annualIncomeNet)) - sum(budgetItems.map((budget) => budget.amount)), missingBudget: false };
-  });
-  const differenceMonths = annualBudgetChecks.flatMap((item) => (item.difference !== null && item.difference !== 0 ? [{ month: item.month, amount: item.difference }] : []));
-  const unverifiedMonths = annualBudgetChecks.filter((item) => item.missingBudget);
 
   useLayoutEffect(() => {
     const container = tableScrollRef.current;
@@ -433,28 +461,6 @@ export const AnnualSettlementView = ({ year, ownerSelection }: { year: number; o
 
   return (
     <div className="flex min-w-0 flex-col gap-stack-mobile lg:gap-stack-desktop">
-      {differenceMonths.length || unverifiedMonths.length ? (
-        <NoticeBox variant="warning" className="[&>svg]:mt-1">
-          {differenceMonths.length ? (
-            <details className="group">
-              <summary className="-my-2.5 flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 py-2.5 font-bold [&::-webkit-details-marker]:hidden">
-                <span>수입과 예산 간 {formatSignedWon(sum(differenceMonths.map((item) => item.amount)))} 차이가 있습니다.</span>
-                <ChevronDown aria-hidden="true" className="size-4 shrink-0 group-open:rotate-180" />
-              </summary>
-              <div className="mt-3 space-y-1">
-                {differenceMonths.map((item) => (
-                  <div key={item.month} className="flex justify-between gap-3 tabular-nums">
-                    <span>{item.month}월</span>
-                    <strong>{formatSignedWon(item.amount)}</strong>
-                  </div>
-                ))}
-              </div>
-            </details>
-          ) : null}
-          {unverifiedMonths.length ? <p>예산 미확인 {unverifiedMonths.length}개월</p> : null}
-        </NoticeBox>
-      ) : null}
-
       <h2 className="sr-only">{year}년 연간 결산</h2>
 
       <section aria-label="연간 요약">

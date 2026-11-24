@@ -574,10 +574,11 @@ export const DesignSystemShowcase = () => {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-foreground">PeriodPicker (월별 · 연도별)</span>
+                  <span className="text-xs font-semibold text-foreground">PeriodPicker (헤더용 ghost · 폼 입력용 outlined)</span>
                   <div className="flex flex-wrap items-center gap-2">
                     <PeriodPicker mode="month" value={periodMonth} onChange={setPeriodMonth} getCellStatus={getSampleMonthStatus} />
                     <PeriodPicker mode="year" value={periodYear} onChange={setPeriodYear} minYear={2022} maxYear={2028} />
+                    <PeriodPicker mode="month" variant="outlined" value={periodMonth} onChange={setPeriodMonth} getCellStatus={getSampleMonthStatus} />
                   </div>
                 </div>
 

@@ -308,37 +308,64 @@ export const AssetsPreview = () => {
     });
   };
 
+  const ownerFilter = (mobile: boolean) => (
+    <FilterMultiSelect
+      label="구성원"
+      options={ASSET_OWNER_ORDER}
+      selected={selectedOwners}
+      onChange={setSelectedOwners}
+      renderOption={(option) => <MemberAvatar name={option} size="xs" />}
+      align="end"
+      variant={mobile ? 'ghost' : 'outlined'}
+      className={mobile ? 'min-h-11' : undefined}
+    />
+  );
+
+  const topNotice =
+    livingBudgetDiff !== 0 ? (
+      <NoticeBox variant="warning" className="items-center">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-medium text-foreground tabular-nums break-keep">
+            생활비 계좌·현금 예상 잔액이 11월 예산상 남은 생활비보다{' '}
+            <strong className="font-bold text-warning">
+              {formatWon(Math.abs(livingBudgetDiff))} {livingBudgetDiff > 0 ? '더 많아요' : '더 적어요'}
+            </strong>
+            .
+          </span>
+          <button
+            type="button"
+            onClick={() => setDiffDialogOpen(true)}
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-bold text-warning underline-offset-2 hover:underline"
+          >
+            <Calculator className="size-3.5" />
+            <span>계산 내역 보기</span>
+          </button>
+        </div>
+      </NoticeBox>
+    ) : null;
+
   return (
     <DesignAppShell
       activeNav="assets"
-      mobileHeaderLeft={<h1 className="truncate text-base font-bold tracking-tight text-foreground">자산 현황</h1>}
-      mobileHeaderRight={
+      title="자산 현황"
+      topNotice={topNotice}
+      mobileActions={
         <>
-          <FilterMultiSelect
-            label="구성원"
-            options={ASSET_OWNER_ORDER}
-            selected={selectedOwners}
-            onChange={setSelectedOwners}
-            renderOption={(option) => <MemberAvatar name={option} size="xs" />}
-            align="end"
-            className="min-h-11"
-          />
-          <Button variant="outline" size="icon" aria-label="가계부 설정에서 자산·카드 관리 안내" onClick={() => void handleOpenSettingsGuide()}>
+          {ownerFilter(true)}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-mr-2 text-muted-foreground hover:text-foreground"
+            aria-label="가계부 설정에서 자산·카드 관리 안내"
+            onClick={() => void handleOpenSettingsGuide()}
+          >
             <Settings className="size-4" />
           </Button>
         </>
       }
-      desktopHeaderLeft={<h1 className="text-lg font-bold tracking-tight text-foreground">자산 현황</h1>}
-      desktopHeaderRight={
+      desktopActions={
         <>
-          <FilterMultiSelect
-            label="구성원"
-            options={ASSET_OWNER_ORDER}
-            selected={selectedOwners}
-            onChange={setSelectedOwners}
-            renderOption={(option) => <MemberAvatar name={option} size="xs" />}
-            align="end"
-          />
+          {ownerFilter(false)}
           <Button variant="outline" size="md" onClick={() => void handleOpenSettingsGuide()} className="gap-1.5">
             <Settings className="size-4" />
             <span>자산·카드 설정</span>
@@ -346,29 +373,6 @@ export const AssetsPreview = () => {
         </>
       }
     >
-      {/* Top Page-level Living Budget Reconciliation Notice (directly below header) */}
-      {livingBudgetDiff !== 0 ? (
-        <NoticeBox variant="warning" className="items-center">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium text-foreground tabular-nums break-keep">
-              생활비 계좌·현금 예상 잔액이 11월 예산상 남은 생활비보다{' '}
-              <strong className="font-bold text-warning">
-                {formatWon(Math.abs(livingBudgetDiff))} {livingBudgetDiff > 0 ? '더 많아요' : '더 적어요'}
-              </strong>
-              .
-            </span>
-            <button
-              type="button"
-              onClick={() => setDiffDialogOpen(true)}
-              className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-bold text-warning underline-offset-2 hover:underline"
-            >
-              <Calculator className="size-3.5" />
-              <span>계산 내역 보기</span>
-            </button>
-          </div>
-        </NoticeBox>
-      ) : null}
-
       <section aria-label={`${summaryOwnerLabel} 자산 요약`} className="md:hidden">
         <SummaryHeroCard
           variant="hero"

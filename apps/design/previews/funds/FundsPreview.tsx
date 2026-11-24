@@ -22,7 +22,7 @@ import {
   SheetTitle,
   cn
 } from '@repo/ui-core';
-import { ArrowLeft, HelpCircle, Landmark, Pencil, SlidersHorizontal } from 'lucide-react';
+import { HelpCircle, Landmark, Pencil, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -400,35 +400,15 @@ export const FundsPreview = () => {
   return (
     <DesignAppShell
       activeNav="expenses"
+      title="지불 관리"
+      back={{ label: '지출 내역', ariaLabel: '지출 내역으로 돌아가기', onClick: () => navigateWithQuery('/preview/expenses') }}
+      periodControl={<PeriodPicker mode="month" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={monthCellStatus} />}
+      mobilePeriodInTitle
       onAddExpense={() => {
         setExpenseDraft(createEmptyExpensePreset(periodMonth));
         setExpenseSheetOpen(true);
       }}
-      mobileHeaderLeft={
-        <div className="flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
-            aria-label="지출 내역으로 돌아가기"
-            onClick={() => navigateWithQuery('/preview/expenses')}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" />
-          </button>
-          <h1 className="shrink-0 whitespace-nowrap text-base font-bold tracking-tight text-foreground">지불 관리</h1>
-          <PeriodPicker mode="month" size="compact" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={monthCellStatus} />
-        </div>
-      }
-      desktopHeaderLeft={
-        <div className="flex items-center gap-2.5">
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigateWithQuery('/preview/expenses')} className="gap-1 px-2 text-muted-foreground">
-            <ArrowLeft className="size-4" />
-            <span>지출 내역</span>
-          </Button>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">지불 관리</h1>
-          <PeriodPicker mode="month" value={periodMonth} onChange={(val) => void handlePeriodChange(val)} getCellStatus={monthCellStatus} />
-        </div>
-      }
-      desktopHeaderRight={
+      desktopActions={
         <Button type="button" variant="outline" size="md" onClick={() => navigateWithQuery('/preview/assets')} className="gap-1.5">
           <Landmark className="size-4" />
           <span>자산 현황 보기</span>
