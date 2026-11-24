@@ -32,52 +32,62 @@ import {
   useIsMobileView
 } from '@repo/ui-core';
 import { Check, ChevronDown, ChevronRight, CircleHelp, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useRef, useState, type ReactNode } from 'react';
 
+import { SettingsAssetsTab } from '@/previews/settings/SettingsAssetsTab';
+import { SettingsBudgetTab } from '@/previews/settings/SettingsBudgetTab';
+import { SettingsFixedTab } from '@/previews/settings/SettingsFixedTab';
+import {
+  SETTING_MENUS,
+  buildPreviewHref,
+  type FixedExpenseRuleRecord,
+  type FixedIncomeRuleRecord,
+  type LedgerAssetRecord,
+  type LedgerCardRecord,
+  type LedgerCategoryRecord,
+  type SettingTabKey
+} from '@/previews/settings/settings-model';
+import { updateSettingsStore, useSettingsStore, type SettingsMember, type SettingsRole } from '@/previews/settings/settings-store';
 import { DesignAppShell } from '@/shared/DesignAppShell';
 import { MemberAvatar } from '@/shared/MemberAvatar';
 import { MemberTaxSettings, useMemberBusinessSubView, type MemberBusinessSubView } from '@/shared/MemberTaxSettings';
 import { setTaxRecordingEnabled, useTaxRecordingEnabled } from '@/shared/design-ledger-settings';
 import { DESIGN_PROFILE_NAME, normalizeMemberBaseName, renameMemberTaxOwner, useAllMemberTaxStatuses, usePersonalBusinesses, usePersonalProfile } from '@/shared/design-personal-businesses';
 
-type Role = '소유자' | '관리자' | '구성원';
-type Member = { id: string; name: string; email: string; role: Role; pending?: boolean; linkedOutsider?: string };
+type Role = SettingsRole;
+type Member = SettingsMember;
 type OutsiderLinkMode = 'member' | 'pending' | 'invite';
-const initialMembers: Member[] = [
-  { id: 'me', name: '민지(나)', email: 'minji@example.com', role: '소유자' },
-  { id: 'two', name: '준호', email: 'junho@example.com', role: '관리자' },
-  { id: 'three', name: '서연', email: 'seoyeon@example.com', role: '구성원' },
-  { id: 'four', name: '초대 대기', email: 'family@example.com', role: '구성원', pending: true }
-];
 const sectionClass = 'rounded-xl border border-border bg-card p-4 sm:p-5';
 const labelClass = 'text-sm font-semibold text-foreground';
-const settingMenus = [
-  { value: 'assets', label: '자산 · 카드' },
-  { value: 'budget', label: '분류 · 예산' },
-  { value: 'fixed', label: '고정 수입 · 지출' },
-  { value: 'ledger', label: '가계부 관리' }
-] as const;
 
-export const SettingsPreview = () => {
+export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { activeTab?: SettingTabKey; previewQuery?: string } = {}) => {
   const isMobile = useIsMobileView();
-  const [tab, setTab] = useState('ledger');
+  const { ledgerName: name, members, outsiders, assets, cards, categories, fixedIncomes, fixedExpenses } = useSettingsStore();
+
+  const setName = (next: string) => updateSettingsStore((prev) => ({ ...prev, ledgerName: next }));
+  const setMembers = (updater: (prev: Member[]) => Member[]) => updateSettingsStore((prev) => ({ ...prev, members: updater(prev.members) }));
+  const setOutsiders = (updater: (prev: string[]) => string[]) => updateSettingsStore((prev) => ({ ...prev, outsiders: updater(prev.outsiders) }));
+  const setAssets = (updater: (prev: LedgerAssetRecord[]) => LedgerAssetRecord[]) => updateSettingsStore((prev) => ({ ...prev, assets: updater(prev.assets) }));
+  const setCards = (updater: (prev: LedgerCardRecord[]) => LedgerCardRecord[]) => updateSettingsStore((prev) => ({ ...prev, cards: updater(prev.cards) }));
+  const setCategories = (updater: (prev: LedgerCategoryRecord[]) => LedgerCategoryRecord[]) => updateSettingsStore((prev) => ({ ...prev, categories: updater(prev.categories) }));
+  const setFixedIncomes = (updater: (prev: FixedIncomeRuleRecord[]) => FixedIncomeRuleRecord[]) => updateSettingsStore((prev) => ({ ...prev, fixedIncomes: updater(prev.fixedIncomes) }));
+  const setFixedExpenses = (updater: (prev: FixedExpenseRuleRecord[]) => FixedExpenseRuleRecord[]) => updateSettingsStore((prev) => ({ ...prev, fixedExpenses: updater(prev.fixedExpenses) }));
+
   const [menuOpen, setMenuOpen] = useState(false);
   const membersSectionRef = useRef<HTMLElement>(null);
-  const [name, setName] = useState('우리집 가계부');
   const [draftName, setDraftName] = useState(name);
   const [editName, setEditName] = useState(false);
   const taxEnabled = useTaxRecordingEnabled();
   const personalProfile = usePersonalProfile();
   const memberTaxStatuses = useAllMemberTaxStatuses();
   const allBusinesses = usePersonalBusinesses();
-  const [members, setMembers] = useState(initialMembers);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [pendingInvitesOpen, setPendingInvitesOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('구성원');
   const [editMember, setEditMember] = useState<Member | null>(null);
   const [draftRole, setDraftRole] = useState('구성원');
-  const [outsiders, setOutsiders] = useState(['지은']);
   const [outsiderOpen, setOutsiderOpen] = useState(false);
   const [outsiderName, setOutsiderName] = useState('');
   const [editOutsider, setEditOutsider] = useState<string | null>(null);
@@ -103,7 +113,11 @@ export const SettingsPreview = () => {
     if (ok) setMembers((prev) => prev.filter((item) => item.id !== member.id));
     setEditMember(null);
   };
-  const isOwner = members.find((item) => item.id === 'me')?.role === '소유자';
+  const myRole = members.find((item) => item.id === 'me')?.role ?? '구성원';
+  const isOwner = myRole === '소유자';
+  const canConfigure = myRole === '소유자' || myRole === '관리자';
+  const ownerNames = participants.map((member) => member.name);
+  const actualUserNames = [...ownerNames, ...outsiders];
 
   const renderTaxBadges = (ownerName: string) => {
     if (!taxEnabled) return null;
@@ -546,34 +560,49 @@ export const SettingsPreview = () => {
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          aria-label={`설정 메뉴 선택, 현재 ${settingMenus.find((menu) => menu.value === tab)?.label}`}
+          aria-label={`설정 메뉴 선택, 현재 ${SETTING_MENUS.find((menu) => menu.value === activeTab)?.label}`}
           aria-haspopup="dialog"
           className="-mr-2 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-md px-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary-tint/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         >
-          {settingMenus.find((menu) => menu.value === tab)?.label}
+          {SETTING_MENUS.find((menu) => menu.value === activeTab)?.label}
           <ChevronDown className="size-4 text-primary" />
         </button>
       }
     >
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-        <Tabs variant="underline" value={tab} onValueChange={setTab} className="hidden md:block">
+        <Tabs variant="underline" value={activeTab} className="hidden md:block">
           <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="assets" className="flex-none">
-              자산 · 카드
-            </TabsTrigger>
-            <TabsTrigger value="budget" className="flex-none">
-              분류 · 예산
-            </TabsTrigger>
-            <TabsTrigger value="fixed" className="flex-none">
-              고정 수입 · 지출
-            </TabsTrigger>
-            <TabsTrigger value="ledger" className="flex-none">
-              가계부 관리
-            </TabsTrigger>
+            {SETTING_MENUS.map((menu) => (
+              <TabsTrigger key={menu.value} value={menu.value} asChild className="flex-none">
+                <Link href={buildPreviewHref(menu.href, previewQuery)}>{menu.label}</Link>
+              </TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
-        {tab !== 'ledger' ? (
-          <div className={`${sectionClass} py-16 text-center text-sm text-muted-foreground`}>이 메뉴의 시안은 준비 중이에요.</div>
+        {activeTab === 'assets' ? (
+          <SettingsAssetsTab owners={ownerNames} assets={assets} onAssetsChange={setAssets} cards={cards} onCardsChange={setCards} fixedIncomes={fixedIncomes} fixedExpenses={fixedExpenses} />
+        ) : activeTab === 'budget' ? (
+          <SettingsBudgetTab
+            canConfigure={canConfigure}
+            categories={categories}
+            onCategoriesChange={setCategories}
+            fixedIncomes={fixedIncomes}
+            fixedExpenses={fixedExpenses}
+            previewQuery={previewQuery}
+          />
+        ) : activeTab === 'fixed' ? (
+          <SettingsFixedTab
+            owners={ownerNames}
+            actualUsers={actualUserNames}
+            assets={assets}
+            cards={cards}
+            categories={categories}
+            fixedIncomes={fixedIncomes}
+            onFixedIncomesChange={setFixedIncomes}
+            fixedExpenses={fixedExpenses}
+            onFixedExpensesChange={setFixedExpenses}
+            previewQuery={previewQuery}
+          />
         ) : (
           <>
             <section className={sectionClass}>
@@ -834,20 +863,17 @@ export const SettingsPreview = () => {
             <SheetTitle>설정 메뉴</SheetTitle>
           </SheetHeader>
           <SheetBody className="gap-1 pb-3">
-            {settingMenus.map((menu) => (
-              <button
+            {SETTING_MENUS.map((menu) => (
+              <Link
                 key={menu.value}
-                type="button"
-                onClick={() => {
-                  setTab(menu.value);
-                  setMenuOpen(false);
-                }}
-                aria-current={tab === menu.value ? 'page' : undefined}
+                href={buildPreviewHref(menu.href, previewQuery)}
+                onClick={() => setMenuOpen(false)}
+                aria-current={activeTab === menu.value ? 'page' : undefined}
                 className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
               >
-                <span className={tab === menu.value ? 'text-primary' : 'text-foreground'}>{menu.label}</span>
-                {tab === menu.value ? <Check className="size-4 text-primary" aria-label="선택됨" /> : null}
-              </button>
+                <span className={activeTab === menu.value ? 'text-primary' : 'text-foreground'}>{menu.label}</span>
+                {activeTab === menu.value ? <Check className="size-4 text-primary" aria-label="선택됨" /> : null}
+              </Link>
             ))}
           </SheetBody>
         </SheetContent>

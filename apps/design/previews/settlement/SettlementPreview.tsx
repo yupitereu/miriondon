@@ -70,7 +70,7 @@ const getMonthCellStatus = ({ year, month }: { year: number; month?: number }): 
   return { disabled: true, tone: 'muted' };
 };
 
-export const SettlementPreview = () => {
+export const SettlementPreview = ({ initialBudgetOpen }: { initialBudgetOpen?: boolean } = {}) => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettlementTab>('monthly');
 
@@ -88,8 +88,17 @@ export const SettlementPreview = () => {
   const visibleCards = MONTHLY_CARDS.filter((card) => (isAllOwners || selectedOwners.has(card.owner)) && (cardCompanies.size === 0 || cardCompanies.has(card.company)));
   const previousMonth = addMonthsToPeriod(periodMonth, -1);
   const [budgetOverrides, setBudgetOverrides] = useState<Record<string, number>>({});
-  const [budgetEditOpen, setBudgetEditOpen] = useState(false);
-  const [budgetDraft, setBudgetDraft] = useState<Partial<Record<AnnualCategory, number | null>>>({});
+  const [budgetEditOpen, setBudgetEditOpen] = useState(() => Boolean(initialBudgetOpen));
+  const [budgetDraft, setBudgetDraft] = useState<Partial<Record<AnnualCategory, number | null>>>(() => {
+    if (!initialBudgetOpen) return {};
+    const initialMonthBudgets = getAnnualExample(2026).budgets.filter((entry) => entry.month === 11);
+    return Object.fromEntries(
+      ANNUAL_CATEGORIES.filter((category) => initialMonthBudgets.some((entry) => entry.category === category.id)).map((category) => [
+        category.id,
+        initialMonthBudgets.filter((entry) => entry.category === category.id).reduce((total, entry) => total + entry.amount, 0)
+      ])
+    );
+  });
   const [budgetError, setBudgetError] = useState('');
   const [budgetConfirming, setBudgetConfirming] = useState(false);
   const [budgetDetailsOpen, setBudgetDetailsOpen] = useState(false);
@@ -620,7 +629,10 @@ export const SettlementPreview = () => {
         onSubmit={handleSaveBudget}
         onManageCategories={() => {
           setBudgetEditOpen(false);
-          void dialog.alert({ title: '분류 관리', description: '가계부 설정의 분류 관리 화면은 아직 준비되지 않았어요.' });
+          const params = new URLSearchParams(window.location.search);
+          params.delete('openBudget');
+          const query = params.toString();
+          router.push(query ? `/preview/settings/budget?${query}` : '/preview/settings/budget');
         }}
       />
     </DesignAppShell>

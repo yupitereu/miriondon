@@ -37,7 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'expenses', pcLabel: '지출 내역', compactLabel: '지출', description: '월별 지출 내역·분할·할부 현황', icon: List, href: '/preview/expenses' },
   { key: 'income', pcLabel: '수입 내역', compactLabel: '수입', description: '월급·상여·기타 수입 기록 및 공제 확인', icon: Wallet, href: '/preview/income' },
   { key: 'assets', pcLabel: '자산 현황', compactLabel: '자산', description: '계좌·현금·저축·부채 보유금 갱신 및 대조', icon: Landmark, href: '/preview/assets' },
-  { key: 'settings', pcLabel: '가계부 설정', compactLabel: '설정', description: '카드·분류·고정 거래·구성원 관리', icon: Settings, href: '/preview/settings' }
+  { key: 'settings', pcLabel: '가계부 설정', compactLabel: '설정', description: '카드·고정 거래·분류·구성원 관리', icon: Settings, href: '/preview/settings/assets' }
 ];
 
 const MOBILE_PRIMARY_NAV_KEYS: AppNavKey[] = ['settlement', 'expenses', 'income'];
@@ -168,6 +168,8 @@ export const DesignAppShell = ({
 
     if (item?.href) {
       const params = new URLSearchParams(window.location.search);
+      params.delete('tab');
+      params.delete('openBudget');
       const query = params.toString();
       router.push(query ? `${item.href}?${query}` : item.href);
       return;

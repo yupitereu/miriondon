@@ -20,7 +20,10 @@ export const DEFAULT_PREVIEW_ROUTE: PreviewRoute = {
 
 export const PREVIEW_ROUTES: PreviewRoute[] = [
   DEFAULT_PREVIEW_ROUTE,
-  { id: 'settings', label: '가계부 설정', path: '/preview/settings', description: '가계부 관리 및 구성원·권한 시안' },
+  { id: 'settings-assets', label: '가계부 설정 · 자산·카드', path: '/preview/settings/assets', description: '구성원별 자산·부채 · 카드 3단계 등록 · 실적 조건 시안' },
+  { id: 'settings-fixed', label: '가계부 설정 · 고정 수입·지출', path: '/preview/settings/fixed', description: '매월 반복 고정 수입(지급·공제) 및 고정 지출 관리 시안' },
+  { id: 'settings-budget', label: '가계부 설정 · 분류·예산', path: '/preview/settings/budget', description: '한 단계 분류 · 고정 수입 대비 기본 예산 · 비활성화 정산 시안' },
+  { id: 'settings-ledger', label: '가계부 설정 · 가계부 관리', path: '/preview/settings/ledger', description: '가계부 기본 정보 · 세무정보 기록하기 · 참여/미참여 구성원 관리 시안' },
   { id: 'transaction-confirmation', label: '입출금 확인', path: '/preview/transaction-confirmation', description: '날짜가 지난 입금·지불 내역 확인 시안' },
   {
     id: 'expenses',
