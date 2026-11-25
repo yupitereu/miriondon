@@ -10,6 +10,7 @@
 - 시안에서는 레이아웃·반응형·카피·핵심 상태 전환 검증에 집중하고, 실서버 분기나 전체 월별 데이터 생성 같은 과도한 구현은 `apps/client` 단계로 미룹니다.
 - 신규 시안 제작 시 공용 패턴(`DesignAppShell`, `FilterMultiSelect`/`FilterSingleSelect`, `table-fixed` 표 규격, `?` `Popover` 안내)을 우선 재사용합니다.
 - `[필수]` 폼 유효성 검사·저장 실패 등 에러 안내는 하단 인라인 박스 대신 기본적으로 `dialog.alert`([`showValidationAlert`](../../apps/design/shared/design-validation.ts))로 표시하고, 실패 원인이 된 모든 폼 컨트롤(`Input`, `NumberInput`, `Select`, `DatePicker`, `PeriodPicker`)은 `invalid` prop으로 빨간 테두리(`border-destructive`)·`aria-invalid="true"`를 표시하며 수정 시 즉시 해제합니다([`docs/design-system.md` §3.3](../../docs/design-system.md#33-폼-유효성-검증--에러-표기)).
+- `[필수]` UI 문구와 설명에는 기능을 정의하는 과정의 변화·개선 내역·설계 결정 사항을 절대 작성하지 않으며, 불필요한 부연 설명·`NoticeBox` 없이 **사용자가 기능을 이용하는 데 꼭 필요한 안내만** 하나의 행동 흐름 안에서 중복 없이 크리티컬 액션 시점(저장·삭제·비활성화 확인 등)에 최대한 간결하게 표현합니다([`docs/design-system.md` §3.2](../../docs/design-system.md#32-검색--상세-필터--액션-카드--보조-안내-규격)).
 - 시안이 확정된 화면만 `apps/client`(FSD 구조) 본 화면으로 이관해 도메인 로직·API·Validation을 연결합니다. 여러 화면에 반복되는 도메인 중립 조합을 공용화할지는 [공용 패키지 규칙](shared-packages.md) 기준으로 판단합니다.
 
 ## 폴더 구조 (경량 시안별 Co-location)
@@ -25,12 +26,12 @@
 
 - `[필수]` 모든 시안 페이지는 `app/preview/<name>/page.tsx`에 배치하고 [`PreviewEntry`](../../apps/design/workbench/PreviewEntry.tsx)로 감싸 직접 접속 시에도 [`DesignWorkbench`](../../apps/design/workbench/DesignWorkbench.tsx)(`4단 비교` / `단독 보기` / Light·Dark 전환)로 열리도록 구성합니다.
 - `[필수]` 새 시안 경로는 [`PREVIEW_ROUTES`](../../apps/design/workbench/preview-routes.ts)에 등록해 워크벤치 시안 셀렉터에서 바로 전환할 수 있어야 합니다.
-- `4단 비교`(`320·375·768·1280px`)와 `단독 보기`(브라우저 창 크기 100% 맞춤)에서 잘림, 가로 오버플로우, 터치 영역(`44px`, `Checkbox` 열 최소 `48px`) 미달, `768px` 필터 줄바꿈·표 열 어긋남, 인터랙티브 요소 `cursor-pointer` 누락이 없는지 확인합니다.
+- 화면 배치·반응형·토큰 변경 시 실제 렌더링된 `4단 비교`(`320·375·768·1280px`)와 `단독 보기`에서 잘림, 가로 오버플로우, 터치 영역(`44px`, `Checkbox` 열 최소 `48px`) 미달, `768px` 필터 줄바꿈·표 열 어긋남, 인터랙티브 요소 `cursor-pointer` 누락을 확인합니다. Light/Dark 테마와 변경된 주요 상호작용도 확인합니다. 확인하지 못한 화면 크기·테마·상태는 완료 보고에 명시합니다.
 
 ## 검증
 
 ```bash
-pnpm exec prettier --check "apps/design/**/*.{ts,tsx,js,mjs,md}"
+pnpm exec prettier --check <변경한 파일>
 pnpm --filter miriondon-design lint
 pnpm --filter miriondon-design check-types
 pnpm --filter miriondon-design build # 라우팅, next.config, 의존성 변경 시

@@ -1531,14 +1531,14 @@
         actual: 2000000,
         assetAmounts: [2000000, 600000, 2000000, 2000000, 400000, 0, 0, 0],
         assetMeta: [
-          { name: '예시 생활비 계좌', type: '계좌', owner: '나', assetClass: '현금 · 수시입출금', living: true, time: '2026-11-04T09:00' },
-          { name: '예시 결제 계좌 A', type: '계좌', owner: '나', assetClass: '현금 · 수시입출금', living: false, time: '2026-11-04T09:00' },
+          { name: '예시 생활비 계좌', type: '계좌', owner: '나', assetClass: '현금·계좌', living: true, time: '2026-11-04T09:00' },
+          { name: '예시 결제 계좌 A', type: '계좌', owner: '나', assetClass: '현금·계좌', living: false, time: '2026-11-04T09:00' },
           { name: '예시 저축', type: '저축', owner: '나', assetClass: '저축 · 투자', time: '2026-11-04T09:00' },
           { name: '예시 대출', type: '부채', owner: '나', assetClass: '부채', time: '2026-11-04T09:00' },
-          { name: '예시 결제 계좌 B', type: '계좌', owner: '나', assetClass: '현금 · 수시입출금', living: false, time: '2026-11-04T09:00' },
-          { name: '현금', type: '현금', owner: '나', assetClass: '현금 · 수시입출금', time: '2026-11-04T09:00', systemCash: true },
-          { name: '현금', type: '현금', owner: '예시 구성원', assetClass: '현금 · 수시입출금', time: '2026-11-04T09:00', systemCash: true },
-          { name: '현금', type: '현금', owner: '예시 구성원 2', assetClass: '현금 · 수시입출금', time: '2026-11-04T09:00', systemCash: true }
+          { name: '예시 결제 계좌 B', type: '계좌', owner: '나', assetClass: '현금·계좌', living: false, time: '2026-11-04T09:00' },
+          { name: '현금', type: '현금', owner: '나', assetClass: '현금·계좌', time: '2026-11-04T09:00', systemCash: true },
+          { name: '현금', type: '현금', owner: '예시 구성원', assetClass: '현금·계좌', time: '2026-11-04T09:00', systemCash: true },
+          { name: '현금', type: '현금', owner: '예시 구성원 2', assetClass: '현금·계좌', time: '2026-11-04T09:00', systemCash: true }
         ],
         monthReset: false,
         transactions: [
@@ -1693,7 +1693,7 @@
           ],
           rules: [
             '시작 기준월은 과거 임의의 월도 선택 가능함.',
-            '첫 달 시작금액 자동 역산은 생활비 포함 계좌 + 현금만 포함(결제 전용 계좌 제외)하며 시작월 1일 기준·상태 기반으로 계산함.',
+            '첫 달 시작금액 자동 역산은 생활비 포함 계좌 + 현금만 포함하며 시작월 1일 기준·상태 기반으로 계산함.',
             '자산·계좌·잔액 대조는 가계부별로 완전 독립 관리함.',
             '잔액 차이 자체로 저장을 차단하지 않음.'
           ],
@@ -2380,7 +2380,7 @@
         return { cards, fixedExpenses, fixedIncomes, hasBalance, hasLinks };
       };
 
-      const assetClasses = ['현금 · 수시입출금', '저축 · 투자', '대여금 · 임차 보증금', '부채'];
+      const assetClasses = ['현금·계좌', '저축 · 투자', '대여금 · 임차 보증금', '부채'];
       const exampleCardTiers = [
         { threshold: '300000', benefit: '생활 영역 할인', limit: '10000' },
         { threshold: '600000', benefit: '생활 영역 할인', limit: '20000' },
@@ -2427,7 +2427,7 @@
         '금융 · 기타': ['연회비', '수수료', '이자', '연체료', '현금서비스', '카드론', '정부지원금', '무이자할부', '부분 무이자할부', '자동납부 수수료']
       };
       const assetTypesByClass = {
-        '현금 · 수시입출금': ['계좌', '외화'],
+        '현금·계좌': ['일반계좌', '외화'],
         '저축 · 투자': ['예·적금', '투자상품', '연금', '외화', '금', '부동산'],
         '대여금 · 임차 보증금': ['대여금', '임차 보증금'],
         부채: ['부채', '차입금', '임대 보증금']
@@ -2440,10 +2440,10 @@
         if (a.assetClass === '기타 자산') return '구분 확인 필요';
         if (a.assetClass) return a.assetClass;
         if (isDebtType(a.type)) return '부채';
-        if (a.type === '현금') return '현금 · 수시입출금';
+        if (a.type === '현금') return '현금·계좌';
         if (a.type === '계좌') return '구분 확인 필요';
         if (['저축', '투자', '예·적금', '투자상품', '연금', '금', '부동산', '임차 보증금'].includes(a.type)) return '저축 · 투자';
-        if (a.type === '외화') return '현금 · 수시입출금';
+        if (a.type === '외화') return '현금·계좌';
         return '구분 확인 필요';
       };
 
@@ -3309,7 +3309,7 @@
             ...(state.assetEditIndex != null ? [[a.owner, personName(a.owner)]] : [['나', personName('나')]]),
             ...(state.assetEditIndex == null && canManageMembers() ? (state.members || []).filter((m) => m.status === 'joined' && m.name !== personName('나')).map((m) => [m.name, m.name]) : [])
           ];
-          return `${heading()}<form id="asset-form" class="card"><fieldset class="asset-kind-group"><legend>자산 구분과 유형</legend><div class="grid">${select('asset-class', '자산 구분', a.systemCash ? ['현금 · 수시입출금'] : [['', '선택해 주세요'], ...assetClasses], state.assetEditIndex == null ? '' : assetClass(a))}${select('asset-type', '유형', assetTypeOptions(state.assetEditIndex == null ? '' : assetClass(a), state.assetEditIndex == null ? null : a), state.assetEditIndex == null ? '' : canonicalAssetType(a.type))}<div id="asset-holding-wrap" hidden>${select('asset-holding', '보유 형태', ['계좌', '실물'], a.holding || '계좌')}</div></div></fieldset>${field('asset-name', '표시명', a.name, 'text', 'required')}<div id="asset-living-wrap" hidden><label class="checks" style="margin:6px 0 12px"><input id="asset-living" type="checkbox" ${a.living === false ? '' : 'checked'} /> 생활비에 포함 (시작금액 역산 · 잔액 대조 기준, 결제 전용 계좌는 해제)</label></div><div id="asset-institution-wrap" hidden>${field('asset-institution', '금융사', a.institution || '')}</div><div id="asset-precious-fields" hidden><div class="grid"><div id="asset-currency-wrap">${field('asset-currency', '통화 코드', a.currency || '', 'text', 'maxlength="3" placeholder="USD"')}</div>${field('asset-quantity', '외화 잔액 · 금 보유량', a.quantity || '', 'text', 'inputmode="decimal"')}<div id="asset-unit-wrap">${select('asset-unit', '금 보유 단위', ['g', '돈', '트로이온스'], a.unit || 'g')}</div>${select(
+          return `${heading()}<form id="asset-form" class="card"><fieldset class="asset-kind-group"><legend>자산 구분과 유형</legend><div class="grid">${select('asset-class', '자산 구분', a.systemCash ? ['현금·계좌'] : [['', '선택해 주세요'], ...assetClasses], state.assetEditIndex == null ? '' : assetClass(a))}${select('asset-type', '유형', assetTypeOptions(state.assetEditIndex == null ? '' : assetClass(a), state.assetEditIndex == null ? null : a), state.assetEditIndex == null ? '' : canonicalAssetType(a.type))}<div id="asset-holding-wrap" hidden>${select('asset-holding', '보유 형태', ['계좌', '실물'], a.holding || '계좌')}</div></div></fieldset>${field('asset-name', '표시명', a.name, 'text', 'required')}<div id="asset-living-wrap" hidden><label class="checks" style="margin:6px 0 12px"><input id="asset-living" type="checkbox" ${a.living === false ? '' : 'checked'} /> 생활비에 포함 (시작금액 역산 · 잔액 대조 기준)</label></div><div id="asset-institution-wrap" hidden>${field('asset-institution', '금융사', a.institution || '')}</div><div id="asset-precious-fields" hidden><div class="grid"><div id="asset-currency-wrap">${field('asset-currency', '통화 코드', a.currency || '', 'text', 'maxlength="3" placeholder="USD"')}</div>${field('asset-quantity', '외화 잔액 · 금 보유량', a.quantity || '', 'text', 'inputmode="decimal"')}<div id="asset-unit-wrap">${select('asset-unit', '금 보유 단위', ['g', '돈', '트로이온스'], a.unit || 'g')}</div>${select(
             'asset-valuation',
             '평가 방식',
             [
@@ -3794,7 +3794,7 @@
           assigned += value;
           return value;
         });
-        return `<h2>첫 달 시작금액 · 전월 이월 기준</h2><div class="split-line"><div class="value">${won(currentStart)}</div>${button('setup-recalc-start', '현재 잔액 기준 자동 역산', 'small')}</div><div class="grid">${field('setup-start-total', '첫 달 총 시작금액(이월금) 직접 입력', currentStart, 'number', 'step="1" required')}</div><p class="caption">역산 근거: ${won(n.actual)} 현재 잔액 + ${won(n.future)} 미입금 − ${won(n.obligation)} 준비 필요 지출 − ${won(n.total)} 첫 달 예산 + ${won(n.expense)} 첫 달 지출</p>${notice('자동 역산은 생활비 포함 계좌 + 현금만 포함(결제 전용 계좌 제외)하며 시작월 1일·상태 기준이에요. 월 중 가입으로 1일~가입일 거래를 생략했다면 직접 수정해 주세요. 시작월 중에는 언제든 바꿀 수 있어요.')}<h3>분류별 시작금액 배분 · 수정 가능</h3><div class="grid">${categories.map((c, i) => field(`setup-allocation-${i}`, c, state.setup[`setup-allocation-${i}`] ?? parts[i], 'number', 'step="1" required')).join('')}</div><p class="caption">배분 합계는 시작금액과 같아야 해요. 예산이 0원인 항목은 직접 입력해 주세요.</p>`;
+        return `<h2>첫 달 시작금액 · 전월 이월 기준</h2><div class="split-line"><div class="value">${won(currentStart)}</div>${button('setup-recalc-start', '현재 잔액 기준 자동 역산', 'small')}</div><div class="grid">${field('setup-start-total', '첫 달 총 시작금액(이월금) 직접 입력', currentStart, 'number', 'step="1" required')}</div><p class="caption">역산 근거: ${won(n.actual)} 현재 잔액 + ${won(n.future)} 미입금 − ${won(n.obligation)} 준비 필요 지출 − ${won(n.total)} 첫 달 예산 + ${won(n.expense)} 첫 달 지출</p>${notice('자동 역산은 생활비 포함 계좌 + 현금만 포함하며 시작월 1일·상태 기준이에요. 월 중 가입으로 1일~가입일 거래를 생략했다면 직접 수정해 주세요. 시작월 중에는 언제든 바꿀 수 있어요.')}<h3>분류별 시작금액 배분 · 수정 가능</h3><div class="grid">${categories.map((c, i) => field(`setup-allocation-${i}`, c, state.setup[`setup-allocation-${i}`] ?? parts[i], 'number', 'step="1" required')).join('')}</div><p class="caption">배분 합계는 시작금액과 같아야 해요. 예산이 0원인 항목은 직접 입력해 주세요.</p>`;
       };
       const defaultSalaryRows = () => [
         { name: '기본급', amount: 3500000, kind: '지급', tax: '과세' },
@@ -5997,7 +5997,7 @@
           if (!difference) return;
           modal(
             '잔액 차이 확인',
-            `<p>생활비 계좌·현금 총액 ${won(accountCashTotal())}<br />+ 수입예정 ${won(assetInflow())}<br />− 지출예정 ${won(obligations())}<br />− 남은 생활비 ${won(remaining())}</p><p><strong>잔액 차이 ${difference > 0 ? '+' : ''}${won(difference)}</strong></p><p class="caption">결제 전용 계좌는 제외되며 지불·입금 완료 거래는 실제 잔액에 이미 반영된 것으로 간주해요. 수입예정에는 입금 예정 수입과 미회수 금액이 포함돼요.</p>`,
+            `<p>생활비 계좌·현금 총액 ${won(accountCashTotal())}<br />+ 수입예정 ${won(assetInflow())}<br />− 지출예정 ${won(obligations())}<br />− 남은 생활비 ${won(remaining())}</p><p><strong>잔액 차이 ${difference > 0 ? '+' : ''}${won(difference)}</strong></p><p class="caption">생활비에 포함하지 않은 계좌는 제외되며 지불·입금 완료 거래는 실제 잔액에 이미 반영된 것으로 간주해요. 수입예정에는 입금 예정 수입과 미회수 금액이 포함돼요.</p>`,
             'close-modal',
             '확인'
           );
@@ -6086,7 +6086,7 @@
             $('#asset-error').textContent = '부채 유형은 부채 구분으로 선택해 주세요.';
             return;
           }
-          if (existingAsset?.systemCash && classification !== '현금 · 수시입출금') return;
+          if (existingAsset?.systemCash && classification !== '현금·계좌') return;
           const counterpartyValue = hasCounterparty(kind) ? $('#asset-counterparty').value : '';
           const counterpartyName = counterpartyValue === 'manual' ? $('#asset-counterparty-manual').value.trim() : counterpartyValue.startsWith('person:') ? counterpartyValue.slice(7) : '';
           if (hasCounterparty(kind) && !counterpartyName) {

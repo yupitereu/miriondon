@@ -20,11 +20,10 @@ description: Create, update, and verify Miriondon screen previews, responsive la
    - `apps/design/app/preview/<name>/page.tsx`를 생성하고 [`PreviewEntry`](../../../apps/design/workbench/PreviewEntry.tsx)로 감싸 `iframe` 임베딩(`?embed=1`), 단독 탭(`?standalone=1`), 직접 접속(워크벤치 래핑)을 모두 지원합니다.
    - `apps/design/workbench/preview-routes.ts`의 `PREVIEW_ROUTES`에 시안 메타데이터를 추가합니다.
 3. **공통 제작 기준 검증**:
-   - `4단 비교`(`320·375·768·1280px`)에서 가로 오버플로우·텍스트 잘림 여부를 확인합니다(`320px` 카드·칩 말줄임 없음, `768px` 이상 검색·필터 1줄 가로 배치, 세로 복수 표 `table-fixed` 수직 열 일치).
-   - `단독 보기`에서 브라우저 창 크기 변화에 따른 `md:` / `lg:` 전환과 인터랙티브 요소 `cursor-pointer` 적용을 확인합니다.
-   - Light/Dark 테마 전환 시 대비·표면 계층(`--background` → `--card` → `--surface-elevated`)이 깨지지 않는지 확인합니다.
+   - 화면 배치·반응형·토큰 변경 시 실제 렌더링된 `4단 비교`(`320·375·768·1280px`)와 `단독 보기`에서 가로 오버플로우·텍스트 잘림, 터치 영역, 필터 줄바꿈, 표 정렬과 `cursor-pointer` 적용을 확인합니다.
+   - Light/Dark 테마의 대비·표면 계층과 변경된 주요 상호작용을 확인하고, 확인하지 못한 화면 크기·테마·상태는 완료 보고에 명시합니다.
    - 모든 금액·수치에 `tabular-nums`와 원화 정수 표기(음수는 유니코드 `−`)를, 거래일은 `MM.DD`와 할부 회차 분리 배지를 적용하고, 모바일 주요 터치 요소 최소 `44px` 높이 및 라벨 없는 `Checkbox` 열 최소 `48px` 폭을 유지합니다.
    - 호버 전용 툴팁 대신 `?` `Popover`를 사용하고, 모바일 하단 탭 2자·태블릿 레일 2자·PC 사이드바/전체 메뉴 시트 전체 명칭, 다이얼로그 버튼 2~4자 단일 단어 및 표준 도메인 용어·띄어쓰기(`docs/design-system.md` §5)를 준수합니다.
 4. **마무리 검증**:
-   - `prettier --check`, `pnpm --filter miriondon-design lint`, `pnpm --filter miriondon-design check-types`, `pnpm --filter miriondon-design build`를 실행합니다.
-   - 필요 시 실행 중인 개발 서버(`http://localhost:4100`)에서 실제 렌더링 스크린샷으로 `320·375·768·1280px` 화면 상태를 확인합니다.
+   - 변경한 파일의 `prettier --check`, `pnpm --filter miriondon-design lint`, `pnpm --filter miriondon-design check-types`를 실행합니다.
+   - 라우팅, `next.config`, 의존성을 변경한 경우 `pnpm --filter miriondon-design build`도 실행합니다.

@@ -70,6 +70,8 @@ pnpm exec prettier --write <변경한-파일들>
 - `[필수]` React 컴포넌트에는 `React.FC`·`React.forwardRef`·`React.ElementRef`·`Context.Provider`/`Consumer`·`defaultProps`/`propTypes`를 사용하지 않습니다. `ref`는 `React.ComponentProps` 기반 일반 prop으로 전달하고(`React.ComponentRef`는 꼭 필요한 경우에만 사용), Context는 `<Context value={...}>`로 직접 렌더링합니다.
 - `[권장]` React 컴포넌트 내부 선언 순서는 변수·state, custom hook·`useMemo`, `useCallback`·이벤트 핸들러, `useEffect` 순으로 둡니다.
 - `[필수]` 한 번만 쓰이는 코드를 의미 없이 공용 유틸리티나 컴포넌트로 추출하지 않습니다.
+- `[필수]` 모바일(`< 768px`)과 태블릿·PC(`>= 768px`)의 레이아웃이 다른 화면은 하나의 파일·컴포넌트에 두 벌 마크업을 혼재하지 않고 모바일 전용 컴포넌트와 태블릿·PC 전용 컴포넌트로 분리하는 것을 기본 원칙으로 합니다.
+- `[필수]` 두 뷰포트나 여러 화면에서 함께 사용할 수 있는 UI 블록과 도메인 계산·포맷팅·매핑 로직은 과도한 props 추상화가 되지 않는 선에서 최대한 공통 컴포넌트·모듈로 분리해 중복을 제거합니다.
 - `[필수]` 운영 코드에 `console.log`, `console.debug`를 남기지 않습니다. 진단용 `console.info`, `console.warn`, `console.error`는 의미 있는 메시지와 필요한 범위에서만 사용합니다.
 - `[필수]` `window`, `document`, `localStorage`, `sessionStorage`는 브라우저 실행이 보장되는 Client Component 또는 hook에서만 사용합니다.
 - `[필수]` App Router의 `'use client'`는 state, effect, event handler, 브라우저 API가 필요한 파일에만 추가하고 경계를 작게 유지합니다.
@@ -82,6 +84,14 @@ pnpm exec prettier --write <변경한-파일들>
 - `[필수]` Tailwind를 사용하는 파일은 해당 영역의 기존 className 그룹화와 정렬 방식을 유지합니다. 단순 포맷 목적으로 전체 className을 재정렬하지 않습니다.
 - `[필수]` 공용 UI가 맞는 경우 shadcn/ui 기반의 `@repo/ui-core`를 우선 사용하고, 한 화면 전용 조합은 앱 가까이에 둡니다.
 - `[필수]` shadcn/ui 컴포넌트는 실제 사용 사례가 생겼을 때만 `packages/ui-core`에 추가합니다. 사용 가능성이 있다는 이유로 컴포넌트 묶음을 미리 추가하지 않습니다.
+
+### 4.5 Next.js App Router 라우팅 및 성능
+
+- `[필수]` 내부 페이지 이동(사이드바·탭·카드 링크 등)에는 `<button onClick={() => router.push(...)}>` 대신 Next.js `<Link>`를 사용해 라우트 prefetch를 활성화합니다. `router.push`는 폼 제출 완료 후 이동이나 확인 절차 뒤의 명령형 리다이렉트에만 사용합니다.
+- `[필수]` 내비게이션 셸(`AppShell` 등)처럼 라우트 간 유지되는 공통 프레임은 개별 페이지 내부가 아니라 App Router `layout.tsx`에 배치해 페이지 전환 시 재마운트를 방지합니다.
+- `[필수]` 최상위 `app/layout.tsx` 및 정적 프리렌더 대상 라우트에서 `cookies()`, `headers()`, `searchParams`를 불필요하게 호출해 전체 라우트를 동적 SSR로 강제하지 않습니다. 세션·테마 등 동적 참조는 필요한 하위 세그먼트나 클라이언트 경계로 격리합니다.
+- `[권장]` 공통 레이아웃이나 초기 목록에 함께 걸리는 대형 폼·모달·차트·에디터는 정적 `import` 대신 `next/dynamic`으로 지연 로드해 초기 JS 번들과 하이드레이션 비용을 줄입니다.
+- `[권장]` 서버 조회가 동반되는 라우트 세그먼트에는 `loading.tsx` 또는 `Suspense` 경계를 두고, 독립 API 조회는 직렬 대기 대신 병렬 호출 또는 클라이언트 캐시를 활용합니다.
 
 ## 4. API와 데이터 접근
 

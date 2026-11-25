@@ -5,6 +5,7 @@
 - Core dev rules: [`.ai/dev-rule.md`](.ai/dev-rule.md)
 - Domain rules (finance/ledger): [`.ai/domain-rule.md`](.ai/domain-rule.md)
 - Git & commit rules: [`.ai/git-rule.md`](.ai/git-rule.md)
+- Design system: For UI design and implementation, consult the relevant sections of [`docs/design-system.md`](docs/design-system.md) for tokens, components, and responsive patterns.
 - Scope rules:
   - Client (`apps/client/**`): [`.ai/scopes/client.md`](.ai/scopes/client.md)
   - Design (`apps/design/**`): [`.ai/scopes/design.md`](.ai/scopes/design.md)
@@ -36,13 +37,15 @@ Documentation rule: When writing or updating documents (`docs/**`, `.ai/**`, `*.
 - **Objective Analysis & Blunt Critique**:
   - Strictly distinguish verified facts from assumptions. Ground explanations in real code, concrete data, and edge cases—never vague adjectives or baseless optimism.
   - Avoid noncommittal balance ("it depends") or unconditional agreement. If the user's premise has flaws, underappreciated risks, or inefficiencies, point them out bluntly and counter-propose a clear recommendation with tradeoffs.
+  - Evaluate the user's proposed change independently on its merits; never agree or disagree merely to accommodate the user's preference. State concrete reasons for the judgment.
 - **Minimal Changes with High Quality**:
   - Deliver minimal necessary diffs, but never write messy workarounds that sacrifice readability or stability.
 - **Tool Economy**:
   - Restrict research and tool calls to the minimum required for accuracy and completion. Stop immediately once sufficient evidence is found.
 - **Execution Control (Ask vs Execute)**:
+  - **User-Proposed Change**: When the user proposes a specific, actionable change and asks for an opinion, assess it independently. If you agree and the scope is clear, briefly explain why and implement it. If you disagree, explain the concern and a concrete alternative, then wait for the user's direction before making the disputed change. Treat explicit requests to only review or not modify as overriding this rule.
   - **Confirm First**: Stop and get explicit approval before modifying code (unless explicitly pre-approved/instructed by the user) for:
-    1. Pure opinion/review requests: Provide review and rationale only; do not modify code.
+    1. Pure questions or review requests without a proposed actionable change: Provide an answer or review and rationale only; do not modify code.
     2. Critical decision forks with diverging paths: Ask multiple-choice/short-answer questions with recommendations and tradeoffs.
     3. Fundamental refactoring or major structural changes: Brief `[Current Limitations vs Proposed Design]`.
   - **Execute Immediately**: For clear operational tasks outside the above three cases (or once approved), execute file edits, dependency installs, and build/lint/test commands immediately without asking permission ("Shall I edit?"), provided there is no critical security threat.
