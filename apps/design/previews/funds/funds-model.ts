@@ -223,6 +223,8 @@ export const getFundAccountMeta = (id: FundAccountId): FundAccountMeta => {
   return FUND_ACCOUNT_BY_ID[id];
 };
 
+export const requiresAccountTransfer = (account: FundAccountMeta): boolean => Boolean(account.isCash || !account.sameAsLivingBudget);
+
 export const computeFundAccountGroups = (items: FundTransactionItem[], adjustments: Record<FundAccountId, number>): FundAccountGroupSummary[] => {
   const byAccount = new Map<FundAccountId, { count: number; total: number; sourceIds: Set<string> }>();
 

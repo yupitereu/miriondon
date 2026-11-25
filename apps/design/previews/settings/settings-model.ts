@@ -1,5 +1,9 @@
 import { ASSET_GROUP_ORDER, type AssetGroupKey, type AssetMarketQuote } from '@/previews/assets/assets-model';
-import { createIncomeLines, type IncomeKind, type IncomeLine } from '@/previews/income/income-model';
+import { createIncomeLines, type IncomeDetails, type IncomeKind, type IncomeLine } from '@/previews/income/income-model';
+import { CASH_CURRENCY_OPTIONS, FX_CURRENCY_OPTIONS } from '@/shared/currency-options';
+import type { ExpenseTaxInfo } from '@/shared/expense-form/expense-form-model';
+
+export { CASH_CURRENCY_OPTIONS, FX_CURRENCY_OPTIONS };
 
 export type SettingTabKey = 'assets' | 'fixed' | 'budget' | 'ledger';
 
@@ -35,24 +39,16 @@ export type LedgerAssetRecord = {
   institution: string;
   group: AssetGroupKey;
   typeLabel: string;
+  currency?: string;
   owner: string;
   includeInLivingBudget: boolean;
   currentBalance: number;
   counterparty?: string;
   memo?: string;
   marketQuote?: AssetMarketQuote;
-  isDefaultCash?: boolean;
   inactive: boolean;
   updatedAt: string;
 };
-
-export const FX_CURRENCY_OPTIONS: ReadonlyArray<{ code: string; label: string; ratePerUnit: number }> = [
-  { code: 'USD', label: 'USD (미국 달러)', ratePerUnit: 1385 },
-  { code: 'JPY', label: 'JPY (일본 엔)', ratePerUnit: 9.1 },
-  { code: 'EUR', label: 'EUR (유로)', ratePerUnit: 1500 },
-  { code: 'CNY', label: 'CNY (중국 위안)', ratePerUnit: 192 },
-  { code: 'GBP', label: 'GBP (영국 파운드)', ratePerUnit: 1760 }
-];
 
 export const GOLD_UNIT_OPTIONS: ReadonlyArray<{ unit: string; label: string; ratePerUnit: number }> = [
   { unit: '돈', label: '돈 (3.75g)', ratePerUnit: 465000 },
@@ -61,14 +57,15 @@ export const GOLD_UNIT_OPTIONS: ReadonlyArray<{ unit: string; label: string; rat
 
 export const getReferenceRateForUnit = (kind: 'fx' | 'gold', unitLabel: string): number => {
   if (kind === 'fx') {
+    if (unitLabel === 'KRW') return 1;
     return FX_CURRENCY_OPTIONS.find((item) => item.code === unitLabel)?.ratePerUnit ?? 1385;
   }
   return GOLD_UNIT_OPTIONS.find((item) => item.unit === unitLabel)?.ratePerUnit ?? 465000;
 };
 
 export const ASSET_SUBTYPE_OPTIONS: Record<AssetGroupKey, readonly string[]> = {
-  'cash-liquid': ['입출금 계좌'],
-  'savings-invest': ['예·적금', '투자상품', '연금', '외화 계좌', '금', '부동산'],
+  'cash-liquid': ['일반계좌', '현금'],
+  'savings-invest': ['예·적금', '투자상품', '연금', '외화 계좌', '금 통장', '금 실물', '부동산'],
   'loan-deposit': ['임차 보증금', '대여금'],
   debt: ['일반 부채', '임대 보증금']
 };
@@ -216,7 +213,7 @@ export const INITIAL_LEDGER_ASSETS: LedgerAssetRecord[] = [
     name: '신한 쏠편한 입출금',
     institution: '신한은행',
     group: 'cash-liquid',
-    typeLabel: '입출금 계좌',
+    typeLabel: '일반계좌',
     owner: '민지(나)',
     includeInLivingBudget: true,
     currentBalance: 1920000,
@@ -229,7 +226,7 @@ export const INITIAL_LEDGER_ASSETS: LedgerAssetRecord[] = [
     name: 'KB 국민ONE 통장',
     institution: '국민은행',
     group: 'cash-liquid',
-    typeLabel: '입출금 계좌',
+    typeLabel: '일반계좌',
     owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 1100000,
@@ -242,12 +239,12 @@ export const INITIAL_LEDGER_ASSETS: LedgerAssetRecord[] = [
     name: '민지 현금',
     institution: '',
     group: 'cash-liquid',
-    typeLabel: '기본 원화 현금',
+    typeLabel: '현금',
+    currency: 'KRW',
     owner: '민지(나)',
     includeInLivingBudget: true,
     currentBalance: 180000,
     memo: '지갑 현금',
-    isDefaultCash: true,
     inactive: false,
     updatedAt: '11.03 21:10'
   },
@@ -317,7 +314,7 @@ export const INITIAL_LEDGER_ASSETS: LedgerAssetRecord[] = [
     name: '신한 주거래 통장',
     institution: '신한은행',
     group: 'cash-liquid',
-    typeLabel: '입출금 계좌',
+    typeLabel: '일반계좌',
     owner: '준호',
     includeInLivingBudget: false,
     currentBalance: 620000,
@@ -330,11 +327,11 @@ export const INITIAL_LEDGER_ASSETS: LedgerAssetRecord[] = [
     name: '준호 현금',
     institution: '',
     group: 'cash-liquid',
-    typeLabel: '기본 원화 현금',
+    typeLabel: '현금',
+    currency: 'KRW',
     owner: '준호',
     includeInLivingBudget: true,
     currentBalance: 0,
-    isDefaultCash: true,
     inactive: false,
     updatedAt: '11.01 09:00'
   },
@@ -355,11 +352,11 @@ export const INITIAL_LEDGER_ASSETS: LedgerAssetRecord[] = [
     name: '서연 현금',
     institution: '',
     group: 'cash-liquid',
-    typeLabel: '기본 원화 현금',
+    typeLabel: '현금',
+    currency: 'KRW',
     owner: '서연',
     includeInLivingBudget: true,
     currentBalance: 0,
-    isDefaultCash: true,
     inactive: false,
     updatedAt: '11.01 09:00'
   }
@@ -452,14 +449,29 @@ export const INITIAL_LEDGER_CARDS: LedgerCardRecord[] = [
   }
 ];
 
+export type CategoryFutureTransactionItem = {
+  id: string;
+  month: string;
+  title: string;
+  amount: number;
+};
+
 export type LedgerCategoryRecord = {
   id: string;
   name: string;
+  color?: number;
   defaultBudget: number;
   disabled: boolean;
   hasTransactions: boolean;
   hasFutureTransactions: boolean;
   hasActiveInstallments: boolean;
+  futureTransactionItems?: CategoryFutureTransactionItem[];
+  /** 올해 완료된 월(당월 제외) 기준 분류별 월평균 지출액 (없으면 null) */
+  yearlyMonthlyAverageSpend: number | null;
+  /** 당월(2026.11) 기준 배정 예산 */
+  currentMonthBudget: number;
+  /** 당월(2026.11) 기준 실지출 */
+  currentMonthSpent: number;
   /** 당월(2026.11) 기준 최종 잔여액 (전월 이월금 + 당월 예산 - 당월 지출). 0이 아니면 비활성화 시 상계 정산 필요 */
   currentMonthRemaining: number;
 };
@@ -467,17 +479,115 @@ export type LedgerCategoryRecord = {
 export const RECOMMENDED_CATEGORY_NAMES = ['의료/건강', '문화/여가', '교육', '반려동물'] as const;
 
 export const INITIAL_LEDGER_CATEGORIES: LedgerCategoryRecord[] = [
-  { id: 'cat-food', name: '식비', defaultBudget: 700000, disabled: false, hasTransactions: true, hasFutureTransactions: false, hasActiveInstallments: false, currentMonthRemaining: 120000 },
-  { id: 'cat-living', name: '생활/동물', defaultBudget: 400000, disabled: false, hasTransactions: true, hasFutureTransactions: false, hasActiveInstallments: false, currentMonthRemaining: -45000 },
-  { id: 'cat-housing', name: '주거/통신', defaultBudget: 600000, disabled: false, hasTransactions: true, hasFutureTransactions: false, hasActiveInstallments: false, currentMonthRemaining: 0 },
-  { id: 'cat-clothing', name: '의류', defaultBudget: 200000, disabled: false, hasTransactions: true, hasFutureTransactions: false, hasActiveInstallments: true, currentMonthRemaining: 80000 },
-  { id: 'cat-sub', name: '구독', defaultBudget: 150000, disabled: false, hasTransactions: true, hasFutureTransactions: false, hasActiveInstallments: false, currentMonthRemaining: 0 },
-  { id: 'cat-transport', name: '교통', defaultBudget: 300000, disabled: false, hasTransactions: true, hasFutureTransactions: true, hasActiveInstallments: false, currentMonthRemaining: 30000 },
-  { id: 'cat-hobby', name: '취미', defaultBudget: 100000, disabled: false, hasTransactions: false, hasFutureTransactions: false, hasActiveInstallments: false, currentMonthRemaining: 0 },
-  { id: 'cat-event', name: '경조사', defaultBudget: 0, disabled: true, hasTransactions: true, hasFutureTransactions: false, hasActiveInstallments: false, currentMonthRemaining: 0 }
+  {
+    id: 'cat-food',
+    name: '식비',
+    defaultBudget: 700000,
+    disabled: false,
+    hasTransactions: true,
+    hasFutureTransactions: false,
+    hasActiveInstallments: false,
+    yearlyMonthlyAverageSpend: 668000,
+    currentMonthBudget: 700000,
+    currentMonthSpent: 580000,
+    currentMonthRemaining: 120000
+  },
+  {
+    id: 'cat-living',
+    name: '생활/동물',
+    defaultBudget: 400000,
+    disabled: false,
+    hasTransactions: true,
+    hasFutureTransactions: false,
+    hasActiveInstallments: false,
+    yearlyMonthlyAverageSpend: 425000,
+    currentMonthBudget: 400000,
+    currentMonthSpent: 445000,
+    currentMonthRemaining: -45000
+  },
+  {
+    id: 'cat-housing',
+    name: '주거/통신',
+    defaultBudget: 600000,
+    disabled: false,
+    hasTransactions: true,
+    hasFutureTransactions: false,
+    hasActiveInstallments: false,
+    yearlyMonthlyAverageSpend: 610000,
+    currentMonthBudget: 600000,
+    currentMonthSpent: 600000,
+    currentMonthRemaining: 0
+  },
+  {
+    id: 'cat-clothing',
+    name: '의류',
+    defaultBudget: 200000,
+    disabled: false,
+    hasTransactions: true,
+    hasFutureTransactions: false,
+    hasActiveInstallments: true,
+    yearlyMonthlyAverageSpend: 165000,
+    currentMonthBudget: 200000,
+    currentMonthSpent: 120000,
+    currentMonthRemaining: 80000
+  },
+  {
+    id: 'cat-sub',
+    name: '구독',
+    defaultBudget: 150000,
+    disabled: false,
+    hasTransactions: true,
+    hasFutureTransactions: false,
+    hasActiveInstallments: false,
+    yearlyMonthlyAverageSpend: 138000,
+    currentMonthBudget: 150000,
+    currentMonthSpent: 150000,
+    currentMonthRemaining: 0
+  },
+  {
+    id: 'cat-transport',
+    name: '교통',
+    defaultBudget: 300000,
+    disabled: false,
+    hasTransactions: true,
+    hasFutureTransactions: true,
+    hasActiveInstallments: false,
+    futureTransactionItems: [{ id: 'fut-ktx-1', month: '2026.12', title: 'KTX 예매 (서울→부산)', amount: 59800 }],
+    yearlyMonthlyAverageSpend: 274000,
+    currentMonthBudget: 300000,
+    currentMonthSpent: 270000,
+    currentMonthRemaining: 30000
+  },
+  {
+    id: 'cat-hobby',
+    name: '취미',
+    defaultBudget: 100000,
+    disabled: false,
+    hasTransactions: false,
+    hasFutureTransactions: false,
+    hasActiveInstallments: false,
+    yearlyMonthlyAverageSpend: null,
+    currentMonthBudget: 0,
+    currentMonthSpent: 0,
+    currentMonthRemaining: 0
+  },
+  {
+    id: 'cat-event',
+    name: '경조사',
+    defaultBudget: 0,
+    disabled: true,
+    hasTransactions: true,
+    hasFutureTransactions: false,
+    hasActiveInstallments: false,
+    yearlyMonthlyAverageSpend: 95000,
+    currentMonthBudget: 0,
+    currentMonthSpent: 0,
+    currentMonthRemaining: 0
+  }
 ];
 
 export type BudgetAllocationRule = 'current' | 'next';
+export type TaxAttributionMonthRule = 'current' | 'previous';
 
 export type FixedIncomeRuleRecord = {
   id: string;
@@ -489,7 +599,9 @@ export type FixedIncomeRuleRecord = {
   day: number;
   budgetRule: BudgetAllocationRule;
   startMonth: string;
-  active: boolean;
+  attributionMonthRule?: TaxAttributionMonthRule;
+  businessId?: string;
+  details?: IncomeDetails;
   payments: IncomeLine[];
   deductions: IncomeLine[];
 };
@@ -506,7 +618,7 @@ export type FixedExpenseRuleRecord = {
   approvedAmount: number;
   discountAmount: number;
   performanceIncluded: boolean;
-  active: boolean;
+  taxInfo?: ExpenseTaxInfo;
 };
 
 export const INITIAL_FIXED_INCOMES: FixedIncomeRuleRecord[] = [
@@ -520,7 +632,7 @@ export const INITIAL_FIXED_INCOMES: FixedIncomeRuleRecord[] = [
     day: 10,
     budgetRule: 'current',
     startMonth: '2026-01',
-    active: true,
+    details: { employment: '상용근로' },
     payments: [
       { id: 'base-pay', itemId: 'base-pay', amount: '3500000', taxStatus: '과세' },
       { id: 'meal-nontaxable', itemId: 'meal-nontaxable', amount: '200000', taxStatus: '비과세' }
@@ -541,7 +653,7 @@ export const INITIAL_FIXED_INCOMES: FixedIncomeRuleRecord[] = [
     day: 25,
     budgetRule: 'next',
     startMonth: '2026-01',
-    active: true,
+    details: { employment: '상용근로' },
     payments: [{ id: 'base-pay', itemId: 'base-pay', amount: '3200000', taxStatus: '과세' }],
     deductions: createIncomeLines('근로소득', 'deductions')
   }
@@ -559,8 +671,7 @@ export const INITIAL_FIXED_EXPENSES: FixedExpenseRuleRecord[] = [
     startMonth: '2026-01',
     approvedAmount: 550000,
     discountAmount: 0,
-    performanceIncluded: false,
-    active: true
+    performanceIncluded: false
   },
   {
     id: 'fix-exp-2',
@@ -573,8 +684,7 @@ export const INITIAL_FIXED_EXPENSES: FixedExpenseRuleRecord[] = [
     startMonth: '2026-01',
     approvedAmount: 65000,
     discountAmount: 5000,
-    performanceIncluded: true,
-    active: true
+    performanceIncluded: true
   },
   {
     id: 'fix-exp-3',
@@ -587,8 +697,7 @@ export const INITIAL_FIXED_EXPENSES: FixedExpenseRuleRecord[] = [
     startMonth: '2026-03',
     approvedAmount: 14900,
     discountAmount: 0,
-    performanceIncluded: true,
-    active: false
+    performanceIncluded: true
   }
 ];
 

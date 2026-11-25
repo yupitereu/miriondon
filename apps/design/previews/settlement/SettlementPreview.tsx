@@ -21,13 +21,14 @@ import {
   TabsTrigger,
   cn
 } from '@repo/ui-core';
-import { AlertTriangle, ChartPie, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChartPie, ChevronDown, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type CSSProperties, type SubmitEvent } from 'react';
 
 import { IncomeDetails } from '@/previews/settlement/AnnualIncomeTable';
 import { AnnualSettlementNotice, AnnualSettlementView } from '@/previews/settlement/AnnualSettlementView';
 import { BudgetEditOverlay } from '@/previews/settlement/BudgetEditOverlay';
+import { MonthlyCardAccountPayments } from '@/previews/settlement/MonthlyCardAccountPayments';
 import { MonthlyCardPayments } from '@/previews/settlement/MonthlyCardPayments';
 import { MONTHLY_CHART_COLORS, MonthlySpendingChart } from '@/previews/settlement/MonthlySpendingChart';
 import { ANNUAL_CATEGORIES, ANNUAL_OWNERS, annualIncomeNet, getAnnualExample, type AnnualCategory, type AnnualOwner } from '@/previews/settlement/annual-settlement-data';
@@ -85,7 +86,10 @@ export const SettlementPreview = ({ initialBudgetOpen }: { initialBudgetOpen?: b
   const selectedOwnerLabels = selectedOwnerItems.map((item) => item.label);
   const selectedOwnerSummary = selectedOwnerLabels.length <= 2 ? selectedOwnerLabels.join(', ') : `${selectedOwnerLabels[0]} 외 ${selectedOwnerLabels.length - 1}개`;
   const ownerSelection: SettlementOwnerId[] | null = isAllOwners ? null : selectedOwnerIds;
-  const visibleCards = MONTHLY_CARDS.filter((card) => (isAllOwners || selectedOwners.has(card.owner)) && (cardCompanies.size === 0 || cardCompanies.has(card.company)));
+  const ownerCards = MONTHLY_CARDS.filter((card) => isAllOwners || selectedOwners.has(card.owner));
+  const hasCreditCard = ownerCards.some((card) => card.kind === 'credit');
+  const cardCompanyOptions = [...new Set(ownerCards.map((card) => card.company))];
+  const visibleCards = ownerCards.filter((card) => cardCompanies.size === 0 || cardCompanies.has(card.company));
   const previousMonth = addMonthsToPeriod(periodMonth, -1);
   const [budgetOverrides, setBudgetOverrides] = useState<Record<string, number>>({});
   const [budgetEditOpen, setBudgetEditOpen] = useState(() => Boolean(initialBudgetOpen));
@@ -258,7 +262,8 @@ export const SettlementPreview = ({ initialBudgetOpen }: { initialBudgetOpen?: b
           title: '이대로 저장할까요?',
           description: budgetDifferenceSummary(budgetIncome - draftTotal),
           confirmText: '저장',
-          cancelText: '취소'
+          cancelText: '취소',
+          variant: 'destructive'
         });
       } finally {
         setBudgetConfirming(false);
@@ -296,7 +301,11 @@ export const SettlementPreview = ({ initialBudgetOpen }: { initialBudgetOpen?: b
       label="구성원"
       options={settlementOwnerOptions}
       selected={selectedOwners}
-      onChange={setSelectedOwners}
+      onChange={(nextOwners) => {
+        setSelectedOwners(nextOwners);
+        const availableCompanies = new Set(MONTHLY_CARDS.filter((card) => nextOwners.size === 0 || nextOwners.has(card.owner)).map((card) => card.company));
+        setCardCompanies((previous) => new Set([...previous].filter((company) => availableCompanies.has(company))));
+      }}
       renderOption={(option) => <MemberAvatar name={option} size="xs" />}
       align="end"
       variant={mobile ? 'ghost' : 'outlined'}
@@ -308,13 +317,10 @@ export const SettlementPreview = ({ initialBudgetOpen }: { initialBudgetOpen?: b
     activeTab === 'yearly' ? (
       <AnnualSettlementNotice year={periodYear} />
     ) : monthBudgets.length > 0 && monthIncomes.length > 0 && budgetIncome !== totals.budget ? (
-      <NoticeBox variant="warning" icon={null}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-2">
-            <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-            <p className="font-bold">{budgetDifferenceSummary(budgetIncome - totals.budget)}</p>
-          </div>
-          <button type="button" onClick={handleEditBudget} className="-my-2.5 inline-flex min-h-11 shrink-0 cursor-pointer items-center font-bold underline underline-offset-2">
+      <NoticeBox variant="warning">
+        <div className="flex items-start justify-between gap-3 leading-5">
+          <p className="min-w-0 font-bold">{budgetDifferenceSummary(budgetIncome - totals.budget)}</p>
+          <button type="button" onClick={handleEditBudget} className="inline-flex shrink-0 cursor-pointer font-bold underline underline-offset-2">
             예산 관리
           </button>
         </div>
@@ -375,7 +381,7 @@ export const SettlementPreview = ({ initialBudgetOpen }: { initialBudgetOpen?: b
                 <CardHeader className="flex flex-col gap-1 pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle>예산 · 지출</CardTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={handleEditBudget}>
+                    <Button type="button" variant="primary" size="sm" onClick={handleEditBudget}>
                       예산 관리
                     </Button>
                   </div>
@@ -570,42 +576,46 @@ export const SettlementPreview = ({ initialBudgetOpen }: { initialBudgetOpen?: b
 
           {monthIncomeSection}
 
-          <Card>
-            <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-3">
-              <CardTitle>카드 현황</CardTitle>
-              <div className="flex flex-wrap gap-2">
-                <FilterMultiSelect label="카드사" options={[...new Set(MONTHLY_CARDS.map((card) => card.company))]} selected={cardCompanies} onChange={setCardCompanies} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              {visibleCards.length ? (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {visibleCards.map(({ id, name, last4, owner, tiers, needsReview, performance, bills }) => (
-                    <CardPerformanceCard
-                      key={id}
-                      card={{
-                        id,
-                        name,
-                        tiers,
-                        needsReview,
-                        meta: (
-                          <span className="inline-flex flex-wrap items-center gap-1.5 tabular-nums">
-                            <MemberAvatar name={owner} size="xs" />
-                            <span>{last4}</span>
-                          </span>
-                        ),
-                        totalAmount: performance[formatYearMonth(periodMonth)] ?? null
-                      }}
-                      paymentSummary={<MonthlyCardPayments cardName={name} period={periodMonth} bills={bills} />}
-                      period={{ month: periodMonth.month, previousMonth: previousMonth.month, previousAmount: performance[formatYearMonth(previousMonth)] ?? null }}
-                    />
-                  ))}
+          <MonthlyCardAccountPayments cards={MONTHLY_CARDS} period={periodMonth} selectedOwners={isAllOwners ? null : selectedOwners} />
+
+          {hasCreditCard ? (
+            <Card>
+              <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-3">
+                <CardTitle>카드 현황</CardTitle>
+                <div className="flex flex-wrap gap-2">
+                  <FilterMultiSelect label="카드사" options={cardCompanyOptions} selected={cardCompanies} onChange={setCardCompanies} />
                 </div>
-              ) : (
-                <p className="py-4 text-center text-sm text-muted-foreground">조건에 맞는 카드가 없어요.</p>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent>
+                {visibleCards.length ? (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {visibleCards.map(({ id, name, last4, owner, tiers, needsReview, performance, bills }) => (
+                      <CardPerformanceCard
+                        key={id}
+                        card={{
+                          id,
+                          name,
+                          tiers,
+                          needsReview,
+                          meta: (
+                            <span className="inline-flex flex-wrap items-center gap-1.5 tabular-nums">
+                              <MemberAvatar name={owner} size="xs" />
+                              <span>{last4}</span>
+                            </span>
+                          ),
+                          totalAmount: performance[formatYearMonth(periodMonth)] ?? null
+                        }}
+                        paymentSummary={<MonthlyCardPayments cardName={name} period={periodMonth} bills={bills} />}
+                        period={{ month: periodMonth.month, previousMonth: previousMonth.month, previousAmount: performance[formatYearMonth(previousMonth)] ?? null }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-4 text-center text-sm text-muted-foreground">조건에 맞는 카드가 없어요.</p>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
         </TabsContent>
 
         <TabsContent value="yearly" className="mt-0 flex flex-col gap-3">

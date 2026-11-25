@@ -2,7 +2,7 @@
 
 import { EmptyState, FilterChipGroup, FilterMultiSelect, PeriodPicker, SummaryHeroCard, dialog, type PeriodMonthValue } from '@repo/ui-composition';
 import { Badge, Button, Card, SearchInput, Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader, SheetTitle, Tooltip, TooltipContent, TooltipTrigger, cn } from '@repo/ui-core';
-import { ChevronRight, Plus, Repeat, Settings, SlidersHorizontal } from 'lucide-react';
+import { Plus, Repeat, Settings, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode, type SubmitEvent } from 'react';
 
@@ -11,12 +11,15 @@ import { INCOME_KINDS, INCOME_OWNERS, INCOME_STATUSES, INITIAL_INCOMES, createIn
 import { BudgetEditOverlay, type BudgetEditCategoryItem, type BudgetEditPeriodTab } from '@/previews/settlement/BudgetEditOverlay';
 import { ANNUAL_CATEGORIES, getAnnualExample, type AnnualCategory } from '@/previews/settlement/annual-settlement-data';
 import { DesignAppShell } from '@/shared/DesignAppShell';
+import { FilterResetButton } from '@/shared/FilterResetButton';
 import { MemberAvatar } from '@/shared/MemberAvatar';
+import { SearchFilterToolbar } from '@/shared/SearchFilterToolbar';
+import { TransactionListHeader, TransactionMobileRow } from '@/shared/TransactionListLayout';
 import { formatWon } from '@/shared/design-format';
 
 const formatMonth = ({ year, month }: PeriodMonthValue) => `${year}-${String(month).padStart(2, '0')}`;
 const formatDate = (date: string) => date.slice(5).replace('-', '.');
-const statusBadge = (status: IncomeRecord['status']) => <Badge variant={status === '입금 완료' ? 'neutral' : 'wine'}>{status}</Badge>;
+const statusBadge = (status: IncomeRecord['status']) => <Badge variant={status === '입금 완료' ? 'positive' : 'wine'}>{status}</Badge>;
 const incomeDetailText = (record: IncomeRecord) => record.payer;
 const recurringIcon = (record: IncomeRecord) =>
   record.recurring ? (
@@ -32,7 +35,6 @@ const recurringIcon = (record: IncomeRecord) =>
 
 export const IncomePreview = () => {
   const router = useRouter();
-  const ownerAvatar = (owner: IncomeRecord['owner']) => <MemberAvatar name={owner} mode="icon-interactive" size="md" />;
   const [month, setMonth] = useState<PeriodMonthValue>({ year: 2026, month: 11 });
   const [incomes, setIncomes] = useState(INITIAL_INCOMES);
   const [editing, setEditing] = useState<IncomeRecord | null>(null);
@@ -51,7 +53,7 @@ export const IncomePreview = () => {
   const renderOwnerOption = (option: string): ReactNode => <MemberAvatar name={option} size="xs" />;
 
   const filters = [
-    { label: '수입 종류', options: INCOME_KINDS, selected: kinds, onChange: setKinds },
+    { label: '소득 분류', options: INCOME_KINDS, selected: kinds, onChange: setKinds },
     { label: '구성원', options: INCOME_OWNERS, selected: owners, onChange: setOwners, renderOption: renderOwnerOption },
     { label: '입금 상태', options: INCOME_STATUSES, selected: statuses, onChange: setStatuses }
   ];
@@ -287,7 +289,7 @@ export const IncomePreview = () => {
       }
     }
   };
-  const openFixedSettings = () => void dialog.alert({ title: '고정 수입 설정', description: '가계부 설정의 고정 수입 · 지출에서 관리해요.' });
+  const openFixedSettings = () => router.push(`/preview/settings/fixed${window.location.search}#fixed-income`);
 
   return (
     <DesignAppShell
@@ -311,7 +313,10 @@ export const IncomePreview = () => {
         <SummaryHeroCard
           variant="hero-income"
           aria-label={activeFilters ? '검색 결과 수입 요약' : '월별 수입 요약'}
-          title={activeFilters ? '검색 결과 실수령액 합계' : '실수령액 합계'}
+          title="실수령액 합계"
+          action={
+            activeFilters ? <span className="rounded-full border border-hero-foreground/25 bg-hero-foreground/15 px-2.5 py-0.5 text-[11px] font-semibold text-hero-foreground">검색 결과</span> : null
+          }
           value={visibleIncomes.length ? formatWon(completed + planned) : '—'}
           mobileSummary={(summaryGroups[1] ?? []).map(({ label, amount }) => ({
             label,
@@ -328,134 +333,149 @@ export const IncomePreview = () => {
         />
       ) : null}
 
-      <section aria-label="수입 검색 및 필터" className="flex flex-wrap items-center gap-2">
-        <SearchInput size="md" value={search} onValueChange={setSearch} placeholder="내역 검색" aria-label="수입 내역 검색" wrapperClassName="min-w-0 flex-1 md:min-w-32 md:max-w-64" />
-        <Button variant="outline" size="sm" className={cn('min-h-11 shrink-0 md:hidden', filterCount > 0 && 'border-primary text-primary')} onClick={() => setFilterOpen(true)}>
-          <SlidersHorizontal className="size-4" /> 상세 검색{filterCount ? ` ${filterCount}` : ''}
-        </Button>
-        <div className="hidden items-center gap-2 md:flex">
-          {filters.map((filter) => (
-            <FilterMultiSelect key={filter.label} {...filter} />
-          ))}
-          {activeFilters ? (
-            <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={resetSearch}>
-              초기화
-            </Button>
-          ) : null}
-        </div>
-      </section>
+      <SearchFilterToolbar
+        ariaLabel="수입 검색 및 필터"
+        search={<SearchInput size="md" value={search} onValueChange={setSearch} placeholder="내역 검색" aria-label="수입 내역 검색" wrapperClassName="min-w-0 flex-1" />}
+        mobileAction={
+          <button
+            type="button"
+            aria-label={filterCount > 0 ? `상세 검색 ${filterCount}개 선택됨` : '상세 검색'}
+            onClick={() => setFilterOpen(true)}
+            className={cn(
+              'inline-flex min-h-control-md shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors md:hidden',
+              filterCount > 0 ? 'border-primary bg-primary-tint font-bold text-primary' : 'border-border-strong bg-card font-semibold text-foreground hover:bg-accent/40'
+            )}
+          >
+            <SlidersHorizontal className="size-4 shrink-0" />
+            <span className="hidden min-[360px]:inline">상세 검색</span>
+            {filterCount > 0 ? (
+              <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-extrabold text-primary-foreground tabular-nums">{filterCount}</span>
+            ) : null}
+          </button>
+        }
+        filters={
+          <>
+            {filters.map((filter) => (
+              <FilterMultiSelect key={filter.label} {...filter} />
+            ))}
+            {activeFilters ? <FilterResetButton onClick={resetSearch} /> : null}
+          </>
+        }
+        filtersClassName="md:gap-2"
+      />
 
       <Card padding="none" className="gap-0 overflow-hidden" aria-label="수입 목록">
-        <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5 md:px-4 md:py-3">
-          <h2 className="text-sm font-bold">수입 목록</h2>
-          <Badge variant="count" className="tabular-nums">
-            {visibleIncomes.length}건
-          </Badge>
-          <Button variant="outline" size="sm" aria-label="고정 수입 설정" className="relative ml-auto px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0 md:hidden" onClick={openFixedSettings}>
-            <Settings /> 고정 수입
-          </Button>
-        </div>
+        <TransactionListHeader
+          title="수입 목록"
+          count={visibleIncomes.length}
+          actions={
+            <Button variant="outline" size="sm" aria-label="고정 수입 설정" className="relative px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0" onClick={openFixedSettings}>
+              <Settings /> 고정 수입
+            </Button>
+          }
+        />
         {visibleIncomes.length ? (
           <>
             <ul className="divide-y divide-border md:hidden">
               {visibleIncomes.map((record) => {
                 const detailText = incomeDetailText(record);
+                const depositAccountName = getIncomeDepositAccountName(record.accountId);
                 return (
                   <li key={record.id}>
-                    <button
-                      type="button"
+                    <TransactionMobileRow
                       onClick={() => setEditing(record)}
-                      className="flex min-h-11 w-full cursor-pointer items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-muted/35 focus-visible:outline-2 focus-visible:outline-primary"
-                    >
-                      <span className="grid min-w-0 flex-1 gap-1">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className="min-w-0 text-sm font-bold break-keep">{record.title}</span>
-                          {recurringIcon(record)}
-                        </span>
-                        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      date={<span className="text-xs font-medium text-muted-foreground tabular-nums">{formatDate(record.date)}</span>}
+                      category={
+                        <Badge variant="neutral" className="max-w-full truncate">
+                          {record.kind}
+                        </Badge>
+                      }
+                      content={
+                        <div className="min-w-0 flex flex-col gap-0.5">
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <span className="truncate text-sm font-bold text-foreground">{record.title}</span>
+                            {recurringIcon(record)}
+                          </div>
+                          {detailText ? <span className="truncate text-xs text-muted-foreground">{detailText}</span> : null}
+                        </div>
+                      }
+                      amount={<strong className="shrink-0 text-sm font-extrabold text-income tabular-nums">{formatWon(netIncome(record))}</strong>}
+                      metadata={
+                        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                           <MemberAvatar name={record.owner} mode="icon-hover" size="xs" />
-                          <span className="shrink-0 tabular-nums">{formatDate(record.date)}</span>
-                          {detailText ? (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className="truncate">{detailText}</span>
-                            </>
-                          ) : null}
-                        </span>
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          {statusBadge(record.status)}
-                          <Badge variant="neutral">{record.kind}</Badge>
-                        </span>
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1">
-                        <strong className="text-sm whitespace-nowrap text-income tabular-nums">{formatWon(netIncome(record))}</strong>
-                        <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />
-                      </span>
-                    </button>
+                          <span className="truncate">{depositAccountName ?? '—'}</span>
+                        </div>
+                      }
+                      status={statusBadge(record.status)}
+                    />
                   </li>
                 );
               })}
             </ul>
-            <table className="hidden w-full table-fixed border-collapse text-sm md:table">
-              <thead className="bg-background text-xs text-muted-foreground">
-                <tr>
-                  <th scope="col" className="w-20 px-2 py-3 text-center font-medium whitespace-nowrap">
-                    입금일
-                  </th>
-                  <th scope="col" className="w-24 px-2 py-3 text-center font-medium whitespace-nowrap">
-                    소득 유형
-                  </th>
-                  <th scope="col" className="px-2 py-3 text-left font-medium">
-                    내용
-                  </th>
-                  <th scope="col" className="hidden px-2 py-3 text-left font-medium whitespace-nowrap lg:table-cell lg:w-44">
-                    입금 계좌
-                  </th>
-                  <th scope="col" className="w-16 px-2 py-3 text-center font-medium whitespace-nowrap lg:w-20">
-                    구성원
-                  </th>
-                  <th scope="col" className="w-22 px-2 py-3 text-center font-medium whitespace-nowrap lg:w-24">
-                    입금 상태
-                  </th>
-                  <th scope="col" className="w-28 py-3 pr-4 pl-2 text-right font-medium whitespace-nowrap lg:w-32">
-                    실수령액
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border border-t border-border">
-                {visibleIncomes.map((record) => {
-                  const detailText = incomeDetailText(record);
-                  const depositAccountName = getIncomeDepositAccountName(record.accountId);
-                  return (
-                    <tr key={record.id} className="hover:bg-muted/30">
-                      <td className="px-2 py-2.5 text-center tabular-nums">{formatDate(record.date)}</td>
-                      <td className="px-2 py-2.5 text-center whitespace-nowrap">
-                        <Badge variant="neutral">{record.kind}</Badge>
-                      </td>
-                      <td className="px-2 py-2.5">
-                        <button
-                          type="button"
-                          onClick={() => setEditing(record)}
-                          className="flex min-h-11 w-full cursor-pointer flex-col items-start justify-center gap-0.5 rounded-sm text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
-                        >
-                          <span className="flex max-w-full items-center gap-1.5">
-                            <span className="min-w-0 truncate font-bold">{record.title}</span>
-                            {recurringIcon(record)}
-                          </span>
-                          {detailText ? <span className="max-w-full truncate text-xs text-muted-foreground">{detailText}</span> : null}
-                        </button>
-                      </td>
-                      <td className="hidden truncate px-2 py-2.5 text-xs text-muted-foreground whitespace-nowrap lg:table-cell">{depositAccountName ?? '—'}</td>
-                      <td className="px-2 py-2.5 text-center">{ownerAvatar(record.owner)}</td>
-                      <td className="px-2 py-2.5 text-center whitespace-nowrap">{statusBadge(record.status)}</td>
-                      <td className="py-2.5 pr-4 pl-2 text-right whitespace-nowrap tabular-nums">
-                        <strong className="text-income">{formatWon(netIncome(record))}</strong>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full table-fixed border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs font-medium text-muted-foreground">
+                    <th scope="col" className="w-16 px-2 py-3 text-center font-medium text-muted-foreground whitespace-nowrap">
+                      입금일
+                    </th>
+                    <th scope="col" className="w-24 px-2 py-3 text-center font-medium text-muted-foreground whitespace-nowrap">
+                      소득 분류
+                    </th>
+                    <th scope="col" className="px-3 py-3 text-left font-medium text-muted-foreground">
+                      내용
+                    </th>
+                    <th scope="col" className="w-36 px-3 py-3 text-left font-medium text-muted-foreground whitespace-nowrap lg:w-44">
+                      입금 계좌 · 구성원
+                    </th>
+                    <th scope="col" className="w-24 px-3 py-3 text-center font-medium text-muted-foreground whitespace-nowrap">
+                      입금 상태
+                    </th>
+                    <th scope="col" className="w-28 py-3 pr-4 pl-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+                      실수령액
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {visibleIncomes.map((record) => {
+                    const detailText = incomeDetailText(record);
+                    const depositAccountName = getIncomeDepositAccountName(record.accountId);
+                    return (
+                      <tr key={record.id} onClick={() => setEditing(record)} className="cursor-pointer transition-colors hover:bg-muted/40">
+                        <td className="px-2 py-3.5 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">{formatDate(record.date)}</td>
+                        <td className="px-2 py-3.5 text-center align-middle whitespace-nowrap">
+                          <Badge variant="neutral" className="max-w-full truncate">
+                            {record.kind}
+                          </Badge>
+                        </td>
+                        <td className="min-w-0 px-3 py-3.5">
+                          <div className="flex min-w-0 flex-col gap-0.5">
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate font-bold text-foreground">{record.title}</span>
+                              {recurringIcon(record)}
+                            </div>
+                            {detailText ? <span className="truncate text-xs text-muted-foreground">{detailText}</span> : null}
+                          </div>
+                        </td>
+                        <td className="min-w-0 px-3 py-3.5">
+                          <div className="flex min-w-0 flex-col gap-0.5">
+                            <p className="truncate text-xs font-medium text-foreground">{depositAccountName ?? '—'}</p>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <MemberAvatar name={record.owner} mode="icon-hover" size="xs" />
+                              <span className="truncate text-xs text-muted-foreground">{record.owner}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3.5 text-center whitespace-nowrap">{statusBadge(record.status)}</td>
+                        <td className="py-3.5 pr-4 pl-2 text-right whitespace-nowrap tabular-nums">
+                          <strong className="font-extrabold text-income">{formatWon(netIncome(record))}</strong>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </>
         ) : (
           <EmptyState
@@ -463,7 +483,7 @@ export const IncomePreview = () => {
             actions={
               monthIncomes.length ? (
                 <Button variant="outline" size="sm" onClick={resetSearch}>
-                  초기화
+                  필터 초기화
                 </Button>
               ) : (
                 <Button variant="income" size="sm" onClick={addIncome}>

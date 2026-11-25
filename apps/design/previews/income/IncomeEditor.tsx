@@ -11,8 +11,8 @@ import {
   ResponsiveOverlayTitle,
   type PeriodMonthValue
 } from '@repo/ui-composition';
-import { Button, Input, NumberInput, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn, useIsMobileView } from '@repo/ui-core';
-import { ArrowLeft, ChevronDown, CircleHelp, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Button, Input, Popover, PopoverContent, PopoverTrigger, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn, useIsMobileView } from '@repo/ui-core';
+import { ArrowLeft, CircleHelp, Sparkles } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import { IncomeAiAssist } from '@/previews/income/IncomeAiAssist';
@@ -23,19 +23,20 @@ import {
   INCOME_KINDS,
   INCOME_OWNERS,
   INCOME_STATUSES,
-  TAX_OPTIONS,
   getIncomeDepositAccounts,
-  getIncomeLineItem,
   netIncome,
   sumIncomeLines,
+  type IncomeDetailKey,
   type IncomeLine,
   type IncomeRecord
 } from '@/previews/income/income-model';
+import { IncomeLineItemsEditor } from '@/shared/IncomeLineItemsEditor';
+import { IncomeTaxSection, resolveIncomeTaxMeta } from '@/shared/IncomeTaxSection';
 import { MemberAvatar } from '@/shared/MemberAvatar';
 import { isPastTransactionDate } from '@/shared/design-date';
 import { formatWon } from '@/shared/design-format';
 import { useTaxRecordingEnabled } from '@/shared/design-ledger-settings';
-import { isCurrentUserName, normalizeMemberBaseName, useAllMemberTaxStatuses, usePersonalBusinesses, usePersonalProfile } from '@/shared/design-personal-businesses';
+import { useAllMemberTaxStatuses, usePersonalBusinesses, usePersonalProfile } from '@/shared/design-personal-businesses';
 import { showValidationAlert } from '@/shared/design-validation';
 
 const sectionClassName = 'flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-3.5 md:p-4';
@@ -190,10 +191,22 @@ export const IncomeEditor = ({
   const [aiOpen, setAiOpen] = useState(false);
   const taxRecordingEnabled = useTaxRecordingEnabled();
   const profile = usePersonalProfile();
+  const allBusinesses = usePersonalBusinesses();
   const memberTaxStatuses = useAllMemberTaxStatuses();
-  const isOwnerWorker = isCurrentUserName(draft.owner, profile.name)
-    ? profile.taxStatus === 'worker'
-    : (memberTaxStatuses[draft.owner] ?? memberTaxStatuses[normalizeMemberBaseName(draft.owner)] ?? 'none') === 'worker';
+  const details = draft.details ?? {};
+  const { isOwnerWorker, selectedBusinessId, employmentInvalid, invalidServiceRange, invalidDetailAmountKeys } = resolveIncomeTaxMeta(
+    {
+      owner: draft.owner,
+      kind: draft.kind,
+      businessId: draft.businessId,
+      retainedRecordBusinessId: record.businessId,
+      details,
+      taxRecordingEnabled
+    },
+    profile,
+    allBusinesses,
+    memberTaxStatuses
+  );
   const [taxOpen, setTaxOpen] = useState(
     () =>
       Boolean(record.businessId) ||
@@ -210,18 +223,8 @@ export const IncomeEditor = ({
   const hasPositivePayment = draft.payments.some((row) => row.amount !== '' && validAmount(row.amount) && Number(row.amount) > 0);
   const hasAmounts = hasPositivePayment && validLines(draft.payments, 'payments', taxRecordingEnabled) && validLines(draft.deductions, 'deductions', taxRecordingEnabled) && net >= 0;
   const depositAccounts = getIncomeDepositAccounts(draft.owner);
-  const memberBusinesses = usePersonalBusinesses().filter(({ owner }) => owner === draft.owner);
-  const availableBusinesses = memberBusinesses.filter(({ active }) => active);
-  const retainedBusiness = memberBusinesses.find(({ id, active }) => !active && id === draft.businessId && id === record.businessId);
-  const businessId = availableBusinesses.some(({ id }) => id === draft.businessId) ? draft.businessId : retainedBusiness?.id;
-  const showEmploymentField = draft.kind === '근로소득' && isOwnerWorker;
-  const showBusinessField = draft.kind === '사업소득' && (availableBusinesses.length > 0 || Boolean(retainedBusiness));
-  const details = draft.details ?? {};
-  const employment = EMPLOYMENT_OPTIONS.find((option) => option === details.employment) ?? '';
-  const detailFields = INCOME_DETAIL_FIELDS[draft.kind].filter(({ key }) => key !== 'vatAmount' || details.vatStatus === '포함' || details.vatStatus === '별도');
-  const activeDetailFields = taxRecordingEnabled ? detailFields : [];
   const update = <K extends keyof IncomeRecord>(key: K, value: IncomeRecord[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  const updateDetail = (key: keyof typeof details, value: string) => {
+  const updateDetail = (key: IncomeDetailKey, value: string) => {
     setDraft((current) => {
       const next = { ...current.details, [key]: value || undefined };
       if (key === 'vatStatus' && value !== '포함' && value !== '별도') delete next.vatAmount;
@@ -231,8 +234,6 @@ export const IncomeEditor = ({
 
   const paymentsOverflow = !Number.isSafeInteger(sumIncomeLines(draft.payments));
   const deductionsOverflow = !Number.isSafeInteger(sumIncomeLines(draft.deductions));
-  const invalidServiceRange = taxRecordingEnabled && Boolean(details.serviceStart && details.serviceEnd && details.serviceEnd < details.serviceStart);
-  const invalidDetailAmountKeys = new Set(activeDetailFields.filter(({ key, type }) => type === 'amount' && details[key] && !validAmount(details[key])).map(({ key }) => key));
   const paymentNameErrors = new Set(draft.payments.filter((row) => !row.itemId && !row.label?.trim()).map((row) => row.id));
   const paymentAmountErrors = new Set(
     draft.payments
@@ -262,7 +263,7 @@ export const IncomeEditor = ({
     month: !draft.month,
     attributionMonth: taxRecordingEnabled && !draft.attributionMonth,
     accountId: !depositAccounts.some((account) => account.id === draft.accountId),
-    employment: taxRecordingEnabled && showEmploymentField && !employment,
+    employment: employmentInvalid,
     invalidServiceRange,
     invalidDetailAmountKeys,
     paymentNameErrors,
@@ -308,7 +309,7 @@ export const IncomeEditor = ({
       return;
     }
     setShowFieldErrors(false);
-    finishWithExit(() => onSave({ ...draft, businessId: draft.kind === '사업소득' ? businessId : undefined, status: confirmDeposit ? '입금 완료' : draft.status }));
+    finishWithExit(() => onSave({ ...draft, businessId: draft.kind === '사업소득' ? selectedBusinessId : undefined, status: confirmDeposit ? '입금 완료' : draft.status }));
   };
 
   const fields = (
@@ -325,7 +326,7 @@ export const IncomeEditor = ({
         </div>
         <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
           <Field
-            label="수입 종류"
+            label="소득 분류"
             help={
               <dl className="divide-y divide-border">
                 {INCOME_KINDS.map((kind) => (
@@ -351,6 +352,7 @@ export const IncomeEditor = ({
                     details: kind === '근로소득' ? { employment: EMPLOYMENT_OPTIONS[0] } : undefined
                   };
                   setDraft({ ...draft, kind, ...next });
+                  setPaymentsOpen(true);
                   setDeductionsOpen(hasPositiveLine(next.deductions));
                   setTaxOpen(INCOME_DETAIL_FIELDS[kind].some(({ key }) => Boolean(next.details?.[key])));
                 }}
@@ -452,255 +454,54 @@ export const IncomeEditor = ({
           </Button>
         ) : null}
       </section>
-      {taxRecordingEnabled ? (
-        <section className={sectionClassName}>
-          <button
-            type="button"
-            aria-expanded={taxOpen}
-            onClick={() => setTaxOpen((open) => !open)}
-            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-          >
-            <h3 className="text-sm font-bold text-foreground">
-              세무 정보 <span className="text-xs font-medium text-muted-foreground">(선택)</span>
-            </h3>
-            <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-muted-foreground transition-transform', taxOpen && 'rotate-180')} />
-          </button>
-          {taxOpen ? (
-            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
-              <Field label="귀속월" help={'수입이 발생한 기간에 해당하는 연월을 입력해 주세요.\n입금일이나 예산 반영월과 다를 수 있어요.'}>
-                {(id) => (
-                  <PeriodPicker
-                    id={id}
-                    mode="month"
-                    size="default"
-                    value={parseMonth(draft.attributionMonth) ?? parseMonth(draft.month) ?? { year: new Date().getFullYear(), month: new Date().getMonth() + 1 }}
-                    invalid={Boolean(invalidFields?.attributionMonth)}
-                    onChange={(month) => {
-                      attributionManuallyChanged.current = true;
-                      update('attributionMonth', formatMonth(month));
-                    }}
-                    className="min-w-0"
-                  />
-                )}
-              </Field>
-              {showEmploymentField ? (
-                <Field label="근로 구분">
-                  {(id) => (
-                    <Choice
-                      id={id}
-                      value={employment}
-                      options={EMPLOYMENT_OPTIONS}
-                      onChange={(value) => updateDetail('employment', value)}
-                      placeholder="선택"
-                      required
-                      invalid={Boolean(invalidFields?.employment)}
-                    />
-                  )}
-                </Field>
-              ) : null}
-              {showBusinessField ? (
-                <Field label="사업자 (선택)">
-                  {(id) => (
-                    <Select value={businessId ?? 'unassigned'} onValueChange={(value) => update('businessId', value === 'unassigned' ? undefined : value)}>
-                      <SelectTrigger id={id} className="min-w-0">
-                        <SelectValue placeholder="선택 안 함" />
-                      </SelectTrigger>
-                      <SelectContent className="max-w-[var(--radix-select-content-available-width)]">
-                        <SelectItem value="unassigned">선택 안 함</SelectItem>
-                        {availableBusinesses.map((business) => (
-                          <SelectItem key={business.id} value={business.id} className="wrap-anywhere">
-                            {business.name}
-                            {business.businessNumber ? ` (${business.businessNumber})` : ''}
-                          </SelectItem>
-                        ))}
-                        {retainedBusiness ? (
-                          <SelectItem value={retainedBusiness.id} className="wrap-anywhere" disabled>
-                            {retainedBusiness.name} (사용 중지)
-                          </SelectItem>
-                        ) : null}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </Field>
-              ) : null}
-              {detailFields.map((field) => {
-                const value = details[field.key] ?? '';
-                return (
-                  <Field key={field.key} label={field.label}>
-                    {(id) => {
-                      if (field.type === 'choice') {
-                        return (
-                          <Choice id={id} value={value || '선택 안 함'} options={['선택 안 함', ...field.options]} onChange={(next) => updateDetail(field.key, next === '선택 안 함' ? '' : next)} />
-                        );
-                      }
-                      if (field.type === 'date') {
-                        const isInvalidServiceDate = Boolean(invalidFields?.invalidServiceRange) && (field.key === 'serviceStart' || field.key === 'serviceEnd');
-                        return (
-                          <DatePicker
-                            id={id}
-                            value={parseDate(value)}
-                            invalid={isInvalidServiceDate}
-                            onChange={(date) => updateDetail(field.key, formatDate(date))}
-                            presets={[]}
-                            clearable
-                            placeholder="날짜 선택"
-                            className="min-w-0"
-                          />
-                        );
-                      }
-                      if (field.type === 'amount') {
-                        return (
-                          <NumberInput
-                            id={id}
-                            invalid={Boolean(invalidFields?.invalidDetailAmountKeys.has(field.key))}
-                            value={value ? Number(value) : null}
-                            onValueChange={(amount) => updateDetail(field.key, amount === null ? '' : String(amount))}
-                          />
-                        );
-                      }
-                      return <Input id={id} value={value} onChange={(event) => updateDetail(field.key, event.target.value)} />;
-                    }}
-                  </Field>
-                );
-              })}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-      {(['payments', 'deductions'] as const).map((key) => {
-        const label = key === 'payments' ? '지급 항목' : '공제 항목';
-        const rows = draft[key];
-        const isExpanded = key === 'payments' ? paymentsOpen : deductionsOpen;
-        const toggleExpanded = () => (key === 'payments' ? setPaymentsOpen((open) => !open) : setDeductionsOpen((open) => !open));
-        const sectionSum = sumIncomeLines(rows);
-        const patchLine = (id: string, patch: Partial<IncomeLine>) =>
-          update(
-            key,
-            rows.map((row) => (row.id === id ? { ...row, ...patch } : row))
-          );
-        return (
-          <section key={key} className={sectionClassName}>
-            <button
-              type="button"
-              aria-expanded={isExpanded}
-              onClick={toggleExpanded}
-              className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-            >
-              <h3 className="text-sm font-bold text-foreground">{label}</h3>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="text-sm font-bold text-foreground tabular-nums">{Number.isSafeInteger(sectionSum) ? formatWon(sectionSum) : '—'}</span>
-                <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-muted-foreground transition-transform', isExpanded && 'rotate-180')} />
-              </span>
-            </button>
-            {isExpanded ? (
-              <div className="grid min-w-0 gap-2">
-                {rows.map((row) => {
-                  const item = getIncomeLineItem(draft.kind, key, row.itemId);
-                  const itemLabel = item?.label ?? row.label ?? '';
-                  const isCustom = !row.itemId;
-                  return (
-                    <div
-                      key={row.id}
-                      className={`grid items-center gap-1.5 ${
-                        key === 'payments' && taxRecordingEnabled
-                          ? isCustom
-                            ? 'grid-cols-[minmax(0,26%)_minmax(0,1fr)_3.75rem_1.75rem] min-[480px]:grid-cols-[minmax(0,34%)_minmax(0,1fr)_4.25rem_1.75rem]'
-                            : 'grid-cols-[minmax(0,34%)_minmax(0,1fr)_2.75rem] min-[480px]:grid-cols-[minmax(0,36%)_minmax(0,1fr)_2.75rem]'
-                          : isCustom
-                            ? 'grid-cols-[minmax(0,38%)_minmax(0,1fr)_1.75rem]'
-                            : 'grid-cols-[minmax(0,38%)_minmax(0,1fr)]'
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        {isCustom ? (
-                          <Input
-                            aria-label={`${label} ${itemLabel || '새 항목'} 이름`}
-                            placeholder="항목명"
-                            className="min-w-0 flex-1"
-                            invalid={Boolean((key === 'payments' ? invalidFields?.paymentNameErrors : invalidFields?.deductionNameErrors)?.has(row.id))}
-                            value={row.label ?? ''}
-                            onChange={(e) => patchLine(row.id, { label: e.target.value })}
-                          />
-                        ) : (
-                          <span className="block text-xs leading-tight font-medium text-foreground break-keep">{itemLabel}</span>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <NumberInput
-                          aria-label={`${itemLabel || label} 금액`}
-                          placeholder="금액 (원)"
-                          className="w-full min-w-0 text-right tabular-nums"
-                          invalid={Boolean((key === 'payments' ? invalidFields?.paymentAmountErrors : invalidFields?.deductionAmountErrors)?.has(row.id))}
-                          value={row.amount === '' ? null : Number(row.amount)}
-                          onValueChange={(value) => patchLine(row.id, { amount: value === null ? '' : String(value) })}
-                        />
-                      </div>
-                      {key === 'payments' && taxRecordingEnabled ? (
-                        <div className="flex min-w-0 justify-end">
-                          {isCustom ? (
-                            <Select value={row.taxStatus ?? '과세'} onValueChange={(value) => patchLine(row.id, { taxStatus: TAX_OPTIONS.find((option) => option === value) })}>
-                              <SelectTrigger
-                                aria-label={`${itemLabel || '추가 항목'} 과세 구분`}
-                                invalid={Boolean(invalidFields?.paymentTaxErrors.has(row.id))}
-                                className="w-[3.75rem] gap-0.5 px-1.5 text-xs min-[480px]:w-[4.25rem]"
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {TAX_OPTIONS.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : item?.taxStatus ? (
-                            <span
-                              className={`inline-flex h-6 w-11 items-center justify-center rounded-md px-1.5 text-[10px] font-semibold whitespace-nowrap ${
-                                item.taxStatus === '비과세' ? 'bg-primary-tint text-primary' : 'bg-muted text-muted-foreground'
-                              }`}
-                            >
-                              {item.taxStatus}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {isCustom ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="!size-7 !min-w-7 !min-h-7 p-0"
-                          aria-label={`${itemLabel || '추가 항목'} 삭제`}
-                          onClick={() =>
-                            update(
-                              key,
-                              rows.filter((candidate) => candidate.id !== row.id)
-                            )
-                          }
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      ) : null}
-                    </div>
-                  );
-                })}
-                <div className="flex justify-end pt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1"
-                    onClick={() => update(key, [...rows, { id: crypto.randomUUID(), label: '', amount: '0', ...(key === 'payments' ? { taxStatus: '과세' as const } : {}) }])}
-                  >
-                    <Plus className="size-3.5" /> {label} 추가
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </section>
-        );
-      })}
+      <IncomeTaxSection
+        owner={draft.owner}
+        kind={draft.kind}
+        businessId={draft.businessId}
+        retainedRecordBusinessId={record.businessId}
+        details={draft.details}
+        onBusinessIdChange={(next) => update('businessId', next)}
+        onDetailChange={updateDetail}
+        open={taxOpen}
+        onOpenChange={setTaxOpen}
+        invalidFields={invalidFields ?? undefined}
+        attributionMonthProps={{
+          value: draft.attributionMonth,
+          fallbackMonth: draft.month,
+          onChange: (ym) => {
+            attributionManuallyChanged.current = true;
+            update('attributionMonth', ym);
+          }
+        }}
+      />
+      <IncomeLineItemsEditor
+        key={draft.kind}
+        kind={draft.kind}
+        payments={draft.payments}
+        deductions={draft.deductions}
+        taxRecordingEnabled={taxRecordingEnabled}
+        expandedSections={{ payments: paymentsOpen, deductions: deductionsOpen }}
+        onExpandedChange={(section, expanded) => {
+          if (section === 'payments') setPaymentsOpen(expanded);
+          else setDeductionsOpen(expanded);
+        }}
+        errors={
+          invalidFields
+            ? {
+                payments: {
+                  name: invalidFields.paymentNameErrors,
+                  amount: invalidFields.paymentAmountErrors,
+                  taxStatus: invalidFields.paymentTaxErrors
+                },
+                deductions: {
+                  name: invalidFields.deductionNameErrors,
+                  amount: invalidFields.deductionAmountErrors
+                }
+              }
+            : undefined
+        }
+        onLinesChange={(section, rows) => update(section, rows)}
+      />
       <section className={cn(sectionClassName, 'gap-2 border-income/20 bg-income-tint')}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-foreground">실수령액</h3>
@@ -729,7 +530,6 @@ export const IncomeEditor = ({
   const aiContent = (
     <IncomeAiAssist
       draft={draft}
-      onBack={() => setAiOpen(false)}
       onApply={(next) => {
         setDraft(next);
         if (hasPositiveLine(next.payments)) setPaymentsOpen(true);

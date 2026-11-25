@@ -33,31 +33,20 @@ import {
   cn,
   useIsMobileView
 } from '@repo/ui-core';
-import { ArrowLeft, ChevronDown, CircleHelp, Plus, Sparkles, Upload, X } from 'lucide-react';
+import { ArrowLeft, CircleHelp, Plus, Sparkles, X } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 
 import { MemberAvatar } from '@/shared/MemberAvatar';
 import { formatWon } from '@/shared/design-format';
 import { setTaxRecordingEnabled, useTaxRecordingEnabled } from '@/shared/design-ledger-settings';
-import {
-  DESIGN_PROFILE_NAME,
-  isCurrentUserName,
-  normalizeMemberBaseName,
-  useAllMemberTaxStatuses,
-  usePersonalBusinesses,
-  usePersonalProfile,
-  type PersonalBusiness,
-  type PersonalTaxStatus
-} from '@/shared/design-personal-businesses';
+import { normalizeMemberBaseName, useAllMemberTaxStatuses, usePersonalBusinesses, usePersonalProfile } from '@/shared/design-personal-businesses';
 import { showValidationAlert } from '@/shared/design-validation';
 import { ExpenseAiAssist } from '@/shared/expense-form/ExpenseAiAssist';
+import { ExpenseTaxSection, resolveExpenseTaxEligibilityByMethod } from '@/shared/expense-form/ExpenseTaxSection';
 import {
   ACTUAL_USERS,
   CATEGORIES,
   DEPOSIT_ACCOUNTS,
-  EXPENSE_CASH_RECEIPT_OPTIONS,
-  EXPENSE_PROOF_OPTIONS,
-  EXPENSE_YEAR_END_TAX_OPTIONS,
   PAYMENT_METHOD_ITEMS,
   RECOVERY_PEOPLE,
   computeExpensePreview,
@@ -73,13 +62,9 @@ import {
   syncSingleSplitDraft,
   validateExpenseDraftDetailed,
   withAutoInstallmentPrincipal,
-  type ExpenseCashReceiptType,
   type ExpenseCategorySplit,
   type ExpenseDraft,
-  type ExpenseProofType,
   type ExpenseRecoveryItem,
-  type ExpenseTaxScope,
-  type ExpenseYearEndTaxType,
   type InstallmentType,
   type PaymentPlan,
   type PaymentStatus
@@ -100,30 +85,6 @@ export {
 
 const CUSTOM_RECOVERY_PERSON = '__custom__';
 
-const resolveExpenseTaxEligibility = (
-  draft: ExpenseDraft,
-  profile: { name: string; taxStatus: PersonalTaxStatus },
-  allBusinesses: readonly PersonalBusiness[],
-  memberTaxStatuses: Readonly<Record<string, PersonalTaxStatus>> = {}
-) => {
-  const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
-  const taxOwner = methodMeta.owner;
-  const isCurrentUser = isCurrentUserName(taxOwner, profile.name);
-  const normalizedOwner = normalizeMemberBaseName(taxOwner);
-  const taxOwnerStatus: PersonalTaxStatus = isCurrentUser ? profile.taxStatus : (memberTaxStatuses[taxOwner] ?? memberTaxStatuses[normalizedOwner] ?? 'none');
-  const ownerBusinesses = allBusinesses.filter(
-    (business) => business.active && (isCurrentUser ? business.owner === DESIGN_PROFILE_NAME : normalizeMemberBaseName(business.owner) === normalizeMemberBaseName(taxOwner))
-  );
-  const allowsYearEndTax = taxOwnerStatus === 'worker' || (taxOwnerStatus === 'dependent' && ownerBusinesses.length === 0);
-  const taxInfo = draft.taxInfo ?? {};
-  const retainedBusiness = allBusinesses.find(({ id, active }) => !active && id === taxInfo.businessId);
-  const selectedBusinessId = ownerBusinesses.some(({ id }) => id === taxInfo.businessId) ? taxInfo.businessId : retainedBusiness?.id;
-  const cashReceiptAllowed = methodMeta.kind !== 'card';
-  const showWorkerTax = allowsYearEndTax || Boolean(taxInfo.yearEndTaxType || (cashReceiptAllowed && taxInfo.cashReceiptType));
-  const showBusinessTax = ownerBusinesses.length > 0 || Boolean(retainedBusiness || taxInfo.isBusinessExpense);
-  return { ownerBusinesses, retainedBusiness, selectedBusinessId, cashReceiptAllowed, showWorkerTax, showBusinessTax };
-};
-
 type ExpenseFormFieldsProps = {
   draft: ExpenseDraft;
   onChange: (next: ExpenseDraft) => void;
@@ -140,13 +101,7 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
   const profile = usePersonalProfile();
   const allBusinesses = usePersonalBusinesses();
   const memberTaxStatuses = useAllMemberTaxStatuses();
-  const taxInfo = draft.taxInfo ?? {};
-  const { ownerBusinesses, retainedBusiness, selectedBusinessId, cashReceiptAllowed, showWorkerTax, showBusinessTax } = resolveExpenseTaxEligibility(draft, profile, allBusinesses, memberTaxStatuses);
-  const showTaxSection = taxRecordingEnabled && (showWorkerTax || showBusinessTax);
-  const dualTaxEligible = showWorkerTax && showBusinessTax;
-  const hasWorkerDetailValue = Boolean(taxInfo.yearEndTaxType || (cashReceiptAllowed && taxInfo.cashReceiptType));
-  const [taxTab, setTaxTab] = useState<ExpenseTaxScope>(() => (taxInfo.taxScope === 'business' || taxInfo.isBusinessExpense ? 'business' : 'worker'));
-  const activeTaxScope: ExpenseTaxScope = taxInfo.taxScope === 'business' || taxInfo.isBusinessExpense ? 'business' : taxInfo.taxScope === 'worker' || hasWorkerDetailValue ? 'worker' : taxTab;
+  const { showBusinessTax } = resolveExpenseTaxEligibilityByMethod({ owner: methodMeta.owner, methodKind: methodMeta.kind, taxInfo: draft.taxInfo }, profile, allBusinesses, memberTaxStatuses);
   const invalidFields = showFieldErrors ? validateExpenseDraftDetailed(draft, { checkTaxInfo: taxRecordingEnabled && showBusinessTax }).fieldErrors : null;
   const doneLocked = isCompletedEditLocked(draft);
   const laterRoundLocked = !doneLocked && draft.mode === 'edit' && draft.paymentPlan === 'installment' && (draft.initialInstallmentRound ?? draft.installmentRound ?? 1) >= 2;
@@ -154,26 +109,6 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
   const baseFieldsLocked = doneLocked || laterRoundLocked || siblingRoundsLocked;
   const recoveryLockedByInstallment = draft.paymentPlan === 'installment' && (draft.initialInstallmentRound ?? draft.installmentRound ?? 1) >= 2;
   const [discountExpanded, setDiscountExpanded] = useState(false);
-  const workerTaxActive = showWorkerTax && (!dualTaxEligible || activeTaxScope === 'worker');
-  const businessTaxActive = showBusinessTax && (dualTaxEligible ? activeTaxScope === 'business' : Boolean(taxInfo.isBusinessExpense));
-  const hasBusinessValue = Boolean(taxInfo.isBusinessExpense || selectedBusinessId || taxInfo.proofType || (taxInfo.inputVatAmount ?? 0) > 0);
-  const hasTaxInfoValue = Boolean((workerTaxActive && hasWorkerDetailValue) || (businessTaxActive && hasBusinessValue));
-  const hasTaxInfoError = Boolean(invalidFields?.businessId || invalidFields?.inputVatAmount);
-  const [taxExpanded, setTaxExpanded] = useState(() => hasTaxInfoValue);
-  const isTaxOpen = taxExpanded || hasTaxInfoError;
-
-  const handleSelectTaxTab = (nextScope: ExpenseTaxScope) => {
-    if (nextScope === activeTaxScope) {
-      return;
-    }
-    setTaxTab(nextScope);
-    if (draft.taxInfo) {
-      onChange({
-        ...draft,
-        taxInfo: undefined
-      });
-    }
-  };
   const installmentAllowed = isCreditCardMethod(methodMeta);
   const discountAllowed = methodMeta.kind === 'card';
   const hasDiscountValue = (draft.cardDiscount ?? 0) > 0 || draft.splits.some((row) => (row.discount ?? 0) > 0);
@@ -251,9 +186,6 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
           }))
         : draft.splits;
     const ownerChanged = normalizeMemberBaseName(nextMeta.owner) !== normalizeMemberBaseName(methodMeta.owner);
-    if (ownerChanged) {
-      setTaxTab('worker');
-    }
     const clearedCashReceiptTaxInfo =
       nextMeta.kind === 'card' && draft.taxInfo?.cashReceiptType
         ? !draft.taxInfo.yearEndTaxType && !draft.taxInfo.isBusinessExpense
@@ -330,208 +262,6 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
   const splitAdjLabel = splitAdjMode === 'discount' ? '할인 금액' : '이자·수수료';
   const splitAdjSum = hasSplitAdjColumn ? draft.splits.reduce((sum, row) => sum + Math.max(0, Math.trunc((splitAdjMode === 'discount' ? row.discount : row.installmentFee) ?? 0)), 0) : 0;
   const splitAdjDiff = splitAdjTotal - splitAdjSum;
-
-  const workerTaxFields = (
-    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`${idPrefix}-tax-yearend`} className="text-xs font-semibold text-foreground">
-          공제 구분
-        </label>
-        <Select
-          value={taxInfo.yearEndTaxType ?? '__none__'}
-          onValueChange={(value) => {
-            const nextYearEnd = value === '__none__' ? undefined : (value as ExpenseYearEndTaxType);
-            const nextCashReceipt = cashReceiptAllowed ? taxInfo.cashReceiptType : undefined;
-            const hasWorkerValue = Boolean(nextYearEnd || nextCashReceipt);
-            onChange({
-              ...draft,
-              taxInfo: dualTaxEligible
-                ? hasWorkerValue
-                  ? { taxScope: 'worker', yearEndTaxType: nextYearEnd, cashReceiptType: nextCashReceipt, isBusinessExpense: false }
-                  : undefined
-                : { ...taxInfo, yearEndTaxType: nextYearEnd }
-            });
-          }}
-        >
-          <SelectTrigger id={`${idPrefix}-tax-yearend`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">선택 안 함</SelectItem>
-            {EXPENSE_YEAR_END_TAX_OPTIONS.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {cashReceiptAllowed ? (
-        <div className="flex flex-col gap-1">
-          <label htmlFor={`${idPrefix}-tax-cash-receipt`} className="text-xs font-semibold text-foreground">
-            현금영수증
-          </label>
-          <Select
-            value={taxInfo.cashReceiptType ?? '__none__'}
-            onValueChange={(value) => {
-              const nextCashReceipt = value === '__none__' ? undefined : (value as ExpenseCashReceiptType);
-              const hasWorkerValue = Boolean(taxInfo.yearEndTaxType || nextCashReceipt);
-              onChange({
-                ...draft,
-                taxInfo: dualTaxEligible
-                  ? hasWorkerValue
-                    ? { taxScope: 'worker', yearEndTaxType: taxInfo.yearEndTaxType, cashReceiptType: nextCashReceipt, isBusinessExpense: false }
-                    : undefined
-                  : { ...taxInfo, cashReceiptType: nextCashReceipt }
-              });
-            }}
-          >
-            <SelectTrigger id={`${idPrefix}-tax-cash-receipt`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">선택 안 함</SelectItem>
-              {EXPENSE_CASH_RECEIPT_OPTIONS.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-    </div>
-  );
-
-  const businessTaxFields = (
-    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-      <div className="flex flex-col gap-1 md:col-span-2">
-        <label htmlFor={`${idPrefix}-tax-business`} className="text-xs font-semibold text-foreground">
-          사업자 <span className="text-primary">*</span>
-        </label>
-        <Select
-          value={selectedBusinessId ?? ''}
-          disabled={ownerBusinesses.length === 0 && !retainedBusiness}
-          onValueChange={(value) =>
-            onChange({
-              ...draft,
-              taxInfo: {
-                ...taxInfo,
-                ...(dualTaxEligible ? { taxScope: 'business' as const, isBusinessExpense: true } : {}),
-                businessId: value || undefined
-              }
-            })
-          }
-        >
-          <SelectTrigger id={`${idPrefix}-tax-business`} invalid={Boolean(invalidFields?.businessId)}>
-            <SelectValue placeholder={ownerBusinesses.length > 0 || retainedBusiness ? '사업자 선택' : '등록된 사업자 없음'} />
-          </SelectTrigger>
-          <SelectContent>
-            {ownerBusinesses.map((business) => (
-              <SelectItem key={business.id} value={business.id} className="wrap-anywhere">
-                {business.name}
-                {business.businessNumber ? ` (${business.businessNumber})` : ''}
-              </SelectItem>
-            ))}
-            {retainedBusiness ? (
-              <SelectItem value={retainedBusiness.id} disabled className="wrap-anywhere">
-                {retainedBusiness.name} (사용 중지)
-              </SelectItem>
-            ) : null}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`${idPrefix}-tax-proof`} className="text-xs font-semibold text-foreground">
-          적격증빙 구분
-        </label>
-        <Select
-          value={taxInfo.proofType ?? '__none__'}
-          onValueChange={(value) =>
-            onChange({
-              ...draft,
-              taxInfo: {
-                ...taxInfo,
-                ...(dualTaxEligible ? { taxScope: 'business' as const, isBusinessExpense: true } : {}),
-                proofType: value === '__none__' ? undefined : (value as ExpenseProofType)
-              }
-            })
-          }
-        >
-          <SelectTrigger id={`${idPrefix}-tax-proof`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">선택 안 함</SelectItem>
-            {EXPENSE_PROOF_OPTIONS.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor={`${idPrefix}-tax-vat`} className="text-xs font-semibold text-foreground">
-          매입 부가세
-        </label>
-        <NumberInput
-          id={`${idPrefix}-tax-vat`}
-          value={taxInfo.inputVatAmount ?? null}
-          invalid={Boolean(invalidFields?.inputVatAmount)}
-          onValueChange={(value) =>
-            onChange({
-              ...draft,
-              taxInfo: {
-                ...taxInfo,
-                ...(dualTaxEligible ? { taxScope: 'business' as const, isBusinessExpense: true } : {}),
-                inputVatAmount: value
-              }
-            })
-          }
-          suffix="원"
-          placeholder="0"
-        />
-      </div>
-    </div>
-  );
-
-  const businessTaxContent = (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {dualTaxEligible ? null : <span className="text-xs font-semibold text-muted-foreground">사업자 경비</span>}
-        <Checkbox
-          label="사업 경비로 기록"
-          checked={Boolean(taxInfo.isBusinessExpense)}
-          onCheckedChange={(checked) => {
-            const nextEnabled = checked === true;
-            if (!nextEnabled) {
-              if (dualTaxEligible) {
-                setTaxTab('business');
-              }
-              onChange({ ...draft, taxInfo: undefined });
-              return;
-            }
-            const matchedBusiness = ownerBusinesses[0];
-            onChange({
-              ...draft,
-              taxInfo: {
-                ...(dualTaxEligible ? { taxScope: 'business' as const } : {}),
-                isBusinessExpense: true,
-                businessId: selectedBusinessId ?? matchedBusiness?.id,
-                proofType: taxInfo.proofType,
-                inputVatAmount: taxInfo.inputVatAmount
-              }
-            });
-          }}
-        />
-      </div>
-      {taxInfo.isBusinessExpense ? businessTaxFields : null}
-    </div>
-  );
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -730,69 +460,16 @@ export const ExpenseFormFields = ({ draft, onChange, idPrefix = 'expense-form', 
       </section>
 
       {/* Section 2: 세무 정보 (선택 · 내 정보에 근로자/사업자 등록 시 노출) */}
-      {showTaxSection ? (
-        <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 md:p-4">
-          <button
-            type="button"
-            aria-expanded={isTaxOpen}
-            onClick={() => setTaxExpanded((open) => !open)}
-            className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-          >
-            <h3 className="text-sm font-bold text-foreground">
-              세무 정보 <span className="text-xs font-medium text-muted-foreground">(선택)</span>
-            </h3>
-            <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-muted-foreground transition-transform', isTaxOpen && 'rotate-180')} />
-          </button>
-
-          {isTaxOpen ? (
-            <div className="flex flex-col gap-3 border-t border-border pt-3">
-              {dualTaxEligible ? (
-                <>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex flex-wrap items-center justify-between gap-1">
-                      <span className="text-xs font-semibold text-foreground">적용 구분</span>
-                      <span className="text-[11px] text-muted-foreground">한 가지만 적용되며 항목 선택 시에만 저장돼요</span>
-                    </div>
-                    <div role="group" aria-label="적용 구분" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-0.5">
-                      {(
-                        [
-                          { value: 'worker', label: '근로자(부양가족)' },
-                          { value: 'business', label: '사업자' }
-                        ] as const
-                      ).map((option) => {
-                        const selected = activeTaxScope === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            aria-pressed={selected}
-                            onClick={() => handleSelectTaxTab(option.value)}
-                            className={cn(
-                              'min-h-8 rounded-md px-2 text-xs transition-colors',
-                              selected ? 'bg-card font-bold text-primary shadow-sm' : 'font-medium text-muted-foreground hover:text-foreground'
-                            )}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  {activeTaxScope === 'worker' ? workerTaxFields : null}
-                  {activeTaxScope === 'business' ? businessTaxContent : null}
-                </>
-              ) : showWorkerTax ? (
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground">근로자(부양가족)</span>
-                  {workerTaxFields}
-                </div>
-              ) : showBusinessTax ? (
-                businessTaxContent
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+      <ExpenseTaxSection
+        key={normalizeMemberBaseName(methodMeta.owner)}
+        owner={methodMeta.owner}
+        methodKind={methodMeta.kind}
+        taxInfo={draft.taxInfo}
+        onTaxInfoChange={(nextTaxInfo) => onChange({ ...draft, taxInfo: nextTaxInfo })}
+        idPrefix={idPrefix}
+        businessIdInvalid={Boolean(invalidFields?.businessId)}
+        inputVatInvalid={Boolean(invalidFields?.inputVatAmount)}
+      />
 
       {/* Section 3: 결제 금액 */}
       <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 md:p-4">
@@ -1440,16 +1117,16 @@ type ExpenseFormOverlayProps = {
   onDraftChange: (next: ExpenseDraft) => void;
   onSave: (draft: ExpenseDraft) => void;
   onDelete?: (draft: ExpenseDraft) => void;
-  onOpenImport?: () => void;
 };
 
-export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, onSave, onDelete, onOpenImport }: ExpenseFormOverlayProps) => {
+export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, onSave, onDelete }: ExpenseFormOverlayProps) => {
   const isMobile = useIsMobileView();
   const taxRecordingEnabled = useTaxRecordingEnabled();
   const profile = usePersonalProfile();
   const allBusinesses = usePersonalBusinesses();
   const memberTaxStatuses = useAllMemberTaxStatuses();
-  const { showBusinessTax } = resolveExpenseTaxEligibility(draft, profile, allBusinesses, memberTaxStatuses);
+  const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
+  const { showBusinessTax } = resolveExpenseTaxEligibilityByMethod({ owner: methodMeta.owner, methodKind: methodMeta.kind, taxInfo: draft.taxInfo }, profile, allBusinesses, memberTaxStatuses);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiNotice, setAiNotice] = useState<string | null>(null);
@@ -1536,17 +1213,7 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
     setAiOpen(false);
   };
 
-  const aiContent = <ExpenseAiAssist draft={draft} onBack={() => setAiOpen(false)} onApplyCandidate={handleApplyAiCandidate} />;
-  const handleOpenImport = () => {
-    if (onOpenImport) {
-      onOpenImport();
-      return;
-    }
-    void dialog.alert({
-      title: '카드 내역 가져오기',
-      description: 'CSV 또는 엑셀(.xlsx) 카드 이용 내역을 업로드해 일괄 등록합니다.'
-    });
-  };
+  const aiContent = <ExpenseAiAssist draft={draft} onApplyCandidate={handleApplyAiCandidate} />;
 
   return (
     <ResponsiveOverlay open={open} onOpenChange={handleOpenChange}>
@@ -1573,16 +1240,8 @@ export const ExpenseFormOverlay = ({ open, onOpenChange, draft, onDraftChange, o
           </div>
         ) : (
           <form onSubmit={(event) => void handleSubmit(event)} className={cn('flex min-h-0 flex-col gap-3', isMobile && 'flex-1')}>
-            <ResponsiveOverlayHeader className={draft.mode !== 'edit' ? 'pr-9' : undefined}>
-              <div className="flex items-center justify-between gap-2">
-                <ResponsiveOverlayTitle>{title}</ResponsiveOverlayTitle>
-                {draft.mode !== 'edit' ? (
-                  <Button type="button" variant="outline" size="sm" onClick={handleOpenImport} className="shrink-0 gap-1 px-2.5 text-xs">
-                    <Upload className="size-3.5 text-primary" />
-                    <span>카드 내역 가져오기</span>
-                  </Button>
-                ) : null}
-              </div>
+            <ResponsiveOverlayHeader>
+              <ResponsiveOverlayTitle>{title}</ResponsiveOverlayTitle>
               <ResponsiveOverlayDescription className="sr-only">지출 금액, 분류 분할, 납부 방식과 회수 금액을 입력합니다.</ResponsiveOverlayDescription>
             </ResponsiveOverlayHeader>
             <ResponsiveOverlayBody sheetClassName="pr-0.5" dialogClassName="max-h-[calc(100dvh-11rem)] pr-1">
@@ -1638,7 +1297,8 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
   const profile = usePersonalProfile();
   const allBusinesses = usePersonalBusinesses();
   const memberTaxStatuses = useAllMemberTaxStatuses();
-  const { showBusinessTax } = resolveExpenseTaxEligibility(draft, profile, allBusinesses, memberTaxStatuses);
+  const methodMeta = getPaymentMethodMeta(draft.paymentMethod);
+  const { showBusinessTax } = resolveExpenseTaxEligibilityByMethod({ owner: methodMeta.owner, methodKind: methodMeta.kind, taxInfo: draft.taxInfo }, profile, allBusinesses, memberTaxStatuses);
 
   const handleSelectPreset = (nextPreset: ExpensePreviewPreset) => {
     setPreset(nextPreset);
@@ -1726,7 +1386,6 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
             key={preset}
             draft={draft}
             defaultOpenReview={preset === 'ai-review'}
-            onBack={() => setAiOpen(false)}
             onApplyCandidate={(nextDraft, summary) => {
               setDraft(nextDraft);
               setAiNotice(summary);
@@ -1743,38 +1402,19 @@ export const ExpenseEditPreview = ({ initialPreset }: { initialPreset?: string }
 
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-base font-bold tracking-tight text-foreground md:text-lg">{draft.mode === 'edit' ? '지출 수정' : '지출 추가'}</h1>
-            <div className="flex items-center gap-1.5">
-              {draft.mode !== 'edit' ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    void dialog.alert({
-                      title: '카드 내역 가져오기',
-                      description: 'CSV 또는 엑셀(.xlsx) 카드 이용 내역을 업로드해 일괄 등록합니다.'
-                    })
-                  }
-                  className="shrink-0 gap-1 px-2.5 text-xs"
-                >
-                  <Upload className="size-3.5 text-primary" />
-                  <span>카드 내역 가져오기</span>
-                </Button>
-              ) : null}
-              <button
-                type="button"
-                aria-label="시안 닫기 안내"
-                onClick={() =>
-                  void dialog.alert({
-                    title: '지출 추가 시안',
-                    description: '실제 화면에서는 닫기 버튼을 누르면 지출 내역 화면으로 돌아갑니다.'
-                  })
-                }
-                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="시안 닫기 안내"
+              onClick={() =>
+                void dialog.alert({
+                  title: '지출 추가 시안',
+                  description: '실제 화면에서는 닫기 버튼을 누르면 지출 내역 화면으로 돌아갑니다.'
+                })
+              }
+              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
           </div>
 
           <ExpenseFormFields key={preset} draft={draft} onChange={setDraft} idPrefix="preview-expense" onOpenAi={() => setAiOpen(true)} aiAppliedNotice={aiNotice} showFieldErrors={showFieldErrors} />

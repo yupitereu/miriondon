@@ -568,6 +568,24 @@ export type ExpenseValidationFieldErrors = {
   inputVatAmount: boolean;
 };
 
+export const validateExpenseTaxInfo = (taxInfo: ExpenseTaxInfo | undefined, checkTaxInfo: boolean): { errors: string[]; businessId: boolean; inputVatAmount: boolean } => {
+  const errors: string[] = [];
+  let businessId = false;
+  let inputVatAmount = false;
+  const isBusinessTaxSelected = taxInfo?.taxScope === 'business' || Boolean(taxInfo?.isBusinessExpense);
+
+  if (checkTaxInfo && isBusinessTaxSelected && !taxInfo?.businessId) {
+    errors.push('사업 경비에 연결할 사업자를 선택해 주세요.');
+    businessId = true;
+  }
+  if (checkTaxInfo && isBusinessTaxSelected && (taxInfo?.inputVatAmount ?? 0) < 0) {
+    errors.push('매입 부가세는 0원 이상으로 입력해 주세요.');
+    inputVatAmount = true;
+  }
+
+  return { errors, businessId, inputVatAmount };
+};
+
 export const validateExpenseDraftDetailed = (draft: ExpenseDraft, options?: { checkTaxInfo?: boolean }): { errors: string[]; fieldErrors: ExpenseValidationFieldErrors } => {
   const checkTaxInfo = options?.checkTaxInfo ?? true;
   const errors: string[] = [];
@@ -745,14 +763,11 @@ export const validateExpenseDraftDetailed = (draft: ExpenseDraft, options?: { ch
     }
   }
 
-  const isBusinessTaxSelected = draft.taxInfo?.taxScope === 'business' || Boolean(draft.taxInfo?.isBusinessExpense);
-  if (checkTaxInfo && isBusinessTaxSelected && !draft.taxInfo?.businessId) {
-    errors.push('사업 경비에 연결할 사업자를 선택해 주세요.');
-    fieldErrors.businessId = true;
-  }
-  if (checkTaxInfo && isBusinessTaxSelected && (draft.taxInfo?.inputVatAmount ?? 0) < 0) {
-    errors.push('매입 부가세는 0원 이상으로 입력해 주세요.');
-    fieldErrors.inputVatAmount = true;
+  const taxValidation = validateExpenseTaxInfo(draft.taxInfo, checkTaxInfo);
+  if (taxValidation.errors.length > 0) {
+    errors.push(...taxValidation.errors);
+    fieldErrors.businessId = taxValidation.businessId;
+    fieldErrors.inputVatAmount = taxValidation.inputVatAmount;
   }
 
   return { errors, fieldErrors };

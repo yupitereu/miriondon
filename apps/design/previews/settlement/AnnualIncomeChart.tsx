@@ -36,7 +36,7 @@ export const AnnualIncomeChart = ({ records, availableKinds }: { records: Annual
   return (
     <div>
       <div className="mb-3">
-        <FilterMultiSelect label="수입 종류" options={kinds} selected={selectedKinds} onChange={setSelectedKinds} />
+        <FilterMultiSelect label="소득 분류" options={kinds} selected={selectedKinds} onChange={setSelectedKinds} />
       </div>
       {active.length ? (
         <>
@@ -49,13 +49,13 @@ export const AnnualIncomeChart = ({ records, availableKinds }: { records: Annual
             ))}
           </div>
           <div ref={wrapperRef} className="relative">
-            <div ref={viewportRef} className="max-w-full overflow-x-auto overscroll-x-contain" role="region" aria-label="수입 종류별 그래프, 좌우로 이동 가능" tabIndex={0}>
+            <div ref={viewportRef} className="max-w-full overflow-x-auto overscroll-x-contain" role="region" aria-label="소득 분류별 그래프, 좌우로 이동 가능" tabIndex={0}>
               <div className="min-w-[480px] md:min-w-[600px] lg:min-w-[720px]">
                 <div
                   ref={chartRef}
                   role="slider"
                   tabIndex={0}
-                  aria-label="수입 종류별 월별 금액, 방향키로 월 선택"
+                  aria-label="소득 분류별 월별 금액, 방향키로 월 선택"
                   aria-valuemin={1}
                   aria-valuemax={12}
                   aria-valuenow={(index ?? 0) + 1}
@@ -140,7 +140,7 @@ export const AnnualIncomeChart = ({ records, availableKinds }: { records: Annual
           </ul>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">수입 종류를 선택해 주세요.</p>
+        <p className="text-sm text-muted-foreground">소득 분류를 선택해 주세요.</p>
       )}
     </div>
   );

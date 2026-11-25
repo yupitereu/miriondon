@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge, Button, Checkbox, NoticeBox, cn } from '@repo/ui-core';
-import { ImagePlus, Loader2, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { FilePlus2, FileText, Loader2, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { formatWon } from '@/shared/design-format';
@@ -34,12 +34,11 @@ type AiDraftCandidate = {
 export type ExpenseAiAssistProps = {
   draft: ExpenseDraft;
   onApplyCandidate: (nextDraft: ExpenseDraft, appliedNotice: string) => void;
-  onBack?: () => void;
   defaultOpenReview?: boolean;
 };
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const ALLOWED_FILE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
 
 const formatDateShort = (date: Date | null): string => {
   if (!date) {
@@ -108,16 +107,15 @@ type ProposalItem = {
   status: 'proposed' | 'unchanged' | 'uncertain' | 'locked';
 };
 
-export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenReview = false }: ExpenseAiAssistProps) => {
+export const ExpenseAiAssist = ({ draft, onApplyCandidate, defaultOpenReview = false }: ExpenseAiAssistProps) => {
   const [stage, setStage] = useState<AssistStage>(defaultOpenReview ? 'review' : 'input');
   const [text, setText] = useState(defaultOpenReview ? '11/04 예시 마트에서 현대카드로 100,000원 결제(할인 5,000원), 식비 80,000원 · 생활 20,000원' : '');
-  const [imageFile, setImageFile] = useState<{ name: string; url: string; size: number } | null>(null);
+  const [imageFile, setImageFile] = useState<{ name: string; url: string; size: number; isPdf: boolean } | null>(null);
   const [errorKind, setErrorKind] = useState<AssistErrorKind>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [candidate, setCandidate] = useState<AiDraftCandidate | null>(() => (defaultOpenReview ? buildSyntheticCandidate('split', draft) : null));
   const [reviewSnapshot, setReviewSnapshot] = useState<string | null>(() => (defaultOpenReview ? createFormSnapshot(draft) : null));
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<number | null>(null);
@@ -139,43 +137,27 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
     };
   }, [revokeImage]);
 
-  const handleSelectImage = (file: File | null | undefined) => {
+  const handleSelectFile = (file: File | null | undefined) => {
     if (!file) {
       return;
     }
-    if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES) {
+    if (!ALLOWED_FILE_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES) {
       setErrorKind('validation');
-      setErrorMessage('PNG·JPEG·WebP 이미지 1장을 10MB 이하로 올려 주세요.');
+      setErrorMessage('이미지 또는 PDF 파일 1개를 10MB 이하로 올려 주세요.');
       return;
     }
     revokeImage();
     const nextUrl = URL.createObjectURL(file);
     imageUrlRef.current = nextUrl;
-    setImageFile({ name: file.name || '붙여넣은 캡처 이미지', url: nextUrl, size: file.size });
+    setImageFile({ name: file.name || '첨부 결제 자료', url: nextUrl, size: file.size, isPdf: file.type === 'application/pdf' });
     setErrorKind(null);
     setErrorMessage('');
-  };
-
-  const handleClear = () => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    revokeImage();
-    setText('');
-    setImageFile(null);
-    setCandidate(null);
-    setReviewSnapshot(null);
-    setDuplicateConfirmed(false);
-    setErrorKind(null);
-    setErrorMessage('');
-    setStage('input');
   };
 
   const runAnalysis = () => {
     if (!text.trim() && !imageFile) {
       setErrorKind('validation');
-      setErrorMessage('결제 캡처 이미지를 올리거나 지출 설명을 입력해 주세요.');
+      setErrorMessage('결제 자료를 올리거나 지출 설명을 입력해 주세요.');
       return;
     }
     if (timerRef.current !== null) {
@@ -351,39 +333,7 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
   const nextOwnerName = candidate?.paymentMethod ? getPaymentMethodMeta(candidate.paymentMethod).owner : null;
 
   return (
-    <section
-      aria-label="AI 입력 보조"
-      onDragOver={(event) => {
-        event.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={(event) => {
-        event.preventDefault();
-        setIsDragging(false);
-        const dropped = event.dataTransfer.files?.[0];
-        if (dropped) {
-          handleSelectImage(dropped);
-        }
-      }}
-      onPaste={(event) => {
-        const items = Array.from(event.clipboardData?.items ?? []);
-        const imageItem = items.find((item) => item.type.startsWith('image/'));
-        if (imageItem) {
-          const pastedFile = imageItem.getAsFile();
-          if (pastedFile) {
-            event.preventDefault();
-            handleSelectImage(pastedFile);
-          }
-        }
-      }}
-      className={cn('flex flex-col gap-3 rounded-xl border bg-card p-3.5 transition-colors md:p-4', isDragging ? 'border-primary bg-primary-tint/60' : 'border-border')}
-    >
-      <div className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground break-keep">
-        <Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" />
-        <span>결제 캡처 붙여넣기·첨부 또는 글 설명으로 초안을 채워요. 참고화면에서는 합성 예시로 흐름을 확인합니다.</span>
-      </div>
-
+    <section aria-label="AI 입력 보조" className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 md:p-4">
       {stage === 'input' || stage === 'error' ? (
         <>
           <div className="flex flex-col gap-1.5">
@@ -402,36 +352,42 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
                 }
               }}
               placeholder="예: 11/04 예시 마트 10만원(할인 5천원), 식비 8만원 + 생활 2만원"
-              className="w-full resize-y rounded-md border border-border-strong bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/25 focus:outline-none"
+              className="w-full resize-y rounded-md border border-border-strong bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             />
           </div>
 
           <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border-strong bg-muted/35 p-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-foreground">결제 캡처 1장 (선택)</p>
-                <p className="text-[11px] text-muted-foreground">PNG·JPEG·WebP, 10MB 이하 · 붙여넣기/끌어놓기 지원</p>
+                <p className="text-xs font-semibold text-foreground">결제 자료 (선택)</p>
+                <p className="text-[11px] text-muted-foreground">영수증, 카드 결제 내역서, 거래명세서, 계좌 이체 내역 등</p>
+                <p className="text-[11px] text-muted-foreground">PNG·JPEG·WebP·PDF, 10MB 이하</p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
                 className="sr-only"
                 onChange={(event) => {
-                  handleSelectImage(event.target.files?.[0]);
+                  handleSelectFile(event.target.files?.[0]);
                   event.target.value = '';
                 }}
               />
-              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-1">
-                <ImagePlus className="size-3.5" />
-                <span>이미지 선택</span>
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <FilePlus2 className="size-3.5" /> 파일 선택
               </Button>
             </div>
 
             {imageFile ? (
               <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-card p-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <img src={imageFile.url} alt="첨부 결제 이미지 미리보기" className="size-10 shrink-0 rounded object-cover" />
+                  {imageFile.isPdf ? (
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded bg-muted text-primary">
+                      <FileText className="size-4" />
+                    </div>
+                  ) : (
+                    <img src={imageFile.url} alt="첨부 결제 자료 미리보기" className="size-10 shrink-0 rounded object-cover" />
+                  )}
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-foreground">{imageFile.name}</p>
                     <p className="text-[11px] text-muted-foreground tabular-nums">{Math.max(1, Math.round(imageFile.size / 1024))} KB · 로컬 미리보기</p>
@@ -439,7 +395,7 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
                 </div>
                 <button
                   type="button"
-                  aria-label="첨부 이미지 제거"
+                  aria-label="첨부 파일 제거"
                   onClick={() => {
                     revokeImage();
                     setImageFile(null);
@@ -459,16 +415,14 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
           ) : null}
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={handleClear}>
-              입력 비우기
-            </Button>
-            {onBack ? (
-              <Button type="button" variant="outline" size="sm" onClick={onBack}>
-                직접 입력
-              </Button>
-            ) : null}
             <Button type="button" variant="primary" size="sm" onClick={runAnalysis}>
-              {stage === 'error' ? '다시 시도' : '초안 만들기 · 시연'}
+              {stage === 'error' ? (
+                '다시 시도'
+              ) : (
+                <>
+                  <Sparkles className="size-3.5" /> 초안 생성
+                </>
+              )}
             </Button>
           </div>
         </>
@@ -478,7 +432,7 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-3">
           <div className="flex items-center gap-2 text-xs text-foreground">
             <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
-            <span>원문과 이미지를 바탕으로 지출 초안을 정리하고 있어요…</span>
+            <span>입력 내용과 첨부 자료를 바탕으로 지출 초안을 정리하고 있어요…</span>
           </div>
           <Button
             type="button"
@@ -504,7 +458,13 @@ export const ExpenseAiAssist = ({ draft, onApplyCandidate, onBack, defaultOpenRe
             <p className="mt-1 text-muted-foreground break-keep">{text.trim() || candidate.sourceSummary}</p>
             {imageFile ? (
               <div className="mt-2 flex items-center gap-2">
-                <img src={imageFile.url} alt="원본 첨부 이미지" className="size-11 rounded object-cover" />
+                {imageFile.isPdf ? (
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded bg-muted text-primary">
+                    <FileText className="size-4" />
+                  </div>
+                ) : (
+                  <img src={imageFile.url} alt="원본 첨부 자료" className="size-11 rounded object-cover" />
+                )}
                 <span className="truncate text-[11px] text-muted-foreground">{imageFile.name}</span>
               </div>
             ) : null}

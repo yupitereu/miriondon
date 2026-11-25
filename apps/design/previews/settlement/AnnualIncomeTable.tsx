@@ -123,7 +123,7 @@ export const AnnualIncomeTable = ({ records, availableKinds }: { records: Annual
           );
         })}
       </div>
-      <div className="hidden max-w-full overflow-x-auto rounded-md border border-border md:block" role="region" tabIndex={0} aria-label="월별 수입 종류 표, 좌우로 이동 가능">
+      <div className="hidden max-w-full overflow-x-auto rounded-md border border-border md:block" role="region" tabIndex={0} aria-label="월별 소득 분류 표, 좌우로 이동 가능">
         <table
           className="w-[var(--desktop-width)] min-w-full table-fixed border-collapse text-center text-sm tabular-nums"
           style={{ '--desktop-width': `${72 + (kinds.length + 1) * 148}px` } as CSSProperties}

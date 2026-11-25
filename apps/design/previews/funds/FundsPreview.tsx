@@ -1,13 +1,21 @@
 'use client';
 
-import { EmptyState, FilterChipGroup, FilterMultiSelect, FilterSingleSelect, PeriodPicker, dialog, mergeFilterOptions, type PeriodCellStatus, type PeriodMonthValue } from '@repo/ui-composition';
+import {
+  EmptyState,
+  FilterChipGroup,
+  FilterMultiSelect,
+  FilterSingleSelect,
+  PeriodPicker,
+  SummaryHeroCard,
+  dialog,
+  mergeFilterOptions,
+  type PeriodCellStatus,
+  type PeriodMonthValue
+} from '@repo/ui-composition';
 import {
   Badge,
   Button,
   Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Popover,
   PopoverContent,
@@ -22,7 +30,7 @@ import {
   SheetTitle,
   cn
 } from '@repo/ui-core';
-import { HelpCircle, Landmark, Pencil, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, HelpCircle, Landmark, Pencil, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -34,14 +42,38 @@ import {
   INITIAL_FUND_TRANSACTIONS,
   computeFundAccountGroups,
   getFundAccountMeta,
+  requiresAccountTransfer,
   type FundAccountId,
   type FundTransactionItem
 } from '@/previews/funds/funds-model';
 import { DesignAppShell } from '@/shared/DesignAppShell';
+import { FilterResetButton } from '@/shared/FilterResetButton';
+import { SearchFilterToolbar } from '@/shared/SearchFilterToolbar';
+import { TransactionListHeader, TransactionMobileRow } from '@/shared/TransactionListLayout';
 import { INITIAL_DESIGN_ASSETS, getInitialAssetBalancesMap } from '@/shared/design-assets-store';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/shared/expense-form/ExpenseFormView';
 import { DEFAULT_VIEWED_MONTH, PAYMENT_METHOD_ITEMS, formatPaymentMethodName, formatYearMonth, getPaymentMethodMeta } from '@/shared/expense-form/expense-form-model';
+
+const getAdjustmentTextClass = (adjustment: number) => (adjustment !== 0 ? 'font-semibold text-foreground' : 'text-muted-foreground');
+
+const ColumnHelpPopover = ({ label, description }: { label: string; description: string }) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button
+        type="button"
+        aria-label={`${label} 안내`}
+        className="inline-flex cursor-pointer items-center gap-1 rounded-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+      >
+        <span>{label}</span>
+        <HelpCircle aria-hidden="true" className="size-3.5 shrink-0" />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent align="end" collisionPadding={8} className="w-[min(18rem,calc(100vw-2rem))] p-3 text-left text-xs leading-relaxed font-normal text-foreground break-keep">
+      {description}
+    </PopoverContent>
+  </Popover>
+);
 
 const STATUS_ORDER: readonly PaymentStatus[] = ['지불 준비 필요', '지불 대기', '지불 완료'] as const;
 
@@ -108,9 +140,14 @@ export const FundsPreview = () => {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const [activeStatus, setActiveStatus] = useState<PaymentStatus>('지불 준비 필요');
+  const [summaryOpenByTab, setSummaryOpenByTab] = useState<Record<PaymentStatus, boolean>>({
+    '지불 준비 필요': true,
+    '지불 대기': false,
+    '지불 완료': false
+  });
   const [transactions, setTransactions] = useState<FundTransactionItem[]>(INITIAL_FUND_TRANSACTIONS);
   const [adjustments, setAdjustments] = useState<Record<FundAccountId, number>>(INITIAL_FUND_ADJUSTMENTS);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(() => new Set());
   const assetBalances = useMemo(() => getInitialAssetBalancesMap(), []);
 
   const sourceAccounts = useMemo(
@@ -157,7 +194,7 @@ export const FundsPreview = () => {
     setPeriodScope(defaultPeriodScope);
     setSelectedAccountNames(new Set());
     setSelectedMethods(new Set());
-    setSelectedIds(new Set());
+    setExcludedIds(new Set());
   };
 
   const handleResetFilters = () => {
@@ -187,7 +224,7 @@ export const FundsPreview = () => {
     const defaultYm = DEFAULT_VIEWED_MONTH.year * 12 + DEFAULT_VIEWED_MONTH.month;
     setPeriodMonth(next);
     setPeriodScope(nextYm <= defaultYm ? 'all-unpaid' : 'current-only');
-    setSelectedIds(new Set());
+    setExcludedIds(new Set());
   };
 
   const monthCellStatus = useMemo(() => createMonthCellStatus(decemberCreated), [decemberCreated]);
@@ -218,25 +255,33 @@ export const FundsPreview = () => {
     });
   }, [transactions, selectedAccountNames, selectedMethods, searchQuery, viewedYmString, periodScope]);
 
-  const countByStatus = useMemo(() => {
-    const counts: Record<PaymentStatus, number> = {
-      '지불 준비 필요': 0,
-      '지불 대기': 0,
-      '지불 완료': 0
+  const summaryByStatus = useMemo(() => {
+    const next: Record<PaymentStatus, { count: number; total: number }> = {
+      '지불 준비 필요': { count: 0, total: 0 },
+      '지불 대기': { count: 0, total: 0 },
+      '지불 완료': { count: 0, total: 0 }
     };
     for (const item of scopedTransactions) {
-      counts[item.status] += 1;
+      next[item.status].count += 1;
+      next[item.status].total += item.amount;
     }
-    return counts;
+    return next;
   }, [scopedTransactions]);
 
-  const visibleItems = useMemo(() => scopedTransactions.filter((item) => item.status === activeStatus), [scopedTransactions, activeStatus]);
-  const selectedItems = useMemo(() => visibleItems.filter((item) => selectedIds.has(item.id)), [visibleItems, selectedIds]);
-  const selectedTotal = useMemo(() => selectedItems.reduce((sum, item) => sum + item.amount, 0), [selectedItems]);
+  const allPrepareNeededTotal = useMemo(() => {
+    const prepareItems = scopedTransactions.filter((item) => item.status === '지불 준비 필요');
+    return computeFundAccountGroups(prepareItems, adjustments)
+      .filter((group) => requiresAccountTransfer(group.account))
+      .reduce((sum, g) => sum + g.needed, 0);
+  }, [scopedTransactions, adjustments]);
 
-  const summarySourceItems = selectedItems.length > 0 ? selectedItems : visibleItems;
-  const summaryGroups = useMemo(() => (activeStatus === '지불 준비 필요' ? computeFundAccountGroups(summarySourceItems, adjustments) : []), [activeStatus, summarySourceItems, adjustments]);
+  const visibleItems = useMemo(() => scopedTransactions.filter((item) => item.status === activeStatus), [scopedTransactions, activeStatus]);
+  const selectedItems = useMemo(() => visibleItems.filter((item) => !excludedIds.has(item.id)), [visibleItems, excludedIds]);
+
   const selectedGroups = useMemo(() => computeFundAccountGroups(selectedItems, adjustments), [selectedItems, adjustments]);
+  const summaryGroups = useMemo(() => (activeStatus === '지불 준비 필요' ? selectedGroups.filter((group) => requiresAccountTransfer(group.account)) : selectedGroups), [activeStatus, selectedGroups]);
+  const summaryRawTotal = useMemo(() => summaryGroups.reduce((sum, g) => sum + g.total, 0), [summaryGroups]);
+  const summaryNeededTotal = useMemo(() => summaryGroups.reduce((sum, g) => sum + g.needed, 0), [summaryGroups]);
 
   const groupTotalsMap = useMemo(() => {
     const map: Partial<Record<FundAccountId, number>> = {};
@@ -246,15 +291,13 @@ export const FundsPreview = () => {
     return map;
   }, [summaryGroups]);
 
-  const selectedNeededTotal = useMemo(() => selectedGroups.reduce((sum, g) => sum + g.needed, 0), [selectedGroups]);
-
   const filterGroups = [
     { key: 'account', label: '결제 계좌', options: accountOptions, selected: selectedAccountNames, onChange: setSelectedAccountNames },
     { key: 'method', label: '결제 수단', options: methodOptions, selected: selectedMethods, onChange: setSelectedMethods }
   ] as const;
 
   const handleToggleItem = (id: string) => {
-    setSelectedIds((prev) => {
+    setExcludedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -267,15 +310,15 @@ export const FundsPreview = () => {
 
   const handleToggleSelectAllVisible = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(visibleItems.map((item) => item.id)));
+      setExcludedIds(new Set());
       return;
     }
-    setSelectedIds(new Set());
+    setExcludedIds(new Set(visibleItems.map((item) => item.id)));
   };
 
   const handleStatusTabChange = (nextStatus: PaymentStatus) => {
     setActiveStatus(nextStatus);
-    setSelectedIds(new Set());
+    setExcludedIds(new Set());
   };
 
   const handleConfirmPrepare = () => {
@@ -284,7 +327,7 @@ export const FundsPreview = () => {
     }
     const idSet = new Set(selectedItems.map((item) => item.id));
     setTransactions((prev) => prev.map((item) => (idSet.has(item.id) ? { ...item, status: '지불 대기' } : item)));
-    setSelectedIds(new Set());
+    setExcludedIds(new Set());
     setPrepareConfirmOpen(false);
   };
 
@@ -294,7 +337,7 @@ export const FundsPreview = () => {
     }
     const idSet = new Set(selectedItems.map((item) => item.id));
     setTransactions((prev) => prev.map((item) => (idSet.has(item.id) ? { ...item, status: releaseTargetStatus } : item)));
-    setSelectedIds(new Set());
+    setExcludedIds(new Set());
     setReleaseDialogOpen(false);
   };
 
@@ -304,7 +347,7 @@ export const FundsPreview = () => {
     }
     const idSet = new Set(selectedItems.map((item) => item.id));
     setTransactions((prev) => prev.map((item) => (idSet.has(item.id) ? { ...item, status: '지불 완료' } : item)));
-    setSelectedIds(new Set());
+    setExcludedIds(new Set());
     setCompleteConfirmOpen(false);
   };
 
@@ -348,14 +391,14 @@ export const FundsPreview = () => {
     setExpenseSheetOpen(false);
   };
 
-  const renderActionButtons = () => {
+  const renderActionButtons = (disabled: boolean) => {
     if (activeStatus === '지불 준비 필요') {
       return (
         <>
-          <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 완료')}>
+          <Button type="button" variant="outline" size="md" disabled={disabled} className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 완료')}>
             지불 완료로 변경
           </Button>
-          <Button type="button" variant="primary" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 대기')}>
+          <Button type="button" variant="primary" size="md" disabled={disabled} className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 대기')}>
             지불 대기로 변경
           </Button>
         </>
@@ -364,10 +407,10 @@ export const FundsPreview = () => {
     if (activeStatus === '지불 대기') {
       return (
         <>
-          <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 준비 필요')}>
+          <Button type="button" variant="outline" size="md" disabled={disabled} className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 준비 필요')}>
             지불 준비 필요로 변경
           </Button>
-          <Button type="button" variant="primary" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 완료')}>
+          <Button type="button" variant="primary" size="md" disabled={disabled} className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 완료')}>
             지불 완료로 변경
           </Button>
         </>
@@ -375,10 +418,10 @@ export const FundsPreview = () => {
     }
     return (
       <>
-        <Button type="button" variant="outline" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 준비 필요')}>
+        <Button type="button" variant="outline" size="md" disabled={disabled} className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 준비 필요')}>
           지불 준비 필요로 변경
         </Button>
-        <Button type="button" variant="secondary" size="md" className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 대기')}>
+        <Button type="button" variant="secondary" size="md" disabled={disabled} className="px-2 text-xs md:px-3 md:text-sm" onClick={() => handleDirectStatusTransition('지불 대기')}>
           지불 대기로 변경
         </Button>
       </>
@@ -396,6 +439,10 @@ export const FundsPreview = () => {
       <Pencil className="size-3.5" />
     </button>
   );
+
+  const accountSummaryTitle = activeStatus === '지불 준비 필요' ? '계좌별 지불 준비 현황' : activeStatus === '지불 대기' ? '계좌별 지불 대기 현황' : '계좌별 지불 완료 현황';
+  const accountSummaryTotal = activeStatus === '지불 준비 필요' ? summaryNeededTotal : summaryRawTotal;
+  const isSummaryOpen = summaryOpenByTab[activeStatus];
 
   return (
     <DesignAppShell
@@ -415,61 +462,230 @@ export const FundsPreview = () => {
         </Button>
       }
     >
-      {/* 3-Status Tabs + Search & Multi-Select Filters */}
-      <section aria-label="지불 상태 및 상세 검색" className="flex flex-col gap-2.5">
-        <div role="tablist" aria-label="지불 상태 탭" className="grid grid-cols-[1.3fr_1fr_1fr] rounded-xl bg-muted p-1 sm:grid-cols-3">
-          {STATUS_ORDER.map((status) => {
-            const active = activeStatus === status;
-            return (
-              <button
-                key={status}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => handleStatusTabChange(status)}
+      {/* Top Hero Summary */}
+      <SummaryHeroCard
+        variant="hero"
+        aria-label="지불 관리 현황 요약"
+        title="지불 준비 금액 합계"
+        helpLabel="지불 준비 금액 합계 기준 안내"
+        helpText="결제 계좌로 옮기거나 현금으로 마련할 금액 합계에 계좌별 보정을 반영한 총액이에요."
+        badge={<span className="rounded-full bg-hero-foreground/15 px-2 py-0.5 text-[11px] font-semibold text-hero-foreground tabular-nums">{summaryByStatus['지불 준비 필요'].count}건</span>}
+        action={
+          hasActiveFilters ? (
+            <span className="rounded-full border border-hero-foreground/25 bg-hero-foreground/15 px-2.5 py-0.5 text-[11px] font-semibold text-hero-foreground">필터 적용 중</span>
+          ) : null
+        }
+        value={formatWon(allPrepareNeededTotal)}
+        items={(['지불 대기', '지불 완료'] as const).map((status) => ({
+          label: `${status} (${summaryByStatus[status].count}건)`,
+          value: formatWon(summaryByStatus[status].total)
+        }))}
+      />
+
+      {/* 3-Status Tabs */}
+      <div role="tablist" aria-label="지불 상태 탭" className="grid grid-cols-[1.3fr_1fr_1fr] rounded-xl bg-muted p-1 sm:grid-cols-3">
+        {STATUS_ORDER.map((status) => {
+          const active = activeStatus === status;
+
+          return (
+            <button
+              key={status}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => handleStatusTabChange(status)}
+              className={cn(
+                'flex min-h-control-md items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-bold transition-colors min-[360px]:text-xs md:text-sm',
+                active ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <span className="whitespace-nowrap">{status}</span>
+              <span
                 className={cn(
-                  'flex min-h-control-md items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-bold transition-colors min-[360px]:text-xs md:text-sm',
-                  active ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  'inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold tabular-nums',
+                  active ? 'bg-primary text-primary-foreground' : 'bg-background/80 text-muted-foreground'
                 )}
               >
-                <span className="whitespace-nowrap">{status}</span>
-                <span
-                  className={cn(
-                    'inline-flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-extrabold tabular-nums',
-                    active ? 'bg-primary text-primary-foreground' : 'bg-background/80 text-muted-foreground'
-                  )}
-                >
-                  {countByStatus[status]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                {summaryByStatus[status].count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <div className="flex items-center gap-2 md:min-w-36 md:max-w-44 md:flex-1 lg:w-64 lg:max-w-64 lg:flex-none">
-            <SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="내역 검색" wrapperClassName="min-w-0 flex-1" />
+      {/* Active Tab Account Summary / Statistics */}
+      {activeStatus === '지불 준비 필요' || visibleItems.length > 0 ? (
+        <Card padding="none" className="gap-0 overflow-hidden" aria-label={accountSummaryTitle}>
+          <div className="flex min-h-11 items-center justify-between gap-2 transition-colors hover:bg-muted/35">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 py-2.5 pl-3.5 md:pl-4">
+              <button
+                type="button"
+                aria-expanded={isSummaryOpen}
+                onClick={() => setSummaryOpenByTab((prev) => ({ ...prev, [activeStatus]: !prev[activeStatus] }))}
+                className="flex min-w-0 cursor-pointer items-center text-left text-sm font-bold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              >
+                <span className="break-keep">{accountSummaryTitle}</span>
+              </button>
+              {selectedItems.length > 0 && selectedItems.length < visibleItems.length ? (
+                <Badge variant="wine" className="tabular-nums">
+                  선택 {selectedItems.length}건 기준
+                </Badge>
+              ) : null}
+            </div>
 
             <button
               type="button"
-              aria-label={detailFilterCount > 0 ? `상세 검색 ${detailFilterCount}개 선택됨` : '상세 검색'}
-              onClick={() => setMobileFilterOpen(true)}
-              className={cn(
-                'inline-flex min-h-control-md shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors md:hidden',
-                detailFilterCount > 0 ? 'border-primary bg-primary-tint font-bold text-primary' : 'border-border-strong bg-card font-semibold text-foreground hover:bg-accent/40'
-              )}
+              aria-expanded={isSummaryOpen}
+              aria-label={`${accountSummaryTitle} ${isSummaryOpen ? '접기' : '펼치기'}`}
+              onClick={() => setSummaryOpenByTab((prev) => ({ ...prev, [activeStatus]: !prev[activeStatus] }))}
+              className="flex min-h-11 flex-1 cursor-pointer items-center justify-end gap-1.5 py-2.5 pr-3.5 pl-2 text-xs font-extrabold text-primary tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 md:pr-4 md:text-sm"
             >
-              <SlidersHorizontal className="size-4 shrink-0" />
-              <span className="hidden min-[360px]:inline">상세 검색</span>
-              {detailFilterCount > 0 ? (
-                <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-extrabold text-primary-foreground tabular-nums">
-                  {detailFilterCount}
-                </span>
-              ) : null}
+              <span>{formatWon(accountSummaryTotal)}</span>
+              <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-muted-foreground transition-transform', isSummaryOpen && 'rotate-180')} />
             </button>
           </div>
 
-          <div className="hidden md:flex md:shrink-0 md:items-center md:gap-1.5 lg:gap-2">
+          {isSummaryOpen ? (
+            <div className="border-t border-border">
+              {summaryGroups.length === 0 ? (
+                <p className="px-4 py-5 text-center text-xs text-muted-foreground">{selectedItems.length === 0 ? '선택된 내역 없음' : '계좌 이동이 필요한 내역 없음'}</p>
+              ) : activeStatus === '지불 준비 필요' ? (
+                <>
+                  {/* Mobile Compact List (< 768px) */}
+                  <ul className="divide-y divide-border md:hidden">
+                    {summaryGroups.map((group) => (
+                      <li key={group.account.id} className="flex flex-col gap-1.5 px-3.5 py-2.5 text-xs tabular-nums">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 font-bold text-foreground break-keep">{group.account.name}</span>
+                          <span className="shrink-0 text-sm font-extrabold text-primary">{formatWon(group.needed)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                          <span>거래 합계 {formatWon(group.total)}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={getAdjustmentTextClass(group.adjustment)}>보정 {formatSignedWon(group.adjustment)}</span>
+                            {renderAdjustmentEditButton(group.account)}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Tablet/PC Table (>= 768px) */}
+                  <table className="hidden w-full border-collapse text-xs md:table lg:text-sm">
+                    <thead className="bg-muted/45 text-xs text-muted-foreground">
+                      <tr className="border-b border-border">
+                        <th scope="col" className="px-4 py-2.5 text-left font-medium">
+                          결제 계좌 · 현금
+                        </th>
+                        <th scope="col" className="px-3 py-2.5 text-right font-medium whitespace-nowrap">
+                          거래 합계
+                        </th>
+                        <th scope="col" className="px-3 py-2.5 text-right font-medium whitespace-nowrap">
+                          <ColumnHelpPopover label="보정 금액" description="결제 계좌나 현금의 입금·준비 오차가 발생한 경우 이를 맞추기 위해 입력하는 값이에요." />
+                        </th>
+                        <th scope="col" className="px-4 py-2.5 text-right font-medium whitespace-nowrap">
+                          <ColumnHelpPopover label="지불 준비 금액" description="확정된 지출을 결제하기 위해 결제 계좌로 옮기거나 현금으로 마련해 둘 금액이에요." />
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border tabular-nums">
+                      {summaryGroups.map((group) => (
+                        <tr key={group.account.id}>
+                          <td className="px-4 py-2.5 font-bold text-foreground">{group.account.name}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-foreground whitespace-nowrap">{formatWon(group.total)}</td>
+                          <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center justify-end gap-2">
+                              <span className={getAdjustmentTextClass(group.adjustment)}>{formatSignedWon(group.adjustment)}</span>
+                              {renderAdjustmentEditButton(group.account)}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-sm font-extrabold text-primary whitespace-nowrap">{formatWon(group.needed)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <>
+                  {/* Mobile Compact List (< 768px) */}
+                  <ul className="divide-y divide-border md:hidden">
+                    {summaryGroups.map((group) => (
+                      <li key={group.account.id} className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs tabular-nums">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="font-bold text-foreground break-keep">{group.account.name}</span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">{group.count}건</span>
+                        </div>
+                        <span className="shrink-0 font-extrabold text-foreground">{formatWon(group.total)}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Tablet/PC Table (>= 768px) */}
+                  <table className="hidden w-full border-collapse text-xs md:table lg:text-sm">
+                    <thead className="bg-muted/45 text-xs text-muted-foreground">
+                      <tr className="border-b border-border">
+                        <th scope="col" className="px-4 py-2.5 text-left font-medium">
+                          결제 계좌 · 현금
+                        </th>
+                        <th scope="col" className="w-24 px-3 py-2.5 text-center font-medium whitespace-nowrap">
+                          건수
+                        </th>
+                        <th scope="col" className="px-4 py-2.5 text-right font-medium whitespace-nowrap">
+                          {activeStatus === '지불 대기' ? '지불 대기 금액' : '지불 완료 금액'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border tabular-nums">
+                      {summaryGroups.map((group) => (
+                        <tr key={group.account.id}>
+                          <td className="px-4 py-2.5 font-bold text-foreground">{group.account.name}</td>
+                          <td className="px-3 py-2.5 text-center text-muted-foreground whitespace-nowrap">{group.count}건</td>
+                          <td className="px-4 py-2.5 text-right font-extrabold text-foreground whitespace-nowrap">{formatWon(group.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
+      <SearchFilterToolbar
+        ariaLabel="지불 내역 검색 및 필터"
+        search={
+          <SearchInput
+            size="md"
+            value={searchQuery}
+            onValueChange={(next) => {
+              setSearchQuery(next);
+              setExcludedIds(new Set());
+            }}
+            placeholder="내역 검색"
+            aria-label="내역 검색"
+            wrapperClassName="min-w-0 flex-1"
+          />
+        }
+        mobileAction={
+          <button
+            type="button"
+            aria-label={detailFilterCount > 0 ? `상세 검색 ${detailFilterCount}개 선택됨` : '상세 검색'}
+            onClick={() => setMobileFilterOpen(true)}
+            className={cn(
+              'inline-flex min-h-control-md shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors md:hidden',
+              detailFilterCount > 0 ? 'border-primary bg-primary-tint font-bold text-primary' : 'border-border-strong bg-card font-semibold text-foreground hover:bg-accent/40'
+            )}
+          >
+            <SlidersHorizontal className="size-4 shrink-0" />
+            <span className="hidden min-[360px]:inline">상세 검색</span>
+            {detailFilterCount > 0 ? (
+              <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-extrabold text-primary-foreground tabular-nums">{detailFilterCount}</span>
+            ) : null}
+          </button>
+        }
+        filters={
+          <>
             {activeStatus !== '지불 완료' ? (
               <FilterSingleSelect
                 label="기간"
@@ -479,7 +695,7 @@ export const FundsPreview = () => {
                 allValue="all-unpaid"
                 onChange={(next) => {
                   setPeriodScope(next);
-                  setSelectedIds(new Set());
+                  setExcludedIds(new Set());
                 }}
               />
             ) : null}
@@ -492,94 +708,76 @@ export const FundsPreview = () => {
                 selected={group.selected}
                 onChange={(next) => {
                   group.onChange(next);
-                  setSelectedIds(new Set());
+                  setExcludedIds(new Set());
                 }}
               />
             ))}
 
-            {hasActiveFilters ? (
-              <Button type="button" variant="ghost" size="sm" onClick={handleResetFilters} className="shrink-0 px-2 text-muted-foreground">
-                필터 초기화
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </section>
+            {hasActiveFilters ? <FilterResetButton onClick={handleResetFilters} /> : null}
+          </>
+        }
+      />
 
       {/* Transactions Selection Card */}
       <Card padding="none" className="gap-0 overflow-hidden">
-        <CardHeader className="border-b border-border px-3.5 py-2.5 md:px-4 md:py-3">
-          <CardTitle className="text-sm font-bold text-foreground md:text-base">거래 내역</CardTitle>
-        </CardHeader>
+        <TransactionListHeader
+          title="거래 내역"
+          count={visibleItems.length}
+          mobileLeading={
+            visibleItems.length > 0 ? (
+              <Checkbox
+                id="fund-mobile-select-all"
+                aria-label="전체 선택"
+                checked={visibleItems.length > 0 && selectedItems.length === visibleItems.length}
+                onCheckedChange={(checked) => handleToggleSelectAllVisible(checked === true)}
+              />
+            ) : undefined
+          }
+        />
 
         {visibleItems.length === 0 ? (
-          <CardContent className="p-0">
-            <EmptyState
-              title={EMPTY_STATE_COPY[activeStatus].title}
-              description={EMPTY_STATE_COPY[activeStatus].description}
-              actions={
-                hasActiveFilters ? (
-                  <Button type="button" variant="outline" size="sm" onClick={handleResetFilters}>
-                    필터 초기화
-                  </Button>
-                ) : undefined
-              }
-            />
-          </CardContent>
+          <EmptyState
+            title={EMPTY_STATE_COPY[activeStatus].title}
+            description={EMPTY_STATE_COPY[activeStatus].description}
+            actions={
+              hasActiveFilters ? (
+                <Button type="button" variant="outline" size="sm" onClick={handleResetFilters}>
+                  필터 초기화
+                </Button>
+              ) : undefined
+            }
+            className="p-6 md:py-10"
+          />
         ) : (
           <>
-            {/* Mobile Select-All Bar + Stacked Rows (< 768px) */}
-            <div className="flex items-center justify-between border-b border-border bg-muted/25 px-3.5 py-2 text-xs md:hidden">
-              <label htmlFor="fund-mobile-select-all" className="flex cursor-pointer items-center gap-2 font-semibold text-foreground">
-                <Checkbox
-                  id="fund-mobile-select-all"
-                  checked={visibleItems.length > 0 && selectedItems.length === visibleItems.length}
-                  onCheckedChange={(checked) => handleToggleSelectAllVisible(checked === true)}
-                />
-                <span>전체 선택</span>
-              </label>
-              {selectedItems.length > 0 ? (
-                <button type="button" onClick={() => setSelectedIds(new Set())} className="font-semibold text-primary hover:underline">
-                  선택 해제
-                </button>
-              ) : null}
-            </div>
+            {/* Mobile Stacked Rows (< 768px) */}
             <div className="divide-y divide-border md:hidden">
               {visibleItems.map((item) => {
                 const account = getFundAccountMeta(item.accountId);
-                const checked = selectedIds.has(item.id);
+                const checked = !excludedIds.has(item.id);
+
                 return (
-                  <div
+                  <TransactionMobileRow
                     key={item.id}
                     onClick={() => handleToggleItem(item.id)}
-                    className={cn('flex cursor-pointer items-start gap-2.5 px-3.5 py-3 transition-colors', checked ? 'bg-primary-tint/45' : 'hover:bg-muted/35')}
-                  >
-                    <Checkbox checked={checked} aria-label={`${item.merchant} 선택`} onCheckedChange={() => handleToggleItem(item.id)} onClick={(e) => e.stopPropagation()} className="mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                            <p className="truncate text-sm font-bold text-foreground">{item.merchant}</p>
-                            {item.installmentLabel ? (
-                              <Badge variant="neutral" className="shrink-0 tabular-nums">
-                                {item.installmentLabel}
-                              </Badge>
-                            ) : null}
-                          </div>
-                          <p className="truncate text-[11px] text-muted-foreground tabular-nums">
-                            {item.dateLabel}
-                            {item.memo ? ` · ${item.memo}` : ''}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-sm font-extrabold text-foreground tabular-nums">{formatWon(item.amount)}</span>
+                    leading={<Checkbox checked={checked} aria-label={`${item.merchant} 선택`} onCheckedChange={() => handleToggleItem(item.id)} />}
+                    date={<span className="text-xs font-medium text-muted-foreground tabular-nums">{item.dateLabel}</span>}
+                    category={
+                      item.installmentLabel ? (
+                        <Badge variant="neutral" className="shrink-0 tabular-nums">
+                          {item.installmentLabel}
+                        </Badge>
+                      ) : undefined
+                    }
+                    content={
+                      <div className="min-w-0 flex flex-col gap-0.5">
+                        <span className="truncate text-sm font-bold text-foreground">{item.merchant}</span>
+                        {item.memo ? <span className="truncate text-xs text-muted-foreground">{item.memo}</span> : null}
                       </div>
-
-                      <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
-                        <span className="truncate text-muted-foreground">{item.paymentMethod}</span>
-                        <span className="truncate text-right font-semibold text-foreground">{account.name}</span>
-                      </div>
-                    </div>
-                  </div>
+                    }
+                    amount={<span className="shrink-0 text-sm font-extrabold text-foreground tabular-nums">{formatWon(item.amount)}</span>}
+                    metadata={<span className="truncate text-xs text-muted-foreground">{account.name}</span>}
+                  />
                 );
               })}
             </div>
@@ -607,14 +805,15 @@ export const FundsPreview = () => {
                 <tbody className="divide-y divide-border">
                   {visibleItems.map((item) => {
                     const account = getFundAccountMeta(item.accountId);
-                    const checked = selectedIds.has(item.id);
+                    const checked = !excludedIds.has(item.id);
+
                     return (
-                      <tr key={item.id} onClick={() => handleToggleItem(item.id)} className={cn('cursor-pointer transition-colors', checked ? 'bg-primary-tint/45' : 'hover:bg-muted/35')}>
+                      <tr key={item.id} onClick={() => handleToggleItem(item.id)} className="cursor-pointer transition-colors hover:bg-muted/35">
                         <td className="py-1 pl-1 pr-0" onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={checked} aria-label={`${item.merchant} 선택`} onCheckedChange={() => handleToggleItem(item.id)} />
                         </td>
-                        <td className="px-2 py-3 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">{item.dateLabel}</td>
-                        <td className="min-w-0 px-3 py-3">
+                        <td className="px-2 py-3.5 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">{item.dateLabel}</td>
+                        <td className="min-w-0 px-3 py-3.5">
                           <div className="flex min-w-0 flex-col gap-0.5">
                             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                               <span className="truncate font-bold text-foreground">{item.merchant}</span>
@@ -627,9 +826,9 @@ export const FundsPreview = () => {
                             {item.memo ? <span className="truncate text-xs text-muted-foreground">{item.memo}</span> : null}
                           </div>
                         </td>
-                        <td className="truncate px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{item.paymentMethod}</td>
-                        <td className="truncate px-3 py-3 text-xs font-semibold text-foreground whitespace-nowrap">{account.name}</td>
-                        <td className="py-3 pl-3 pr-4 text-right font-extrabold text-foreground tabular-nums whitespace-nowrap">{formatWon(item.amount)}</td>
+                        <td className="truncate px-3 py-3.5 text-xs text-muted-foreground whitespace-nowrap">{item.paymentMethod}</td>
+                        <td className="truncate px-3 py-3.5 text-xs font-semibold text-foreground whitespace-nowrap">{account.name}</td>
+                        <td className="py-3.5 pl-3 pr-4 text-right font-extrabold text-foreground tabular-nums whitespace-nowrap">{formatWon(item.amount)}</td>
                       </tr>
                     );
                   })}
@@ -641,124 +840,11 @@ export const FundsPreview = () => {
 
         {/* Bottom Selection Action Bar */}
         {visibleItems.length > 0 ? (
-          <div className="flex flex-col gap-2.5 border-t border-border bg-muted/40 p-3.5 md:flex-row md:items-center md:justify-between">
-            {selectedItems.length === 0 ? (
-              <p className="text-xs font-medium text-muted-foreground">거래를 선택하면 지불 상태를 변경할 수 있어요.</p>
-            ) : (
-              <>
-                <div className="min-w-0">
-                  <div className="flex items-center justify-between gap-2 md:justify-start">
-                    <span className="text-xs font-extrabold text-foreground tabular-nums md:text-sm">
-                      {selectedItems.length}건 선택 · {formatWon(selectedTotal)}
-                    </span>
-                    <button type="button" onClick={() => setSelectedIds(new Set())} className="text-xs font-semibold text-muted-foreground hover:text-foreground md:hidden">
-                      해제
-                    </button>
-                  </div>
-                  {activeStatus === '지불 준비 필요' ? (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground tabular-nums break-keep">계좌별 더 채울 금액 합계 {formatWon(selectedNeededTotal)} · 보정 금액은 계좌별로 적용해요.</p>
-                  ) : null}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0 md:items-center">{renderActionButtons()}</div>
-              </>
-            )}
+          <div className="flex flex-col gap-2.5 border-t border-border bg-muted/40 p-3.5 md:flex-row md:items-center md:justify-end">
+            <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0 md:items-center">{renderActionButtons(selectedItems.length === 0)}</div>
           </div>
         ) : null}
       </Card>
-
-      {/* Account Summary Card (지불 준비 필요 Tab Only) */}
-      {activeStatus === '지불 준비 필요' ? (
-        <Card>
-          <CardHeader className="pb-2.5">
-            <div className="flex items-center gap-1.5">
-              <CardTitle className="text-sm md:text-base">계좌별 더 채울 금액</CardTitle>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="더 채울 금액 · 보정 금액 안내"
-                    className="inline-flex size-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-                  >
-                    <HelpCircle className="size-4" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed break-keep">
-                  <div className="flex flex-col gap-1.5 text-foreground">
-                    <p>
-                      <strong className="font-bold">더 채울 금액</strong>은 확정된 지출을 결제하기 위해 결제 계좌로 옮기거나 현금으로 마련해 둘 금액이에요.
-                    </p>
-                    <p className="text-muted-foreground">
-                      <strong className="font-semibold text-foreground">보정 금액</strong>은 결제 계좌나 현금의 입금·준비 오차가 발생한 경우 이를 맞추기 위해 입력하는 값이에요.
-                    </p>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </CardHeader>
-
-          <CardContent className="flex flex-col gap-3">
-            {summaryGroups.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">채워야 할 거래가 없어요.</p>
-            ) : (
-              <>
-                {/* Mobile Stacked Account Rows (< 768px) */}
-                <div className="flex flex-col gap-2 md:hidden">
-                  {summaryGroups.map((group) => (
-                    <div key={group.account.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 text-xs tabular-nums">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="min-w-0 font-bold text-foreground break-keep">{group.account.name}</p>
-                        <span className="shrink-0 text-sm font-extrabold text-primary">{formatWon(group.needed)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
-                        <span>거래 합계 {formatWon(group.total)}</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className={cn(group.adjustment < 0 ? 'font-semibold text-positive' : group.adjustment > 0 ? 'font-semibold text-destructive' : '')}>
-                            보정 {formatSignedWon(group.adjustment)}
-                          </span>
-                          {renderAdjustmentEditButton(group.account)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Tablet/PC Table (>= 768px) */}
-                <div className="hidden overflow-hidden rounded-lg border border-border md:block">
-                  <table className="w-full border-collapse text-xs lg:text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/45 text-left text-xs font-medium text-muted-foreground">
-                        <th className="px-3.5 py-2.5 font-medium">결제 계좌 · 현금</th>
-                        <th className="px-3.5 py-2.5 text-right font-medium">거래 합계</th>
-                        <th className="px-3.5 py-2.5 text-right font-medium">보정 금액</th>
-                        <th className="px-3.5 py-2.5 text-right font-medium">더 채울 금액</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border tabular-nums">
-                      {summaryGroups.map((group) => (
-                        <tr key={group.account.id}>
-                          <td className="px-3.5 py-2.5 font-bold text-foreground">{group.account.name}</td>
-                          <td className="px-3.5 py-2.5 text-right font-semibold text-foreground">{formatWon(group.total)}</td>
-                          <td className="px-3.5 py-2.5 text-right">
-                            <div className="inline-flex items-center justify-end gap-2">
-                              <span className={cn('font-semibold', group.adjustment < 0 ? 'text-positive' : group.adjustment > 0 ? 'text-destructive' : 'text-muted-foreground')}>
-                                {formatSignedWon(group.adjustment)}
-                              </span>
-                              {renderAdjustmentEditButton(group.account)}
-                            </div>
-                          </td>
-                          <td className="px-3.5 py-2.5 text-right text-sm font-extrabold text-primary">{formatWon(group.needed)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
 
       {/* Dialogs */}
       <AdjustmentEditDialog
@@ -775,7 +861,6 @@ export const FundsPreview = () => {
         key={`prep-${prepareConfirmOpen}-${selectedItems.length}`}
         open={prepareConfirmOpen}
         onOpenChange={setPrepareConfirmOpen}
-        selectedCount={selectedItems.length}
         groups={selectedGroups}
         accountBalances={assetBalances}
         sourceAccounts={sourceAccounts}
@@ -786,7 +871,6 @@ export const FundsPreview = () => {
         key={`comp-${completeConfirmOpen}-${selectedItems.length}`}
         open={completeConfirmOpen}
         onOpenChange={setCompleteConfirmOpen}
-        selectedCount={selectedItems.length}
         groups={selectedGroups}
         accountBalances={assetBalances}
         sourceAccounts={completeSourceAccounts}
@@ -799,7 +883,6 @@ export const FundsPreview = () => {
         onOpenChange={setReleaseDialogOpen}
         fromStatus={activeStatus === '지불 완료' ? '지불 완료' : '지불 대기'}
         targetStatus={releaseTargetStatus}
-        selectedCount={selectedItems.length}
         groups={selectedGroups}
         accountBalances={assetBalances}
         sourceAccounts={activeStatus === '지불 완료' ? completeSourceAccounts : sourceAccounts}
@@ -822,7 +905,7 @@ export const FundsPreview = () => {
                 value={periodScope}
                 onChange={(next) => {
                   setPeriodScope(next);
-                  setSelectedIds(new Set());
+                  setExcludedIds(new Set());
                 }}
               />
             ) : null}
@@ -835,7 +918,7 @@ export const FundsPreview = () => {
                 selected={group.selected}
                 onChange={(next) => {
                   group.onChange(next);
-                  setSelectedIds(new Set());
+                  setExcludedIds(new Set());
                 }}
               />
             ))}

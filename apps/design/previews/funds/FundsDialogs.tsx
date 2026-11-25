@@ -22,7 +22,7 @@ import {
 } from '@repo/ui-core';
 import { useMemo, useState, type SubmitEvent } from 'react';
 
-import { getFundAccountMeta, type FundAccountGroupSummary, type FundAccountId } from '@/previews/funds/funds-model';
+import { getFundAccountMeta, requiresAccountTransfer, type FundAccountGroupSummary, type FundAccountId } from '@/previews/funds/funds-model';
 import type { AccountBalanceDelta, AccountBalanceTransfer } from '@/shared/design-assets-store';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 
@@ -91,7 +91,7 @@ export const AdjustmentEditDialog = ({ open, onOpenChange, initialAccountId, adj
                 <span>보정 {formatSignedWon(signedAdjustment)}</span>
               </div>
               <div className="mt-1 flex items-center justify-between gap-2 font-bold text-foreground">
-                <span>더 채울 금액</span>
+                <span>지불 준비 금액</span>
                 <span className="text-sm text-primary">{formatWon(previewNeeded)}</span>
               </div>
             </div>
@@ -240,20 +240,51 @@ const getAssetDisplayName = (group: FundAccountGroupSummary, allAccounts: Array<
   return group.account.id === 'cash' ? '민지 현금' : group.account.name;
 };
 
+const canPrepareGroupTransfer = (group: FundAccountGroupSummary): boolean => requiresAccountTransfer(group.account) && group.needed > 0;
+
+const NoTransferNotice = ({ group }: { group: FundAccountGroupSummary }) => {
+  if (group.account.isCash || !group.account.sameAsLivingBudget) {
+    return null;
+  }
+  return <p className="mt-2.5 border-t border-border/70 pt-2 text-[11px] text-muted-foreground break-keep">생활비 계좌와 결제 계좌가 같아 별도 계좌 이동이 없어요.</p>;
+};
+
+const resolvePrepareSourceId = (group: FundAccountGroupSummary, sourceAccounts: Array<{ id: string; name: string }>): string => {
+  const toAssetId = getAssetIdForFundAccount(group.account.id);
+  const preferredSource =
+    group.defaultTransferSourceId && group.defaultTransferSourceId !== toAssetId && sourceAccounts.some((acc) => acc.id === group.defaultTransferSourceId) ? group.defaultTransferSourceId : undefined;
+  return preferredSource ?? sourceAccounts.find((acc) => acc.id !== toAssetId)?.id ?? 'account-living';
+};
+
+const resolveCompleteSourceId = (accountId: FundAccountId, sourceAccounts: Array<{ id: string; name: string }>): string => {
+  const mappedAssetId = getAssetIdForFundAccount(accountId);
+  return sourceAccounts.find((acc) => acc.id === mappedAssetId)?.id ?? sourceAccounts[0]?.id ?? 'account-living';
+};
+
 type PrepareConfirmDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedCount: number;
   groups: FundAccountGroupSummary[];
   accountBalances: Record<string, number>;
   sourceAccounts: Array<{ id: string; name: string }>;
   onConfirm: (transfers: AccountBalanceTransfer[]) => void;
 };
 
-export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups, accountBalances, sourceAccounts, onConfirm }: PrepareConfirmDialogProps) => {
-  const [syncMap, setSyncMap] = useState<AccountSyncState>({});
+export const PrepareConfirmDialog = ({ open, onOpenChange, groups, accountBalances, sourceAccounts, onConfirm }: PrepareConfirmDialogProps) => {
+  const [syncMap, setSyncMap] = useState<AccountSyncState>(() => {
+    const initial: AccountSyncState = {};
+    for (const group of groups) {
+      if (canPrepareGroupTransfer(group)) {
+        initial[group.account.id] = {
+          enabled: true,
+          targetAccountId: resolvePrepareSourceId(group, sourceAccounts)
+        };
+      }
+    }
+    return initial;
+  });
 
-  const canGroupTransfer = (group: FundAccountGroupSummary) => (group.account.isCash || !group.account.sameAsLivingBudget) && group.needed > 0;
+  const canGroupTransfer = canPrepareGroupTransfer;
   const hasAnyBalanceSync = groups.some((group) => canGroupTransfer(group) && syncMap[group.account.id]?.enabled);
 
   const handleToggleSync = (group: FundAccountGroupSummary, enabled: boolean) => {
@@ -261,16 +292,11 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
     const toAssetId = getAssetIdForFundAccount(accountId);
     setSyncMap((prev) => {
       const existing = prev[accountId];
-      const preferredSource =
-        group.defaultTransferSourceId && group.defaultTransferSourceId !== toAssetId && sourceAccounts.some((acc) => acc.id === group.defaultTransferSourceId)
-          ? group.defaultTransferSourceId
-          : undefined;
-      const fallbackSource = preferredSource ?? sourceAccounts.find((acc) => acc.id !== toAssetId)?.id ?? 'account-living';
       return {
         ...prev,
         [accountId]: {
           enabled,
-          targetAccountId: existing?.targetAccountId && existing.targetAccountId !== toAssetId ? existing.targetAccountId : fallbackSource
+          targetAccountId: existing?.targetAccountId && existing.targetAccountId !== toAssetId ? existing.targetAccountId : resolvePrepareSourceId(group, sourceAccounts)
         }
       };
     });
@@ -330,7 +356,7 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-3">
           <DialogHeader>
             <DialogTitle>지불 대기로 변경</DialogTitle>
-            <DialogDescription>결제 계좌로 돈을 옮겼거나 현금·잔고를 확인한 뒤 변경해 주세요. ({selectedCount}건)</DialogDescription>
+            <DialogDescription>생활비 계좌에서 결제 계좌로 돈을 옮긴 후 변경해 주세요.</DialogDescription>
           </DialogHeader>
 
           <DialogBody className="flex flex-col gap-2">
@@ -356,7 +382,7 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <span className="block text-[10px] text-muted-foreground">더 채울 금액</span>
+                      <span className="block text-[10px] text-muted-foreground">지불 준비 금액</span>
                       <span className="text-sm font-extrabold text-primary">{formatWon(group.needed)}</span>
                     </div>
                   </div>
@@ -380,7 +406,9 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
                           : []
                       }
                     />
-                  ) : null}
+                  ) : (
+                    <NoTransferNotice group={group} />
+                  )}
                 </div>
               );
             })}
@@ -409,20 +437,27 @@ export const PrepareConfirmDialog = ({ open, onOpenChange, selectedCount, groups
 type CompleteConfirmDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedCount: number;
   groups: FundAccountGroupSummary[];
   accountBalances: Record<string, number>;
   sourceAccounts: Array<{ id: string; name: string }>;
   onConfirm: (deductions: AccountBalanceDelta[]) => void;
 };
 
-export const CompleteConfirmDialog = ({ open, onOpenChange, selectedCount, groups, accountBalances, sourceAccounts, onConfirm }: CompleteConfirmDialogProps) => {
-  const [syncMap, setSyncMap] = useState<AccountSyncState>({});
+export const CompleteConfirmDialog = ({ open, onOpenChange, groups, accountBalances, sourceAccounts, onConfirm }: CompleteConfirmDialogProps) => {
+  const [syncMap, setSyncMap] = useState<AccountSyncState>(() => {
+    const initial: AccountSyncState = {};
+    for (const group of groups) {
+      if (group.total > 0 && sourceAccounts.length > 0) {
+        initial[group.account.id] = {
+          enabled: true,
+          targetAccountId: resolveCompleteSourceId(group.account.id, sourceAccounts)
+        };
+      }
+    }
+    return initial;
+  });
 
-  const getDefaultSourceId = (accountId: FundAccountId): string => {
-    const mappedAssetId = getAssetIdForFundAccount(accountId);
-    return sourceAccounts.find((acc) => acc.id === mappedAssetId)?.id ?? sourceAccounts[0]?.id ?? 'account-living';
-  };
+  const getDefaultSourceId = (accountId: FundAccountId): string => resolveCompleteSourceId(accountId, sourceAccounts);
 
   const hasAnyBalanceSync = groups.some((group) => group.total > 0 && syncMap[group.account.id]?.enabled);
 
@@ -485,7 +520,7 @@ export const CompleteConfirmDialog = ({ open, onOpenChange, selectedCount, group
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-3">
           <DialogHeader>
             <DialogTitle>지불 완료로 변경</DialogTitle>
-            <DialogDescription>실제로 결제가 출금되었는지 확인한 뒤 변경해 주세요. ({selectedCount}건)</DialogDescription>
+            <DialogDescription>실제 출금이나 지불이 끝났는지 확인한 후 변경해 주세요.</DialogDescription>
           </DialogHeader>
 
           <DialogBody className="flex flex-col gap-2">
@@ -560,24 +595,13 @@ type ReleaseToPrepareDialogProps = {
   onOpenChange: (open: boolean) => void;
   fromStatus: '지불 대기' | '지불 완료';
   targetStatus?: '지불 준비 필요' | '지불 대기';
-  selectedCount: number;
   groups: FundAccountGroupSummary[];
   accountBalances: Record<string, number>;
   sourceAccounts: Array<{ id: string; name: string }>;
   onConfirm: (result: ReleaseBalanceSyncResult) => void;
 };
 
-export const ReleaseToPrepareDialog = ({
-  open,
-  onOpenChange,
-  fromStatus,
-  targetStatus = '지불 준비 필요',
-  selectedCount,
-  groups,
-  accountBalances,
-  sourceAccounts,
-  onConfirm
-}: ReleaseToPrepareDialogProps) => {
+export const ReleaseToPrepareDialog = ({ open, onOpenChange, fromStatus, targetStatus = '지불 준비 필요', groups, accountBalances, sourceAccounts, onConfirm }: ReleaseToPrepareDialogProps) => {
   const [syncMap, setSyncMap] = useState<AccountSyncState>({});
 
   const isFromCompleted = fromStatus === '지불 완료';
@@ -586,7 +610,7 @@ export const ReleaseToPrepareDialog = ({
     if (group.total <= 0) {
       return false;
     }
-    return isFromCompleted || group.account.isCash || !group.account.sameAsLivingBudget;
+    return isFromCompleted || requiresAccountTransfer(group.account);
   };
 
   const getEligibleTargets = (accountId: FundAccountId) => {
@@ -691,11 +715,7 @@ export const ReleaseToPrepareDialog = ({
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-col gap-3">
           <DialogHeader>
             <DialogTitle>{targetStatus === '지불 대기' ? '지불 대기로 변경' : '지불 준비 필요로 변경'}</DialogTitle>
-            <DialogDescription>
-              {isFromCompleted
-                ? `지불 완료를 취소하고 환불·복구할 계좌가 있다면 잔액 반영을 선택한 뒤 변경해 주세요. (${selectedCount}건)`
-                : `준비해 둔 금액을 반환할 계좌가 있다면 잔액 반영을 선택한 뒤 변경해 주세요. (${selectedCount}건)`}
-            </DialogDescription>
+            <DialogDescription>{isFromCompleted ? '결제가 실제로 취소·환불되었는지 확인한 후 변경해 주세요.' : '결제 계좌에서 생활비 계좌로 돈을 옮긴 후 변경해 주세요.'}</DialogDescription>
           </DialogHeader>
 
           <DialogBody className="flex flex-col gap-2">
@@ -746,6 +766,8 @@ export const ReleaseToPrepareDialog = ({
                       accountBalances={accountBalances}
                       previewLines={previewLines}
                     />
+                  ) : !isFromCompleted ? (
+                    <NoTransferNotice group={group} />
                   ) : null}
                 </div>
               );

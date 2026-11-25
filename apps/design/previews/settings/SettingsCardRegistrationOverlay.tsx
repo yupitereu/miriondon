@@ -113,7 +113,7 @@ export const SettingsCardRegistrationOverlay = ({
   };
 
   const effectiveIssuer = issuer === '기타' ? issuerOther.trim() : issuer;
-  const activeLiquidAccounts = assets.filter((item) => !item.inactive && item.group === 'cash-liquid' && !item.isDefaultCash);
+  const activeLiquidAccounts = assets.filter((item) => !item.inactive && item.group === 'cash-liquid' && item.typeLabel !== '현금');
   const ownerAccounts = activeLiquidAccounts.filter((item) => item.owner === owner);
   const selectableAccounts = ownerAccounts.length > 0 ? ownerAccounts : activeLiquidAccounts;
 

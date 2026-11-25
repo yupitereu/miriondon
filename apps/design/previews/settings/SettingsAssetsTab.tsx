@@ -29,12 +29,14 @@ import {
   useIsMobileView
 } from '@repo/ui-core';
 import { ChevronRight, CircleHelp, CreditCard, Landmark, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
-import { ASSET_GROUP_ORDER, type AssetGroupKey } from '@/previews/assets/assets-model';
+import { ASSET_GROUP_VISUALS } from '@/previews/assets/asset-group-visuals';
+import { ASSET_GROUP_ORDER, getCounterpartyRoleLabel, type AssetGroupKey } from '@/previews/assets/assets-model';
 import { SettingsCardRegistrationOverlay } from '@/previews/settings/SettingsCardRegistrationOverlay';
 import {
   ASSET_SUBTYPE_OPTIONS,
+  CASH_CURRENCY_OPTIONS,
   FX_CURRENCY_OPTIONS,
   GOLD_UNIT_OPTIONS,
   formatConditionSummary,
@@ -69,7 +71,6 @@ type AssetFormState = {
   currentBalance: number | null;
   unitLabel: string;
   quantityText: string;
-  isDefaultCash: boolean;
   inactive: boolean;
 };
 
@@ -119,7 +120,7 @@ export const SettingsAssetsTab = ({
   const [conditionDraft, setConditionDraft] = useState<CardConditionFormState | null>(null);
 
   const findAssetName = (assetId: string) => assets.find((item) => item.id === assetId)?.name ?? '계좌 확인 필요';
-  const activeLiquidAccounts = assets.filter((item) => !item.inactive && item.group === 'cash-liquid' && !item.isDefaultCash);
+  const activeLiquidAccounts = assets.filter((item) => !item.inactive && item.group === 'cash-liquid' && item.typeLabel !== '현금');
 
   const clearAssetInvalid = (key: string) => {
     setAssetInvalid((prev) => {
@@ -146,15 +147,14 @@ export const SettingsAssetsTab = ({
       name: '',
       institution: '',
       group: 'cash-liquid',
-      typeLabel: ASSET_SUBTYPE_OPTIONS['cash-liquid'][0] ?? '입출금 계좌',
+      typeLabel: ASSET_SUBTYPE_OPTIONS['cash-liquid'][0] ?? '일반계좌',
       owner: owners[0] ?? '민지(나)',
       includeInLivingBudget: true,
       counterparty: '',
       memo: '',
       currentBalance: 0,
-      unitLabel: 'USD',
+      unitLabel: 'KRW',
       quantityText: '',
-      isDefaultCash: false,
       inactive: false
     });
   };
@@ -172,9 +172,8 @@ export const SettingsAssetsTab = ({
       counterparty: asset.counterparty ?? '',
       memo: asset.memo ?? '',
       currentBalance: asset.currentBalance,
-      unitLabel: asset.marketQuote?.unitLabel ?? (asset.typeLabel === '금' ? '돈' : 'USD'),
+      unitLabel: asset.marketQuote?.unitLabel ?? asset.currency ?? (asset.typeLabel.startsWith('금 ') ? '돈' : asset.typeLabel === '현금' ? 'KRW' : 'USD'),
       quantityText: asset.marketQuote ? String(asset.marketQuote.quantity) : '',
-      isDefaultCash: Boolean(asset.isDefaultCash),
       inactive: asset.inactive
     });
   };
@@ -184,9 +183,12 @@ export const SettingsAssetsTab = ({
     const errors: string[] = [];
     const nextInvalid = new Set<string>();
     const trimmedName = assetForm.name.trim();
-    const isFx = assetForm.typeLabel === '외화 계좌';
-    const isGold = assetForm.typeLabel === '금';
+    const isCash = assetForm.typeLabel === '현금';
+    const isFx = assetForm.typeLabel === '외화 계좌' || (isCash && assetForm.unitLabel !== 'KRW');
+    const isGold = assetForm.typeLabel === '금 통장' || assetForm.typeLabel === '금 실물';
     const isQuoteAsset = isFx || isGold;
+    const existingAsset = assetForm.id ? assets.find((item) => item.id === assetForm.id) : undefined;
+    const needsQuoteQuantity = isQuoteAsset && (!assetForm.id || !existingAsset?.marketQuote);
     const quoteKind = isFx ? 'fx' : 'gold';
     const ratePerUnit = getReferenceRateForUnit(quoteKind, assetForm.unitLabel);
     const quoteValuation = calculateQuoteValuation(assetForm.quantityText, ratePerUnit);
@@ -195,16 +197,14 @@ export const SettingsAssetsTab = ({
       nextInvalid.add('name');
       errors.push('자산명을 입력해 주세요.');
     }
-    if (!assetForm.id) {
-      if (isQuoteAsset) {
-        if (!quoteValuation.isValid || quoteValuation.computedKrw === null) {
-          nextInvalid.add('quantity');
-          errors.push(`보유량(${assetForm.unitLabel})을 0 이상 숫자로 입력해 주세요.`);
-        }
-      } else if (assetForm.currentBalance == null || !Number.isSafeInteger(assetForm.currentBalance) || assetForm.currentBalance < 0) {
-        nextInvalid.add('balance');
-        errors.push('초기 금액은 0원 이상의 정수로 입력해 주세요.');
+    if (needsQuoteQuantity) {
+      if (!quoteValuation.isValid || quoteValuation.computedKrw === null) {
+        nextInvalid.add('quantity');
+        errors.push(`보유량(${assetForm.unitLabel})을 0 이상 숫자로 입력해 주세요.`);
       }
+    } else if (!assetForm.id && (assetForm.currentBalance == null || !Number.isSafeInteger(assetForm.currentBalance) || assetForm.currentBalance < 0)) {
+      nextInvalid.add('balance');
+      errors.push('초기 금액은 0원 이상의 정수로 입력해 주세요.');
     }
 
     if (errors.length > 0) {
@@ -214,7 +214,7 @@ export const SettingsAssetsTab = ({
     }
 
     const isCounterpartyGroup = assetForm.group === 'loan-deposit' || assetForm.group === 'debt';
-    const showInstitution = !isCounterpartyGroup && !assetForm.isDefaultCash && assetForm.typeLabel !== '금' && assetForm.typeLabel !== '부동산';
+    const showInstitution = !isCounterpartyGroup && !isCash && assetForm.typeLabel !== '금 실물' && assetForm.typeLabel !== '부동산';
 
     if (assetForm.id) {
       onAssetsChange((prev) =>
@@ -235,11 +235,13 @@ export const SettingsAssetsTab = ({
             ...item,
             name: trimmedName,
             institution: showInstitution ? assetForm.institution.trim() : '',
-            group: item.isDefaultCash ? item.group : assetForm.group,
-            typeLabel: item.isDefaultCash ? item.typeLabel : assetForm.typeLabel,
+            group: assetForm.group,
+            typeLabel: assetForm.typeLabel,
+            currency: isCash ? assetForm.unitLabel : undefined,
             includeInLivingBudget: assetForm.group === 'cash-liquid' ? assetForm.includeInLivingBudget : false,
             counterparty: isCounterpartyGroup ? assetForm.counterparty.trim() || undefined : undefined,
             memo: assetForm.memo.trim() || undefined,
+            currentBalance: isQuoteAsset ? (quoteValuation.computedKrw ?? item.currentBalance) : item.currentBalance,
             marketQuote: nextQuote
           };
         })
@@ -265,6 +267,7 @@ export const SettingsAssetsTab = ({
           institution: showInstitution ? assetForm.institution.trim() : '',
           group: assetForm.group,
           typeLabel: assetForm.typeLabel,
+          currency: isCash ? assetForm.unitLabel : undefined,
           owner: assetForm.owner,
           includeInLivingBudget: assetForm.group === 'cash-liquid' ? assetForm.includeInLivingBudget : false,
           currentBalance: computedBalance,
@@ -297,9 +300,6 @@ export const SettingsAssetsTab = ({
     }
 
     const blockReasons: string[] = [];
-    if (target.isDefaultCash) {
-      blockReasons.push('기본 원화 현금은 사용 중지하거나 삭제할 수 없어요.');
-    }
     if (target.currentBalance !== 0) {
       blockReasons.push(`잔액 또는 보유량이 0원이 아니에요 (현재 ${formatWon(target.currentBalance)}). 자산 현황에서 잔액을 먼저 0원으로 정리해 주세요.`);
     }
@@ -482,7 +482,7 @@ export const SettingsAssetsTab = ({
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed text-foreground break-keep">
-                등록 시 4대 자산 구분을 선택해요. 기본 원화 현금은 구성원마다 자동 제공하며 사용 중지할 수 없어요. 단순 잔액 변경은 자산 현황에서 관리해요.
+                자산 구분과 유형에 맞는 현금·계좌·저축·투자 자산을 등록해요. 단순 잔액 변경은 자산 현황에서 관리해요.
               </PopoverContent>
             </Popover>
           </div>
@@ -491,8 +491,8 @@ export const SettingsAssetsTab = ({
           </Button>
         </div>
 
-        <div className="flex flex-col gap-5">
-          {owners.map((ownerName) => {
+        <div className="flex flex-col">
+          {owners.map((ownerName, index) => {
             const ownedAssets = assets.filter((item) => item.owner === ownerName);
             const activeGroups = ASSET_GROUP_ORDER.map((meta) => ({
               meta,
@@ -500,104 +500,121 @@ export const SettingsAssetsTab = ({
             })).filter(({ items }) => items.length > 0);
 
             return (
-              <div key={ownerName} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/15 p-3 sm:p-4">
-                <div className="flex items-center gap-2">
-                  <MemberAvatar name={ownerName} size="sm" mode="icon-hover" />
-                  <h3 className="text-sm font-bold text-foreground">{ownerName}</h3>
-                  <Badge variant="neutral" className="tabular-nums">
-                    {ownedAssets.length}건
-                  </Badge>
-                </div>
-
-                {activeGroups.length === 0 ? (
-                  <p className="py-2 text-xs text-muted-foreground">등록된 자산이 없어요.</p>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {activeGroups.map(({ meta, items }) => (
-                      <div key={meta.key} className="overflow-hidden rounded-lg border border-border bg-card">
-                        <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/35 px-3 py-2">
-                          <span className="text-xs font-bold text-foreground">{meta.label}</span>
-                          <span className="text-[11px] text-muted-foreground tabular-nums">{items.length}건</span>
-                        </div>
-
-                        {/* 모바일 행 리스트 */}
-                        <div className="divide-y divide-border md:hidden">
-                          {items.map((item) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => openEditAsset(item)}
-                              aria-label={`${item.name} 관리`}
-                              className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/35 focus-visible:outline-2 focus-visible:outline-primary"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <strong className={cn('text-sm font-bold break-keep', item.inactive && 'text-muted-foreground line-through')}>{item.name}</strong>
-                                  {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
-                                </div>
-                                <p className="mt-0.5 text-xs text-muted-foreground">{[item.typeLabel, item.marketQuote?.unitLabel, item.counterparty].filter(Boolean).join(' · ')}</p>
-                                {item.memo ? <p className="mt-0.5 text-xs text-muted-foreground/85 break-keep">{item.memo}</p> : null}
-                              </div>
-                              <div className="flex shrink-0 items-center gap-1.5">
-                                <Badge variant={item.inactive ? 'neutral' : 'positive'}>{item.inactive ? '사용 중지' : '사용 중'}</Badge>
-                                <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* 태블릿/PC 정렬 테이블 */}
-                        <table className="hidden w-full table-fixed border-collapse text-sm md:table">
-                          <thead className="bg-background text-xs text-muted-foreground">
-                            <tr className="border-b border-border">
-                              <th scope="col" className="px-3 py-2 text-left font-medium">
-                                자산
-                              </th>
-                              <th scope="col" className="w-36 px-2 py-2 text-left font-medium lg:w-44">
-                                유형
-                              </th>
-                              <th scope="col" className="w-22 px-2 py-2 text-center font-medium lg:w-24">
-                                상태
-                              </th>
-                              <th scope="col" className="w-18 px-3 py-2 text-right font-medium lg:w-20">
-                                관리
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border">
-                            {items.map((item) => (
-                              <tr key={item.id} className="hover:bg-muted/25">
-                                <td className="px-3 py-2.5">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={cn('min-w-0 truncate font-semibold text-foreground', item.inactive && 'text-muted-foreground line-through')}>{item.name}</span>
-                                    {item.includeInLivingBudget ? (
-                                      <Badge variant="wine" className="shrink-0">
-                                        생활비
-                                      </Badge>
-                                    ) : null}
-                                  </div>
-                                  {item.counterparty || item.memo ? (
-                                    <p className="truncate text-xs text-muted-foreground">{[item.counterparty ? `상대: ${item.counterparty}` : null, item.memo].filter(Boolean).join(' · ')}</p>
-                                  ) : null}
-                                </td>
-                                <td className="truncate px-2 py-2.5 text-xs text-muted-foreground">{[item.typeLabel, item.marketQuote?.unitLabel].filter(Boolean).join(' · ')}</td>
-                                <td className="px-2 py-2.5 text-center whitespace-nowrap">
-                                  <Badge variant={item.inactive ? 'neutral' : 'positive'}>{item.inactive ? '사용 중지' : '사용 중'}</Badge>
-                                </td>
-                                <td className="px-3 py-2.5 text-right">
-                                  <Button type="button" size="sm" variant="outline" onClick={() => openEditAsset(item)}>
-                                    수정
-                                  </Button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ))}
+              <Fragment key={ownerName}>
+                {index > 0 ? <div aria-hidden="true" className="mx-2 my-5 h-px bg-border-strong" /> : null}
+                <div className="flex flex-col gap-4 rounded-xl border border-border-strong/70 bg-muted/20 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <MemberAvatar name={ownerName} size="sm" mode="icon-hover" />
+                    <h3 className="text-sm font-bold text-foreground">{ownerName}</h3>
+                    <Badge variant="neutral" className="tabular-nums">
+                      {ownedAssets.length}건
+                    </Badge>
                   </div>
-                )}
-              </div>
+
+                  {activeGroups.length === 0 ? (
+                    <p className="py-2 text-xs text-muted-foreground">등록된 자산이 없어요.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {activeGroups.map(({ meta, items }) => {
+                        const visual = ASSET_GROUP_VISUALS[meta.key];
+                        const GroupIcon = visual.icon;
+
+                        return (
+                          <div key={meta.key} className="overflow-hidden rounded-lg border border-border bg-card">
+                            <div className={cn('flex items-center justify-between gap-2 border-b border-border px-3 py-2', visual.headerBgClass)}>
+                              <div className="flex items-center gap-2">
+                                <span className={cn('inline-flex size-7 shrink-0 items-center justify-center rounded-lg', visual.iconBoxClass)}>
+                                  <GroupIcon aria-hidden="true" className="size-4" />
+                                </span>
+                                <span className="text-xs font-bold text-foreground">{meta.label}</span>
+                              </div>
+                              <span className="text-[11px] text-muted-foreground tabular-nums">{items.length}건</span>
+                            </div>
+
+                            {/* 모바일 행 리스트 */}
+                            <div className="divide-y divide-border md:hidden">
+                              {items.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => openEditAsset(item)}
+                                  aria-label={`${item.name} 관리`}
+                                  className="flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/35 focus-visible:outline-2 focus-visible:outline-primary"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <strong className={cn('text-sm font-bold break-keep', item.inactive && 'text-muted-foreground line-through')}>{item.name}</strong>
+                                      {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                      {[item.typeLabel, item.marketQuote?.unitLabel ?? item.currency, item.counterparty].filter(Boolean).join(' · ')}
+                                    </p>
+                                    {item.memo ? <p className="mt-0.5 text-xs text-muted-foreground/85 break-keep">{item.memo}</p> : null}
+                                  </div>
+                                  <div className="flex shrink-0 items-center gap-1.5">
+                                    <Badge variant={item.inactive ? 'neutral' : 'positive'}>{item.inactive ? '사용 중지' : '사용 중'}</Badge>
+                                    <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* 태블릿/PC 정렬 테이블 */}
+                            <table className="hidden w-full table-fixed border-collapse text-sm md:table">
+                              <thead className="bg-background text-xs text-muted-foreground">
+                                <tr className="border-b border-border">
+                                  <th scope="col" className="px-3 py-2 text-left font-medium">
+                                    자산
+                                  </th>
+                                  <th scope="col" className="w-36 px-2 py-2 text-left font-medium lg:w-44">
+                                    유형
+                                  </th>
+                                  <th scope="col" className="w-22 px-2 py-2 text-center font-medium lg:w-24">
+                                    상태
+                                  </th>
+                                  <th scope="col" className="w-18 px-3 py-2 text-right font-medium lg:w-20">
+                                    관리
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {items.map((item) => (
+                                  <tr key={item.id} className="hover:bg-muted/25">
+                                    <td className="px-3 py-2.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={cn('min-w-0 truncate font-semibold text-foreground', item.inactive && 'text-muted-foreground line-through')}>{item.name}</span>
+                                        {item.includeInLivingBudget ? (
+                                          <Badge variant="wine" className="shrink-0">
+                                            생활비
+                                          </Badge>
+                                        ) : null}
+                                      </div>
+                                      {item.counterparty || item.memo ? (
+                                        <p className="truncate text-xs text-muted-foreground">
+                                          {[item.counterparty ? `${getCounterpartyRoleLabel(item.group)}: ${item.counterparty}` : null, item.memo].filter(Boolean).join(' · ')}
+                                        </p>
+                                      ) : null}
+                                    </td>
+                                    <td className="truncate px-2 py-2.5 text-xs text-muted-foreground">{[item.typeLabel, item.marketQuote?.unitLabel ?? item.currency].filter(Boolean).join(' · ')}</td>
+                                    <td className="px-2 py-2.5 text-center whitespace-nowrap">
+                                      <Badge variant={item.inactive ? 'neutral' : 'positive'}>{item.inactive ? '사용 중지' : '사용 중'}</Badge>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right">
+                                      <Button type="button" size="sm" variant="outline" onClick={() => openEditAsset(item)}>
+                                        수정
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Fragment>
             );
           })}
         </div>
@@ -632,104 +649,107 @@ export const SettingsAssetsTab = ({
           </Button>
         </div>
 
-        <div className="flex flex-col gap-5">
-          {owners.map((ownerName) => {
+        <div className="flex flex-col">
+          {owners.map((ownerName, index) => {
             const ownedCards = cards.filter((card) => card.owner === ownerName);
             return (
-              <div key={ownerName} className="flex flex-col gap-3 rounded-xl border border-border bg-muted/15 p-3 sm:p-4">
-                <div className="flex items-center gap-2">
-                  <MemberAvatar name={ownerName} size="sm" mode="icon-hover" />
-                  <h3 className="text-sm font-bold text-foreground">{ownerName}</h3>
-                  <Badge variant="neutral" className="tabular-nums">
-                    {ownedCards.length}장
-                  </Badge>
-                </div>
-
-                {ownedCards.length === 0 ? (
-                  <p className="py-2 text-xs text-muted-foreground">등록된 카드가 없어요.</p>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {ownedCards.map((card) => {
-                      const sourceBadge = getConditionSourceBadge(card.conditionSource);
-                      return (
-                        <article key={card.id} className="flex flex-col justify-between gap-3 rounded-xl border border-border-strong bg-card p-3.5">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <strong className={cn('text-sm font-bold text-foreground break-keep', card.inactive && 'text-muted-foreground line-through')}>
-                                    {card.label} · <span className="tabular-nums">{card.last4}</span>
-                                  </strong>
-                                </div>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                  {card.issuer} · {card.kind === 'credit' ? '신용카드' : '체크카드'}
-                                </p>
-                              </div>
-                              <Badge variant={card.inactive ? 'neutral' : 'positive'} className="shrink-0">
-                                {card.inactive ? '사용 중지' : '사용 중'}
-                              </Badge>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Badge variant={sourceBadge.variant}>{sourceBadge.label}</Badge>
-                              <span className="text-[11px] text-muted-foreground tabular-nums">
-                                단계 {card.tiers.length}개 · 확인 {card.verifiedAt}
-                              </span>
-                            </div>
-
-                            <dl className="grid grid-cols-1 gap-1 rounded-lg bg-muted/35 px-2.5 py-2 text-xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <dt className="text-muted-foreground">{card.kind === 'credit' ? '결제 계좌' : '출금 계좌'}</dt>
-                                <dd className="truncate font-medium text-foreground">{findAssetName(card.paymentAccountId)}</dd>
-                              </div>
-                              {card.kind === 'credit' ? (
-                                <>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <dt className="text-muted-foreground">송금 계좌</dt>
-                                    <dd className="truncate font-medium text-foreground">{findAssetName(card.transferSourceAccountId)}</dd>
-                                  </div>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <dt className="text-muted-foreground">결제일</dt>
-                                    <dd className="font-medium text-foreground tabular-nums">매월 {card.dueDay}일</dd>
-                                  </div>
-                                </>
-                              ) : null}
-                              {card.useDeferredTransit ? (
-                                <div className="flex items-center justify-between gap-2">
-                                  <dt className="text-muted-foreground">후불교통</dt>
-                                  <dd className="truncate font-medium text-foreground tabular-nums">
-                                    {findAssetName(card.transitAccountId)} · 매월 {card.transitDay}일
-                                  </dd>
-                                </div>
-                              ) : null}
-                            </dl>
-
-                            <p className="text-[11px] text-muted-foreground break-keep">{formatConditionSummary(card)}</p>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-2.5">
-                            <Button type="button" size="sm" variant="outline" onClick={() => openCardEdit(card)}>
-                              수정
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={() => openConditionsModal(card)}>
-                              조건 확인
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className={cn('ml-auto', card.inactive ? 'text-primary' : 'text-destructive hover:bg-destructive-tint hover:text-destructive')}
-                              onClick={() => void handleToggleCardStatus(card)}
-                            >
-                              {card.inactive ? '재사용' : '사용 중지'}
-                            </Button>
-                          </div>
-                        </article>
-                      );
-                    })}
+              <Fragment key={ownerName}>
+                {index > 0 ? <div aria-hidden="true" className="mx-2 my-5 h-px bg-border-strong" /> : null}
+                <div className="flex flex-col gap-4 rounded-xl border border-border-strong/70 bg-muted/20 p-4 sm:p-5">
+                  <div className="flex items-center gap-2">
+                    <MemberAvatar name={ownerName} size="sm" mode="icon-hover" />
+                    <h3 className="text-sm font-bold text-foreground">{ownerName}</h3>
+                    <Badge variant="neutral" className="tabular-nums">
+                      {ownedCards.length}장
+                    </Badge>
                   </div>
-                )}
-              </div>
+
+                  {ownedCards.length === 0 ? (
+                    <p className="py-2 text-xs text-muted-foreground">등록된 카드가 없어요.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {ownedCards.map((card) => {
+                        const sourceBadge = getConditionSourceBadge(card.conditionSource);
+                        return (
+                          <article key={card.id} className="flex flex-col justify-between gap-3 rounded-xl border border-border-strong bg-card p-3.5">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <strong className={cn('text-sm font-bold text-foreground break-keep', card.inactive && 'text-muted-foreground line-through')}>
+                                      {card.label} · <span className="tabular-nums">{card.last4}</span>
+                                    </strong>
+                                  </div>
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {card.issuer} · {card.kind === 'credit' ? '신용카드' : '체크카드'}
+                                  </p>
+                                </div>
+                                <Badge variant={card.inactive ? 'neutral' : 'positive'} className="shrink-0">
+                                  {card.inactive ? '사용 중지' : '사용 중'}
+                                </Badge>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Badge variant={sourceBadge.variant}>{sourceBadge.label}</Badge>
+                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                  단계 {card.tiers.length}개 · 확인 {card.verifiedAt}
+                                </span>
+                              </div>
+
+                              <dl className="grid grid-cols-1 gap-1 rounded-lg bg-muted/35 px-2.5 py-2 text-xs">
+                                <div className="flex items-center justify-between gap-2">
+                                  <dt className="text-muted-foreground">{card.kind === 'credit' ? '결제 계좌' : '출금 계좌'}</dt>
+                                  <dd className="truncate font-medium text-foreground">{findAssetName(card.paymentAccountId)}</dd>
+                                </div>
+                                {card.kind === 'credit' ? (
+                                  <>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <dt className="text-muted-foreground">송금 계좌</dt>
+                                      <dd className="truncate font-medium text-foreground">{findAssetName(card.transferSourceAccountId)}</dd>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <dt className="text-muted-foreground">결제일</dt>
+                                      <dd className="font-medium text-foreground tabular-nums">매월 {card.dueDay}일</dd>
+                                    </div>
+                                  </>
+                                ) : null}
+                                {card.useDeferredTransit ? (
+                                  <div className="flex items-center justify-between gap-2">
+                                    <dt className="text-muted-foreground">후불교통</dt>
+                                    <dd className="truncate font-medium text-foreground tabular-nums">
+                                      {findAssetName(card.transitAccountId)} · 매월 {card.transitDay}일
+                                    </dd>
+                                  </div>
+                                ) : null}
+                              </dl>
+
+                              <p className="text-[11px] text-muted-foreground break-keep">{formatConditionSummary(card)}</p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-2.5">
+                              <Button type="button" size="sm" variant="outline" onClick={() => openCardEdit(card)}>
+                                수정
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => openConditionsModal(card)}>
+                                조건 확인
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className={cn('ml-auto', card.inactive ? 'text-primary' : 'text-destructive hover:bg-destructive-tint hover:text-destructive')}
+                                onClick={() => void handleToggleCardStatus(card)}
+                              >
+                                {card.inactive ? '재사용' : '사용 중지'}
+                              </Button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Fragment>
             );
           })}
         </div>
@@ -754,7 +774,6 @@ export const SettingsAssetsTab = ({
                   <span className="text-xs font-semibold text-foreground">자산 구분</span>
                   <Select
                     value={assetForm.group}
-                    disabled={assetForm.isDefaultCash}
                     onValueChange={(nextGroup) => {
                       const group = nextGroup as AssetGroupKey;
                       const nextType = ASSET_SUBTYPE_OPTIONS[group][0] ?? '';
@@ -765,7 +784,7 @@ export const SettingsAssetsTab = ({
                               ...prev,
                               group,
                               typeLabel: nextType,
-                              unitLabel: nextType === '금' ? '돈' : 'USD',
+                              unitLabel: nextType.startsWith('금 ') ? '돈' : nextType === '현금' ? 'KRW' : 'USD',
                               includeInLivingBudget: group === 'cash-liquid' ? prev.includeInLivingBudget : false
                             }
                           : null
@@ -787,36 +806,32 @@ export const SettingsAssetsTab = ({
 
                 <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-semibold text-foreground">세부 유형</span>
-                  {assetForm.isDefaultCash ? (
-                    <Input value={assetForm.typeLabel} disabled />
-                  ) : (
-                    <Select
-                      value={assetForm.typeLabel}
-                      onValueChange={(nextType) => {
-                        setAssetInvalid(new Set());
-                        setAssetForm((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                typeLabel: nextType,
-                                unitLabel: nextType === '금' ? '돈' : nextType === '외화 계좌' ? 'USD' : prev.unitLabel
-                              }
-                            : null
-                        );
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ASSET_SUBTYPE_OPTIONS[assetForm.group].map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                  <Select
+                    value={assetForm.typeLabel}
+                    onValueChange={(nextType) => {
+                      setAssetInvalid(new Set());
+                      setAssetForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              typeLabel: nextType,
+                              unitLabel: nextType.startsWith('금 ') ? '돈' : nextType === '현금' ? 'KRW' : nextType === '외화 계좌' ? 'USD' : prev.unitLabel
+                            }
+                          : null
+                      );
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ASSET_SUBTYPE_OPTIONS[assetForm.group].map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -838,16 +853,16 @@ export const SettingsAssetsTab = ({
                 {assetForm.group === 'loan-deposit' || assetForm.group === 'debt' ? (
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="asset-form-counterparty" className="text-xs font-semibold text-foreground">
-                      상대방 (사람 또는 기관)
+                      {getCounterpartyRoleLabel(assetForm.group)} (사람 또는 기관)
                     </label>
                     <Input
                       id="asset-form-counterparty"
-                      placeholder="예: 임대인 김OO, 카카오뱅크"
+                      placeholder={assetForm.group === 'loan-deposit' ? '예: 임대인 김OO, 박대리(외부인)' : '예: 카카오뱅크, 세입자 김OO'}
                       value={assetForm.counterparty}
                       onChange={(event) => setAssetForm((prev) => (prev ? { ...prev, counterparty: event.target.value } : null))}
                     />
                   </div>
-                ) : !assetForm.isDefaultCash && assetForm.typeLabel !== '금' && assetForm.typeLabel !== '부동산' ? (
+                ) : assetForm.typeLabel !== '현금' && assetForm.typeLabel !== '금 실물' && assetForm.typeLabel !== '부동산' ? (
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="asset-form-inst" className="text-xs font-semibold text-foreground">
                       금융기관(선택)
@@ -861,7 +876,7 @@ export const SettingsAssetsTab = ({
                   </div>
                 ) : null}
 
-                {assetForm.typeLabel === '외화 계좌' ? (
+                {assetForm.typeLabel === '현금' || assetForm.typeLabel === '외화 계좌' ? (
                   <div className="flex flex-col gap-1.5">
                     <span className="text-xs font-semibold text-foreground">통화</span>
                     <Select value={assetForm.unitLabel} onValueChange={(next) => setAssetForm((prev) => (prev ? { ...prev, unitLabel: next } : null))}>
@@ -869,7 +884,7 @@ export const SettingsAssetsTab = ({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {FX_CURRENCY_OPTIONS.map((currency) => (
+                        {(assetForm.typeLabel === '현금' ? CASH_CURRENCY_OPTIONS : FX_CURRENCY_OPTIONS).map((currency) => (
                           <SelectItem key={currency.code} value={currency.code}>
                             {currency.label}
                           </SelectItem>
@@ -877,7 +892,7 @@ export const SettingsAssetsTab = ({
                       </SelectContent>
                     </Select>
                   </div>
-                ) : assetForm.typeLabel === '금' ? (
+                ) : assetForm.typeLabel === '금 통장' || assetForm.typeLabel === '금 실물' ? (
                   <div className="flex flex-col gap-1.5">
                     <span className="text-xs font-semibold text-foreground">단위</span>
                     <Select value={assetForm.unitLabel} onValueChange={(next) => setAssetForm((prev) => (prev ? { ...prev, unitLabel: next } : null))}>
@@ -898,7 +913,7 @@ export const SettingsAssetsTab = ({
                 <div
                   className={cn(
                     'flex flex-col gap-1.5',
-                    assetForm.id && assetForm.typeLabel !== '외화 계좌' && assetForm.typeLabel !== '금' && !assetForm.isDefaultCash && assetForm.typeLabel !== '부동산' ? 'sm:col-span-2' : ''
+                    assetForm.id && assetForm.typeLabel !== '외화 계좌' && !assetForm.typeLabel.startsWith('금 ') && assetForm.typeLabel !== '부동산' ? 'sm:col-span-2' : ''
                   )}
                 >
                   <span className="text-xs font-semibold text-foreground">소유자</span>
@@ -917,7 +932,7 @@ export const SettingsAssetsTab = ({
                   {assetForm.id ? <p className="text-[11px] text-muted-foreground">등록된 자산의 소유자는 바꿀 수 없어요.</p> : null}
                 </div>
 
-                {!assetForm.id && assetForm.typeLabel !== '외화 계좌' && assetForm.typeLabel !== '금' ? (
+                {!assetForm.id && assetForm.typeLabel !== '외화 계좌' && !(assetForm.typeLabel === '현금' && assetForm.unitLabel !== 'KRW') && !assetForm.typeLabel.startsWith('금 ') ? (
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="asset-form-balance" className="text-xs font-semibold text-foreground">
                       초기 잔액 · 평가액
@@ -936,13 +951,13 @@ export const SettingsAssetsTab = ({
                 ) : null}
               </div>
 
-              {assetForm.typeLabel === '외화 계좌' || assetForm.typeLabel === '금'
+              {assetForm.typeLabel === '외화 계좌' || (assetForm.typeLabel === '현금' && assetForm.unitLabel !== 'KRW') || assetForm.typeLabel === '금 통장' || assetForm.typeLabel === '금 실물'
                 ? (() => {
-                    const quoteKind = assetForm.typeLabel === '외화 계좌' ? 'fx' : 'gold';
+                    const quoteKind = assetForm.typeLabel === '외화 계좌' || assetForm.typeLabel === '현금' ? 'fx' : 'gold';
                     const ratePerUnit = getReferenceRateForUnit(quoteKind, assetForm.unitLabel);
                     return (
                       <div className="rounded-xl border border-border bg-muted/20 p-3">
-                        {!assetForm.id ? (
+                        {!assetForm.id || !assets.find((item) => item.id === assetForm.id)?.marketQuote ? (
                           <MarketQuoteValuationFields
                             assetKind={quoteKind}
                             unitLabel={assetForm.unitLabel}
@@ -980,9 +995,8 @@ export const SettingsAssetsTab = ({
 
               {assetForm.group === 'cash-liquid' ? (
                 <Checkbox
-                  label="생활비 계좌로 사용"
+                  label={assetForm.typeLabel === '현금' ? '생활비에 포함' : '생활비 계좌로 사용'}
                   checked={assetForm.includeInLivingBudget}
-                  disabled={assetForm.isDefaultCash}
                   onCheckedChange={(checked) => setAssetForm((prev) => (prev ? { ...prev, includeInLivingBudget: checked === true } : null))}
                 />
               ) : null}
@@ -994,7 +1008,7 @@ export const SettingsAssetsTab = ({
               </NoticeBox>
             </ResponsiveOverlayBody>
             <ResponsiveOverlayFooter sheetClassName="flex-wrap gap-2">
-              {assetForm.id && !assetForm.isDefaultCash ? (
+              {assetForm.id ? (
                 <Button
                   type="button"
                   variant="ghost"

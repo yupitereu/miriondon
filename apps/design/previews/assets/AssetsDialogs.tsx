@@ -1,6 +1,23 @@
 'use client';
 
-import { Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, NoticeBox, NumberInput, cn } from '@repo/ui-core';
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  NoticeBox,
+  NumberInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  cn
+} from '@repo/ui-core';
 import { ArrowRight } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 
@@ -10,10 +27,12 @@ import {
   formatQuantityWithUnit,
   getAssetCurrentValuation,
   getAssetExpectedTotals,
+  getCounterpartyRoleLabel,
   getTotalUncollectedReceivables,
   type AssetDetailItem,
   type AssetValuationMode
 } from '@/previews/assets/assets-model';
+import { GOLD_UNIT_OPTIONS, getReferenceRateForUnit } from '@/previews/settings/settings-model';
 import { MarketQuoteValuationFields, calculateQuoteValuation } from '@/shared/MarketQuoteValuationFields';
 import { MemberAvatar } from '@/shared/MemberAvatar';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
@@ -23,6 +42,8 @@ export type AssetBalanceSavePayload = {
   currentBalance: number;
   valuationMode?: AssetValuationMode;
   quantity?: number;
+  unitLabel?: string;
+  ratePerUnit?: number;
 };
 
 export const AssetBalanceEditDialog = ({
@@ -40,16 +61,18 @@ export const AssetBalanceEditDialog = ({
   const isDebt = asset.group === 'debt';
 
   const [quantityText, setQuantityText] = useState<string>(() => (quote ? String(quote.quantity) : ''));
+  const [unitLabel, setUnitLabel] = useState<string>(() => quote?.unitLabel ?? '돈');
   const [manualAmount, setManualAmount] = useState<number | null>(() => getAssetCurrentValuation(asset));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const ratePerUnit = quote?.assetKind === 'gold' ? getReferenceRateForUnit('gold', unitLabel) : (quote?.ratePerUnit ?? 0);
 
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (quote) {
-      const { isValid, quantity, computedKrw } = calculateQuoteValuation(quantityText, quote.ratePerUnit);
+      const { isValid, quantity, computedKrw } = calculateQuoteValuation(quantityText, ratePerUnit);
       if (!isValid || computedKrw === null) {
-        setErrorMessage(`0 이상의 보유량(${quote.unitLabel})을 입력해 주세요.`);
+        setErrorMessage(`0 이상의 보유량(${unitLabel})을 입력해 주세요.`);
         return;
       }
       setErrorMessage(null);
@@ -57,7 +80,9 @@ export const AssetBalanceEditDialog = ({
         assetId: asset.id,
         currentBalance: computedKrw,
         valuationMode: 'reference-rate',
-        quantity
+        quantity,
+        unitLabel,
+        ratePerUnit
       });
       onOpenChange(false);
       return;
@@ -81,38 +106,68 @@ export const AssetBalanceEditDialog = ({
       <DialogContent className="gap-0">
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle className="break-keep">{asset.name} · 잔액 수정</DialogTitle>
+            <DialogTitle className="break-keep">{asset.name}</DialogTitle>
             <DialogDescription className="flex flex-wrap items-center gap-1 break-keep">
               <MemberAvatar name={asset.owner} size="xs" />
               {[asset.institution, asset.typeLabel].filter(Boolean).map((part) => (
                 <span key={part}>· {part}</span>
               ))}
               {asset.counterparty ? (
-                <>
-                  <span>· 상대</span>
-                  <MemberAvatar name={asset.counterparty} size="xs" />
-                </>
+                <span>
+                  · {getCounterpartyRoleLabel(asset.group)} {asset.counterparty}
+                </span>
               ) : null}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody className="flex flex-col gap-3.5 pt-4">
             {quote ? (
-              <MarketQuoteValuationFields
-                assetKind={quote.assetKind}
-                unitLabel={quote.unitLabel}
-                ratePerUnit={quote.ratePerUnit}
-                rateSource={quote.rateSource}
-                rateUpdatedAt={quote.rateUpdatedAt}
-                quantityText={quantityText}
-                invalid={Boolean(errorMessage)}
-                onQuantityTextChange={(next) => {
-                  setQuantityText(next);
-                  if (errorMessage) {
-                    setErrorMessage(null);
-                  }
-                }}
-              />
+              <>
+                {quote.assetKind === 'gold' ? (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-foreground">단위</span>
+                    <Select
+                      value={unitLabel}
+                      onValueChange={(next) => {
+                        const currentQuantity = Number(quantityText.replace(/,/g, '').trim());
+                        if (quantityText.trim() && Number.isFinite(currentQuantity)) {
+                          const grams = unitLabel === '돈' ? currentQuantity * 3.75 : currentQuantity;
+                          const converted = next === '돈' ? grams / 3.75 : grams;
+                          setQuantityText(String(Number(converted.toPrecision(12))));
+                        }
+                        setUnitLabel(next);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GOLD_UNIT_OPTIONS.map((option) => (
+                          <SelectItem key={option.unit} value={option.unit}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <MarketQuoteValuationFields
+                  assetKind={quote.assetKind}
+                  unitLabel={unitLabel}
+                  ratePerUnit={ratePerUnit}
+                  rateSource={quote.rateSource}
+                  rateUpdatedAt={quote.rateUpdatedAt}
+                  quantityText={quantityText}
+                  invalid={Boolean(errorMessage)}
+                  onQuantityTextChange={(next) => {
+                    setQuantityText(next);
+                    if (errorMessage) {
+                      setErrorMessage(null);
+                    }
+                  }}
+                />
+              </>
             ) : (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="asset-balance-input" className="text-xs font-semibold text-foreground">
@@ -132,14 +187,6 @@ export const AssetBalanceEditDialog = ({
                 />
               </div>
             )}
-
-            <NoticeBox variant="info">
-              {quote
-                ? '보유량을 저장하면 공통 참고 시세로 원화 평가액이 자동 계산돼요. 단순 수량 수정은 새 수입·지출을 만들지 않아요.'
-                : isDebt
-                  ? '남은 대출 원금을 직접 갱신해요. 단순 금액 수정은 새 지출이나 상환 거래를 만들지 않아요.'
-                  : '마지막 확인 기준 실제 잔액·평가액을 저장해요. 단순 잔액 수정은 새 수입·지출을 만들지 않아요.'}
-            </NoticeBox>
 
             {errorMessage ? (
               <p role="alert" className="text-xs font-semibold text-destructive break-keep">
@@ -245,10 +292,9 @@ export const AssetReceivablesDialog = ({ open, onOpenChange, onGoReceivables }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0">
+      <DialogContent aria-describedby={undefined} className="gap-0">
         <DialogHeader>
           <DialogTitle>전체 미회수 금액</DialogTitle>
-          <DialogDescription className="break-keep">전체 기간 기준으로 아직 정산받지 못한 상대별 미회수 잔액이에요.</DialogDescription>
         </DialogHeader>
 
         <DialogBody className="flex flex-col gap-3.5 pt-4">
@@ -269,7 +315,7 @@ export const AssetReceivablesDialog = ({ open, onOpenChange, onGoReceivables }: 
             ))}
           </div>
 
-          <NoticeBox variant="info">아직 받기 전 금액이라 현재 자산에는 포함되지 않아요. 돈을 받으면 회수 관리에서 완료 처리해 주세요.</NoticeBox>
+          <NoticeBox variant="info">미회수 금액은 현재 자산에는 포함되지 않고, 입금 예정 금액으로 분류돼 예상 잔액에 반영돼요.</NoticeBox>
         </DialogBody>
 
         <DialogFooter className="grid grid-cols-2 gap-2 pt-4 sm:flex sm:justify-end">

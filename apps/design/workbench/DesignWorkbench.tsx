@@ -175,7 +175,7 @@ export const DesignWorkbench = ({ initialTheme, initialRouteId, initialViewportM
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PREVIEW_ROUTES.map((route) => (
+                  {PREVIEW_ROUTES.filter((route) => !route.hiddenFromSwitcher).map((route) => (
                     <SelectItem key={route.id} value={route.id}>
                       {route.label}
                     </SelectItem>

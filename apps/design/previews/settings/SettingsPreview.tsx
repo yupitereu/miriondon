@@ -20,18 +20,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
   Tabs,
   TabsList,
   TabsTrigger,
   cn,
   useIsMobileView
 } from '@repo/ui-core';
-import { Check, ChevronDown, ChevronRight, CircleHelp, Plus } from 'lucide-react';
+import { Check, ChevronRight, CircleHelp, CreditCard, Plus, Repeat, Settings2, Tags } from 'lucide-react';
 import Link from 'next/link';
 import { useRef, useState, type ReactNode } from 'react';
 
@@ -52,7 +47,17 @@ import { updateSettingsStore, useSettingsStore, type SettingsMember, type Settin
 import { DesignAppShell } from '@/shared/DesignAppShell';
 import { MemberAvatar } from '@/shared/MemberAvatar';
 import { MemberTaxSettings, useMemberBusinessSubView, type MemberBusinessSubView } from '@/shared/MemberTaxSettings';
-import { setTaxRecordingEnabled, useTaxRecordingEnabled } from '@/shared/design-ledger-settings';
+import {
+  LEDGER_ICON_OPTIONS,
+  LedgerIcon,
+  findDesignLedger,
+  setTaxRecordingEnabled,
+  updateDesignLedger,
+  useActiveLedgerId,
+  useDesignLedgers,
+  useTaxRecordingEnabled,
+  type LedgerIconKey
+} from '@/shared/design-ledger-settings';
 import { DESIGN_PROFILE_NAME, normalizeMemberBaseName, renameMemberTaxOwner, useAllMemberTaxStatuses, usePersonalBusinesses, usePersonalProfile } from '@/shared/design-personal-businesses';
 
 type Role = SettingsRole;
@@ -63,9 +68,12 @@ const labelClass = 'text-sm font-semibold text-foreground';
 
 export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { activeTab?: SettingTabKey; previewQuery?: string } = {}) => {
   const isMobile = useIsMobileView();
-  const { ledgerName: name, members, outsiders, assets, cards, categories, fixedIncomes, fixedExpenses } = useSettingsStore();
+  const ledgers = useDesignLedgers();
+  const activeLedgerId = useActiveLedgerId();
+  const currentLedger = findDesignLedger(ledgers, activeLedgerId);
+  const name = currentLedger.name;
+  const { members, outsiders, assets, cards, categories, fixedIncomes, fixedExpenses } = useSettingsStore();
 
-  const setName = (next: string) => updateSettingsStore((prev) => ({ ...prev, ledgerName: next }));
   const setMembers = (updater: (prev: Member[]) => Member[]) => updateSettingsStore((prev) => ({ ...prev, members: updater(prev.members) }));
   const setOutsiders = (updater: (prev: string[]) => string[]) => updateSettingsStore((prev) => ({ ...prev, outsiders: updater(prev.outsiders) }));
   const setAssets = (updater: (prev: LedgerAssetRecord[]) => LedgerAssetRecord[]) => updateSettingsStore((prev) => ({ ...prev, assets: updater(prev.assets) }));
@@ -74,9 +82,9 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
   const setFixedIncomes = (updater: (prev: FixedIncomeRuleRecord[]) => FixedIncomeRuleRecord[]) => updateSettingsStore((prev) => ({ ...prev, fixedIncomes: updater(prev.fixedIncomes) }));
   const setFixedExpenses = (updater: (prev: FixedExpenseRuleRecord[]) => FixedExpenseRuleRecord[]) => updateSettingsStore((prev) => ({ ...prev, fixedExpenses: updater(prev.fixedExpenses) }));
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const membersSectionRef = useRef<HTMLElement>(null);
   const [draftName, setDraftName] = useState(name);
+  const [draftIconKey, setDraftIconKey] = useState<LedgerIconKey>(currentLedger.iconKey);
   const [editName, setEditName] = useState(false);
   const taxEnabled = useTaxRecordingEnabled();
   const personalProfile = usePersonalProfile();
@@ -219,7 +227,7 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
         </label>
         <Input
           id="edit-outsider-name"
-          className="mt-2"
+          wrapperClassName="mt-2"
           maxLength={30}
           value={draftOutsiderName}
           error={isDuplicateOutsiderName ? '같은 이름의 미참여 구성원이 있어요.' : undefined}
@@ -427,7 +435,7 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
             <label className={labelClass} htmlFor="link-invite-email">
               이메일
             </label>
-            <Input id="link-invite-email" className="mt-1.5" type="email" placeholder="이메일 주소" value={linkInviteEmail} onChange={(event) => setLinkInviteEmail(event.target.value)} />
+            <Input id="link-invite-email" wrapperClassName="mt-1.5" type="email" placeholder="이메일 주소" value={linkInviteEmail} onChange={(event) => setLinkInviteEmail(event.target.value)} />
           </div>
           <div>
             <span className={labelClass}>역할</span>
@@ -553,28 +561,38 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
     );
   };
   return (
-    <DesignAppShell
-      activeNav="settings"
-      title="가계부 설정"
-      mobileActions={
-        <button
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          aria-label={`설정 메뉴 선택, 현재 ${SETTING_MENUS.find((menu) => menu.value === activeTab)?.label}`}
-          aria-haspopup="dialog"
-          className="-mr-2 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-md px-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary-tint/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-        >
-          {SETTING_MENUS.find((menu) => menu.value === activeTab)?.label}
-          <ChevronDown className="size-4 text-primary" />
-        </button>
-      }
-    >
+    <DesignAppShell activeNav="settings" title="가계부 설정">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+        <nav aria-label="가계부 설정 메뉴" className="grid grid-cols-2 gap-1.5 min-[520px]:grid-cols-4 md:hidden">
+          {SETTING_MENUS.map((menu) => {
+            const isActive = activeTab === menu.value;
+            const MenuIcon = menu.value === 'assets' ? CreditCard : menu.value === 'fixed' ? Repeat : menu.value === 'budget' ? Tags : Settings2;
+            return (
+              <Link
+                key={menu.value}
+                href={buildPreviewHref(menu.href, previewQuery)}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 max-[359px]:gap-1.5 max-[359px]:px-2',
+                  isActive ? 'border-primary/45 bg-primary-tint/55 text-primary' : 'border-border bg-card text-foreground hover:border-border-strong hover:bg-muted/35'
+                )}
+              >
+                <MenuIcon aria-hidden="true" className={cn('size-4 shrink-0 max-[359px]:size-3.5', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                <span className="min-w-0 flex-1 text-xs font-semibold break-keep max-[359px]:text-[11px] max-[359px]:whitespace-nowrap">{menu.label}</span>
+                <ChevronRight aria-hidden="true" className={cn('size-4 shrink-0 max-[359px]:size-3', isActive ? 'text-primary' : 'text-muted-foreground')} />
+              </Link>
+            );
+          })}
+        </nav>
         <Tabs variant="underline" value={activeTab} className="hidden md:block">
-          <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsList className="w-full justify-start border-b-0">
             {SETTING_MENUS.map((menu) => (
-              <TabsTrigger key={menu.value} value={menu.value} asChild className="flex-none">
-                <Link href={buildPreviewHref(menu.href, previewQuery)}>{menu.label}</Link>
+              <TabsTrigger key={menu.value} value={menu.value} asChild className="group flex-none border-b-0 focus-visible:ring-0">
+                <Link href={buildPreviewHref(menu.href, previewQuery)}>
+                  <span className="relative inline-flex after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-transparent after:content-[''] group-data-[state=active]:after:bg-primary">
+                    {menu.label}
+                  </span>
+                </Link>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -601,7 +619,6 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
             onFixedIncomesChange={setFixedIncomes}
             fixedExpenses={fixedExpenses}
             onFixedExpensesChange={setFixedExpenses}
-            previewQuery={previewQuery}
           />
         ) : (
           <>
@@ -613,7 +630,8 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setDraftName(name);
+                      setDraftName(currentLedger.name);
+                      setDraftIconKey(currentLedger.iconKey);
                       setEditName(true);
                     }}
                   >
@@ -624,7 +642,10 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
               <dl className="divide-y divide-border text-sm">
                 <div className="flex items-center justify-between gap-4 py-3">
                   <dt className="text-muted-foreground">가계부 이름</dt>
-                  <dd className="font-semibold">{name}</dd>
+                  <dd className="flex min-w-0 items-center gap-1.5 font-semibold">
+                    <LedgerIcon iconKey={currentLedger.iconKey} className="size-4 shrink-0 text-primary" />
+                    <span className="truncate">{name}</span>
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between gap-4 py-3">
                   <dt className="flex items-center gap-1 text-muted-foreground">
@@ -857,37 +878,44 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
           </>
         )}
       </div>
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="bottom" aria-describedby={undefined}>
-          <SheetHeader>
-            <SheetTitle>설정 메뉴</SheetTitle>
-          </SheetHeader>
-          <SheetBody className="gap-1 pb-3">
-            {SETTING_MENUS.map((menu) => (
-              <Link
-                key={menu.value}
-                href={buildPreviewHref(menu.href, previewQuery)}
-                onClick={() => setMenuOpen(false)}
-                aria-current={activeTab === menu.value ? 'page' : undefined}
-                className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-              >
-                <span className={activeTab === menu.value ? 'text-primary' : 'text-foreground'}>{menu.label}</span>
-                {activeTab === menu.value ? <Check className="size-4 text-primary" aria-label="선택됨" /> : null}
-              </Link>
-            ))}
-          </SheetBody>
-        </SheetContent>
-      </Sheet>
       <Dialog open={editName} onOpenChange={setEditName}>
         <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>가계부 이름 수정</DialogTitle>
           </DialogHeader>
-          <DialogBody>
-            <label className={labelClass} htmlFor="ledger-name">
-              가계부 이름
-            </label>
-            <Input id="ledger-name" className="mt-2" maxLength={30} value={draftName} onChange={(event) => setDraftName(event.target.value)} />
+          <DialogBody className="gap-4">
+            <div>
+              <span className={labelClass}>아이콘</span>
+              <div role="radiogroup" aria-label="가계부 아이콘" className="mt-2 grid grid-cols-6 gap-2">
+                {LEDGER_ICON_OPTIONS.map((option) => {
+                  const OptionIcon = option.icon;
+                  const selected = draftIconKey === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={option.label}
+                      title={option.label}
+                      onClick={() => setDraftIconKey(option.key)}
+                      className={cn(
+                        'flex h-10 cursor-pointer items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
+                        selected ? 'border-primary bg-primary-tint text-primary' : 'border-border bg-card text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground'
+                      )}
+                    >
+                      <OptionIcon aria-hidden="true" className="size-4.5" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="ledger-name">
+                가계부 이름
+              </label>
+              <Input id="ledger-name" wrapperClassName="mt-2" maxLength={30} value={draftName} onChange={(event) => setDraftName(event.target.value)} />
+            </div>
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditName(false)}>
@@ -896,7 +924,7 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
             <Button
               disabled={!draftName.trim()}
               onClick={() => {
-                setName(draftName.trim());
+                updateDesignLedger(currentLedger.id, { name: draftName.trim(), iconKey: draftIconKey });
                 setEditName(false);
               }}
             >
@@ -915,7 +943,7 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
               <label className={labelClass} htmlFor="invite-email">
                 이메일
               </label>
-              <Input id="invite-email" className="mt-2" type="email" placeholder="이메일 주소" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} />
+              <Input id="invite-email" wrapperClassName="mt-2" type="email" placeholder="이메일 주소" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} />
             </div>
             <div>
               <span className={labelClass}>역할</span>
@@ -1013,10 +1041,12 @@ export const SettingsPreview = ({ activeTab = 'assets', previewQuery }: { active
             <DialogTitle>미참여 구성원 추가</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <label className={labelClass} htmlFor="outsider-name">
-              이름
-            </label>
-            <Input className="mt-2" id="outsider-name" value={outsiderName} onChange={(event) => setOutsiderName(event.target.value)} />
+            <div>
+              <label className={labelClass} htmlFor="outsider-name">
+                이름
+              </label>
+              <Input wrapperClassName="mt-2" id="outsider-name" value={outsiderName} onChange={(event) => setOutsiderName(event.target.value)} />
+            </div>
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOutsiderOpen(false)}>

@@ -32,24 +32,39 @@ import {
   SelectValue,
   cn
 } from '@repo/ui-core';
-import { ArrowDownCircle, ArrowRight, ArrowUpCircle, CircleHelp, Plus, Trash2 } from 'lucide-react';
-import Link from 'next/link';
+import { ArrowDownCircle, ArrowUpCircle, CircleHelp, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 
-import { INCOME_KINDS, createIncomeLines, getIncomeLineItem, sumIncomeLines, type IncomeKind, type IncomeLine } from '@/previews/income/income-model';
+import {
+  EMPLOYMENT_OPTIONS,
+  INCOME_DETAIL_FIELDS,
+  INCOME_KINDS,
+  createIncomeLines,
+  sumIncomeLines,
+  type IncomeDetailKey,
+  type IncomeDetails,
+  type IncomeKind,
+  type IncomeLine
+} from '@/previews/income/income-model';
 import {
   CURRENT_PREVIEW_MONTH,
-  buildPreviewHref,
   type BudgetAllocationRule,
   type FixedExpenseRuleRecord,
   type FixedIncomeRuleRecord,
   type LedgerAssetRecord,
   type LedgerCardRecord,
-  type LedgerCategoryRecord
+  type LedgerCategoryRecord,
+  type TaxAttributionMonthRule
 } from '@/previews/settings/settings-model';
+import { IncomeLineItemsEditor } from '@/shared/IncomeLineItemsEditor';
+import { IncomeTaxSection, resolveIncomeTaxMeta } from '@/shared/IncomeTaxSection';
 import { MemberAvatar } from '@/shared/MemberAvatar';
 import { formatWon } from '@/shared/design-format';
+import { useTaxRecordingEnabled } from '@/shared/design-ledger-settings';
+import { useAllMemberTaxStatuses, usePersonalBusinesses, usePersonalProfile } from '@/shared/design-personal-businesses';
 import { showValidationAlert } from '@/shared/design-validation';
+import { ExpenseTaxSection, resolveExpenseTaxEligibilityByMethod } from '@/shared/expense-form/ExpenseTaxSection';
+import { validateExpenseTaxInfo, type ExpenseTaxInfo } from '@/shared/expense-form/expense-form-model';
 
 const sectionClass = 'rounded-xl border border-border bg-card p-4 sm:p-5';
 
@@ -59,9 +74,9 @@ const formatDisplayMonth = (ym: string) => ym.replace('-', '.');
 
 const getFixedCreateNoticeText = (kind: '수입' | '지출', applyNow: boolean, startMonth: PeriodMonthValue) => {
   if (applyNow) {
-    return `적용 시작월(${formatDisplayMonth(formatYearMonth(startMonth))}) 이후 생성된 ${kind} 내역에 바로 추가되고, 신규 월의 장부가 생성될 때 자동 반영돼요.`;
+    return `적용 시작월(${formatDisplayMonth(formatYearMonth(startMonth))}) 이후 생성된 ${kind} 내역에 바로 추가되고, 신규 생성 월 장부에 자동 반영돼요.`;
   }
-  return `추가된 고정 ${kind}은 신규 월의 장부가 생성될 때 자동 반영돼요.`;
+  return `추가된 고정 ${kind}은 신규 생성 월 장부에 자동 반영돼요.`;
 };
 
 const sumIncomeLineArray = (lines: readonly IncomeLine[]) => lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0);
@@ -76,6 +91,9 @@ type FixedIncomeDraft = {
   day: number | null;
   budgetRule: BudgetAllocationRule;
   startMonth: PeriodMonthValue;
+  attributionMonthRule: TaxAttributionMonthRule;
+  businessId?: string;
+  details?: IncomeDetails;
   payments: IncomeLine[];
   deductions: IncomeLine[];
   applyNow: boolean;
@@ -92,6 +110,7 @@ type FixedExpenseDraft = {
   approvedAmount: number | null;
   discountAmount: number | null;
   performanceIncluded: boolean;
+  taxInfo?: ExpenseTaxInfo;
   applyNow: boolean;
 };
 
@@ -104,8 +123,7 @@ export const SettingsFixedTab = ({
   fixedIncomes,
   onFixedIncomesChange,
   fixedExpenses,
-  onFixedExpensesChange,
-  previewQuery
+  onFixedExpensesChange
 }: {
   owners: readonly string[];
   actualUsers: readonly string[];
@@ -116,15 +134,23 @@ export const SettingsFixedTab = ({
   onFixedIncomesChange: (updater: (prev: FixedIncomeRuleRecord[]) => FixedIncomeRuleRecord[]) => void;
   fixedExpenses: readonly FixedExpenseRuleRecord[];
   onFixedExpensesChange: (updater: (prev: FixedExpenseRuleRecord[]) => FixedExpenseRuleRecord[]) => void;
-  previewQuery?: string;
 }) => {
+  const taxRecordingEnabled = useTaxRecordingEnabled();
+  const profile = usePersonalProfile();
+  const allBusinesses = usePersonalBusinesses();
+  const memberTaxStatuses = useAllMemberTaxStatuses();
   const [incomeDraft, setIncomeDraft] = useState<FixedIncomeDraft | null>(null);
+  const [incomeTaxOpen, setIncomeTaxOpen] = useState(false);
+  const [incomePaymentsOpen, setIncomePaymentsOpen] = useState(true);
+  const [incomeDeductionsOpen, setIncomeDeductionsOpen] = useState(true);
   const [incomeInvalid, setIncomeInvalid] = useState<Set<string>>(() => new Set());
   const [expenseDraft, setExpenseDraft] = useState<FixedExpenseDraft | null>(null);
   const [expenseInvalid, setExpenseInvalid] = useState<Set<string>>(() => new Set());
+  const sortedFixedIncomes = [...fixedIncomes].sort((a, b) => a.day - b.day);
+  const sortedFixedExpenses = [...fixedExpenses].sort((a, b) => a.day - b.day);
 
-  const activeDepositAccounts = assets.filter((item) => !item.inactive && item.group === 'cash-liquid' && !item.isDefaultCash);
-  const activeCashAssets = assets.filter((item) => !item.inactive && item.isDefaultCash);
+  const activeDepositAccounts = assets.filter((item) => !item.inactive && item.group === 'cash-liquid' && item.typeLabel !== '현금');
+  const activeCashAssets = assets.filter((item) => !item.inactive && item.group === 'cash-liquid' && item.typeLabel === '현금');
   const activeCards = cards.filter((card) => !card.inactive);
   const activeCategories = categories.filter((cat) => !cat.disabled);
 
@@ -132,12 +158,12 @@ export const SettingsFixedTab = ({
   const findCategoryName = (categoryId: string) => {
     const found = categories.find((cat) => cat.id === categoryId);
     if (!found) return '분류 확인 필요';
-    return found.disabled ? `${found.name} (비활성)` : found.name;
+    return found.name;
   };
   const findExpensePaymentLabel = (rule: FixedExpenseRuleRecord) => {
     if (rule.paymentMethodType === 'card') {
       const card = cards.find((item) => item.id === rule.paymentTargetId);
-      return card ? `${card.label} · ${card.last4}` : '카드 확인 필요';
+      return card?.label ?? '카드 확인 필요';
     }
     return findAssetName(rule.paymentTargetId);
   };
@@ -162,7 +188,15 @@ export const SettingsFixedTab = ({
 
   const openFixedIncomeEditor = (rule: FixedIncomeRuleRecord | null) => {
     setIncomeInvalid(new Set());
+    setIncomePaymentsOpen(true);
+    setIncomeDeductionsOpen(true);
     if (rule) {
+      setIncomeTaxOpen(
+        Boolean(rule.businessId) ||
+          rule.attributionMonthRule === 'previous' ||
+          Boolean(rule.kind === '근로소득' && rule.details?.employment) ||
+          INCOME_DETAIL_FIELDS[rule.kind].some(({ key }) => Boolean(rule.details?.[key]))
+      );
       setIncomeDraft({
         id: rule.id,
         kind: rule.kind,
@@ -173,6 +207,9 @@ export const SettingsFixedTab = ({
         day: rule.day,
         budgetRule: rule.budgetRule,
         startMonth: parseYearMonth(rule.startMonth),
+        attributionMonthRule: rule.attributionMonthRule ?? 'current',
+        businessId: rule.businessId,
+        details: rule.details ? { ...rule.details } : undefined,
         payments: rule.payments.map((line) => ({ ...line })),
         deductions: rule.deductions.map((line) => ({ ...line })),
         applyNow: false
@@ -183,6 +220,7 @@ export const SettingsFixedTab = ({
     const defaultOwner = owners[0] ?? '민지(나)';
     const ownerAccounts = activeDepositAccounts.filter((item) => item.owner === defaultOwner);
     const defaultAccountId = ownerAccounts[0]?.id ?? activeDepositAccounts[0]?.id ?? '';
+    setIncomeTaxOpen(false);
     setIncomeDraft({
       id: null,
       kind: '근로소득',
@@ -193,11 +231,30 @@ export const SettingsFixedTab = ({
       day: 25,
       budgetRule: 'current',
       startMonth: parseYearMonth(CURRENT_PREVIEW_MONTH),
+      attributionMonthRule: 'current',
+      details: { employment: EMPLOYMENT_OPTIONS[0] },
       payments: createIncomeLines('근로소득', 'payments'),
       deductions: createIncomeLines('근로소득', 'deductions'),
       applyNow: true
     });
   };
+
+  const editingIncomeRule = incomeDraft?.id ? fixedIncomes.find((item) => item.id === incomeDraft.id) : undefined;
+  const incomeTaxMeta = incomeDraft
+    ? resolveIncomeTaxMeta(
+        {
+          owner: incomeDraft.owner,
+          kind: incomeDraft.kind,
+          businessId: incomeDraft.businessId,
+          retainedRecordBusinessId: editingIncomeRule?.businessId,
+          details: incomeDraft.details,
+          taxRecordingEnabled
+        },
+        profile,
+        allBusinesses,
+        memberTaxStatuses
+      )
+    : null;
 
   const handleSaveFixedIncome = () => {
     if (!incomeDraft) return;
@@ -217,6 +274,10 @@ export const SettingsFixedTab = ({
       nextInvalid.add('day');
       errors.push('입금 예정일은 1~31일 사이 정수로 입력해 주세요.');
     }
+    if (incomeTaxMeta?.employmentInvalid) {
+      nextInvalid.add('employment');
+      errors.push('근로 구분을 선택해 주세요.');
+    }
 
     const paymentSum = sumIncomeLineArray(incomeDraft.payments);
     const deductionSum = sumIncomeLineArray(incomeDraft.deductions);
@@ -226,15 +287,32 @@ export const SettingsFixedTab = ({
       incomeDraft.deductions.some((line) => !line.itemId && !line.label?.trim() && (Number(line.amount) || 0) > 0);
 
     if (hasEmptyCustomLabel) {
+      setIncomePaymentsOpen(true);
+      setIncomeDeductionsOpen(true);
       errors.push('직접 추가한 지급·공제 항목의 이름을 입력해 주세요.');
     }
     if (paymentSum <= 0 || netAmount <= 0) {
       nextInvalid.add('payments');
+      setIncomePaymentsOpen(true);
+      setIncomeDeductionsOpen(true);
       errors.push('예정 실수령액(지급 합계 − 공제 합계)이 0원보다 커야 해요.');
+    }
+    if (incomeTaxMeta?.invalidServiceRange) {
+      nextInvalid.add('invalidServiceRange');
+      errors.push('근속 종료일을 시작일과 같거나 이후로 선택해 주세요.');
+    }
+    if (incomeTaxMeta && incomeTaxMeta.invalidDetailAmountKeys.size > 0) {
+      for (const key of incomeTaxMeta.invalidDetailAmountKeys) {
+        nextInvalid.add(`detail:${key}`);
+      }
+      errors.push('세무 정보의 금액을 확인해 주세요.');
     }
 
     if (errors.length > 0) {
       setIncomeInvalid(nextInvalid);
+      if (incomeTaxMeta?.employmentInvalid || incomeTaxMeta?.invalidServiceRange || (incomeTaxMeta?.invalidDetailAmountKeys.size ?? 0) > 0) {
+        setIncomeTaxOpen(true);
+      }
       void showValidationAlert(errors);
       return;
     }
@@ -249,7 +327,9 @@ export const SettingsFixedTab = ({
       day: incomeDraft.day ?? 25,
       budgetRule: incomeDraft.budgetRule,
       startMonth: startYm,
-      active: incomeDraft.id ? (fixedIncomes.find((item) => item.id === incomeDraft.id)?.active ?? true) : true,
+      attributionMonthRule: taxRecordingEnabled ? incomeDraft.attributionMonthRule : undefined,
+      businessId: incomeDraft.kind === '사업소득' ? incomeTaxMeta?.selectedBusinessId : undefined,
+      details: incomeDraft.details,
       payments: incomeDraft.payments.map((line) => ({ ...line })),
       deductions: incomeDraft.deductions.map((line) => ({ ...line }))
     };
@@ -260,26 +340,15 @@ export const SettingsFixedTab = ({
     void dialog.alert({
       title: '고정 수입을 저장했어요',
       description: applyNowChecked
-        ? `앞으로 생성되는 신규 월부터 자동 추가하며, ${formatDisplayMonth(startYm)} 이후 수입 내역에도 지금 바로 추가했어요.`
-        : '앞으로 생성되는 신규 월부터 자동 추가하며, 이미 생성된 월의 내역은 바뀌지 않아요.'
+        ? `신규 생성 월부터 자동 추가하며, ${formatDisplayMonth(startYm)} 이후 수입 내역에도 지금 바로 추가했어요.`
+        : '신규 생성 월부터 자동 추가하며, 이미 생성된 월의 내역은 바뀌지 않아요.'
     });
-  };
-
-  const handleToggleFixedIncome = async (rule: FixedIncomeRuleRecord) => {
-    const nextActive = !rule.active;
-    const ok = await dialog.confirm({
-      title: nextActive ? `'${rule.title}' 고정 수입을 재개할까요?` : `'${rule.title}' 고정 수입을 일시중지할까요?`,
-      description: nextActive ? '앞으로 생성되는 신규 월부터 예정 수입으로 다시 자동 추가돼요.' : '앞으로 생성되는 신규 월부터 자동 추가를 멈춰요. 이미 생성된 월의 내역은 유지돼요.',
-      confirmText: nextActive ? '재개' : '중지'
-    });
-    if (!ok) return;
-    onFixedIncomesChange((prev) => prev.map((item) => (item.id === rule.id ? { ...item, active: nextActive } : item)));
   };
 
   const handleDeleteFixedIncome = async (rule: FixedIncomeRuleRecord) => {
     const ok = await dialog.confirm({
       title: `'${rule.title}' 고정 수입을 삭제할까요?`,
-      description: '앞으로 생성되는 신규 월부터 자동 생성을 멈춰요. 이미 생성된 월의 수입 내역은 그대로 유지돼요.',
+      description: '신규 생성 월부터 자동 생성을 멈춰요. 이미 생성된 월의 수입 내역은 그대로 유지돼요.',
       confirmText: '삭제',
       variant: 'destructive'
     });
@@ -302,6 +371,7 @@ export const SettingsFixedTab = ({
         approvedAmount: rule.approvedAmount,
         discountAmount: rule.discountAmount,
         performanceIncluded: rule.performanceIncluded,
+        taxInfo: rule.taxInfo ? { ...rule.taxInfo } : undefined,
         applyNow: false
       });
       return;
@@ -339,6 +409,12 @@ export const SettingsFixedTab = ({
     return { type: 'account', targetId };
   };
 
+  const resolveExpenseMethodOwner = (choice: string, fallbackOwner: string) => {
+    const parsed = parsePaymentChoice(choice);
+    const owner = parsed.type === 'card' ? cards.find((c) => c.id === parsed.targetId)?.owner : assets.find((a) => a.id === parsed.targetId)?.owner;
+    return { methodKind: parsed.type, owner: owner ?? fallbackOwner };
+  };
+
   const handleSaveFixedExpense = () => {
     if (!expenseDraft) return;
     const errors: string[] = [];
@@ -374,6 +450,20 @@ export const SettingsFixedTab = ({
       errors.push('할인 후 예정 금액이 0원보다 커야 해요.');
     }
 
+    const expenseMethodMeta = resolveExpenseMethodOwner(expenseDraft.paymentChoiceValue, expenseDraft.actualUser);
+    const { showBusinessTax } = resolveExpenseTaxEligibilityByMethod(
+      { owner: expenseMethodMeta.owner, methodKind: expenseMethodMeta.methodKind, taxInfo: expenseDraft.taxInfo },
+      profile,
+      allBusinesses,
+      memberTaxStatuses
+    );
+    const taxValidation = validateExpenseTaxInfo(expenseDraft.taxInfo, taxRecordingEnabled && showBusinessTax);
+    if (taxValidation.errors.length > 0) {
+      errors.push(...taxValidation.errors);
+      if (taxValidation.businessId) nextInvalid.add('businessId');
+      if (taxValidation.inputVatAmount) nextInvalid.add('inputVatAmount');
+    }
+
     if (errors.length > 0) {
       setExpenseInvalid(nextInvalid);
       void showValidationAlert(errors);
@@ -392,7 +482,7 @@ export const SettingsFixedTab = ({
       approvedAmount: approved,
       discountAmount: discount,
       performanceIncluded: paymentMethodType === 'card' ? expenseDraft.performanceIncluded : false,
-      active: expenseDraft.id ? (fixedExpenses.find((item) => item.id === expenseDraft.id)?.active ?? true) : true
+      taxInfo: taxRecordingEnabled ? expenseDraft.taxInfo : undefined
     };
 
     onFixedExpensesChange((prev) => (expenseDraft.id ? prev.map((item) => (item.id === expenseDraft.id ? savedRule : item)) : [...prev, savedRule]));
@@ -401,26 +491,15 @@ export const SettingsFixedTab = ({
     void dialog.alert({
       title: '고정 지출을 저장했어요',
       description: applyNowChecked
-        ? `앞으로 생성되는 신규 월부터 자동 추가하며, ${formatDisplayMonth(startYm)} 이후 지출 내역에도 지금 바로 추가했어요.`
-        : '앞으로 생성되는 신규 월부터 자동 추가하며, 이미 생성된 월의 지출 내역은 바뀌지 않아요.'
+        ? `신규 생성 월부터 자동 추가하며, ${formatDisplayMonth(startYm)} 이후 지출 내역에도 지금 바로 추가했어요.`
+        : '신규 생성 월부터 자동 추가하며, 이미 생성된 월의 지출 내역은 바뀌지 않아요.'
     });
-  };
-
-  const handleToggleFixedExpense = async (rule: FixedExpenseRuleRecord) => {
-    const nextActive = !rule.active;
-    const ok = await dialog.confirm({
-      title: nextActive ? `'${rule.title}' 고정 지출을 재개할까요?` : `'${rule.title}' 고정 지출을 일시중지할까요?`,
-      description: nextActive ? '앞으로 생성되는 신규 월부터 예정 지출로 다시 자동 추가돼요.' : '앞으로 생성되는 신규 월부터 자동 추가를 멈춰요. 이미 생성된 월의 내역은 유지돼요.',
-      confirmText: nextActive ? '재개' : '중지'
-    });
-    if (!ok) return;
-    onFixedExpensesChange((prev) => prev.map((item) => (item.id === rule.id ? { ...item, active: nextActive } : item)));
   };
 
   const handleDeleteFixedExpense = async (rule: FixedExpenseRuleRecord) => {
     const ok = await dialog.confirm({
       title: `'${rule.title}' 고정 지출을 삭제할까요?`,
-      description: '앞으로 생성되는 신규 월부터 자동 생성을 멈춰요. 이미 생성된 월의 지출 내역은 그대로 유지돼요.',
+      description: '신규 생성 월부터 자동 생성을 멈춰요. 이미 생성된 월의 지출 내역은 그대로 유지돼요.',
       confirmText: '삭제',
       variant: 'destructive'
     });
@@ -441,12 +520,8 @@ export const SettingsFixedTab = ({
 
   return (
     <div className="flex flex-col gap-5">
-      <NoticeBox variant="info">
-        고정 수입·고정 지출은 소유자·관리자·구성원 모두 등록하고 수정·일시중지할 수 있어요. 아직 생성되지 않은 신규 월이 열릴 때만 예정 거래로 자동 추가하며, 이미 생성된 월의 내역과는 완전히 분리해요.
-      </NoticeBox>
-
       {/* 고정 수입 섹션 */}
-      <section className={sectionClass} aria-label="고정 수입 관리">
+      <section id="fixed-income" className={cn(sectionClass, 'scroll-mt-20')} aria-label="고정 수입 관리">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <ArrowDownCircle aria-hidden="true" className="size-4 text-income" />
@@ -465,7 +540,7 @@ export const SettingsFixedTab = ({
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed text-foreground break-keep">
-                매월 반복되는 급여나 정기 수입을 등록하면 새 월 생성 시 입금 예정으로 자동 추가돼요. 실제 입금 보정과 완료 처리는 수입 내역에서 진행해요.
+                매월 반복되는 급여나 정기 수입을 등록하면 신규 생성 월 장부에 입금 예정으로 자동 추가돼요. 실제 입금 보정과 완료 처리는 수입 내역에서 진행해요.
               </PopoverContent>
             </Popover>
           </div>
@@ -480,46 +555,37 @@ export const SettingsFixedTab = ({
           <>
             {/* 모바일 카드 리스트 */}
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border md:hidden">
-              {fixedIncomes.map((rule) => {
+              {sortedFixedIncomes.map((rule) => {
                 const netAmount = sumIncomeLines(rule.payments) - sumIncomeLines(rule.deductions);
                 return (
-                  <div key={rule.id} className="flex flex-col gap-2.5 p-3">
+                  <div
+                    key={rule.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${rule.title} 수정`}
+                    className="flex cursor-pointer flex-col gap-2 p-3 transition-colors hover:bg-muted/20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
+                    onClick={() => openFixedIncomeEditor(rule)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      openFixedIncomeEditor(rule);
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex rounded-md bg-primary-tint/55 px-1.5 py-0.5 text-xs font-semibold text-primary tabular-nums">매월 {rule.day}일</span>
+                      <Badge variant="neutral">{rule.kind}</Badge>
+                    </div>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <strong className={cn('text-sm font-bold break-keep', !rule.active && 'text-muted-foreground line-through')}>{rule.title}</strong>
-                          <Badge variant="neutral">{rule.kind}</Badge>
-                          <Badge variant={rule.active ? 'positive' : 'neutral'}>{rule.active ? '활성' : '일시중지'}</Badge>
+                          <strong className="text-sm font-bold break-keep text-foreground">{rule.title}</strong>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-                          <MemberAvatar name={rule.owner} size="xs" mode="icon-hover" />
-                          <span>{rule.owner}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="truncate">{findAssetName(rule.accountId)}</span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                          매월 {rule.day}일 · {rule.budgetRule === 'next' ? '익월 예산 배정' : '입금 당월 반영'}
-                        </p>
                       </div>
                       <strong className="shrink-0 text-sm font-bold whitespace-nowrap text-income tabular-nums">{formatWon(netAmount)}</strong>
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => openFixedIncomeEditor(rule)}>
-                        수정
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => void handleToggleFixedIncome(rule)}>
-                        {rule.active ? '일시중지' : '재개'}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="ml-auto text-destructive hover:bg-destructive-tint hover:text-destructive"
-                        onClick={() => void handleDeleteFixedIncome(rule)}
-                      >
-                        삭제
-                      </Button>
+                    <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      <MemberAvatar name={rule.owner} size="sm" mode="icon-hover" />
+                      <span className="min-w-0 truncate">{findAssetName(rule.accountId)}</span>
                     </div>
                   </div>
                 );
@@ -531,63 +597,53 @@ export const SettingsFixedTab = ({
               <table className="w-full table-fixed border-collapse text-sm">
                 <thead className="bg-muted/40 text-xs text-muted-foreground">
                   <tr className="border-b border-border">
+                    <th scope="col" className="w-20 px-2 py-2.5 text-left font-medium whitespace-nowrap lg:w-24">
+                      예정일
+                    </th>
+                    <th scope="col" className="w-20 px-2 py-2.5 text-left font-medium whitespace-nowrap">
+                      소득 분류
+                    </th>
                     <th scope="col" className="px-3 py-2.5 text-left font-medium whitespace-nowrap">
                       내용
                     </th>
                     <th scope="col" className="w-30 px-2 py-2.5 text-left font-medium whitespace-nowrap lg:w-40">
                       귀속 · 입금 계좌
                     </th>
-                    <th scope="col" className="w-26 px-2 py-2.5 text-left font-medium whitespace-nowrap lg:w-34">
-                      예정일 · 반영
-                    </th>
                     <th scope="col" className="w-24 px-2 py-2.5 text-right font-medium whitespace-nowrap lg:w-28">
                       예정 실수령액
                     </th>
-                    <th scope="col" className="w-15 px-2 py-2.5 text-center font-medium whitespace-nowrap lg:w-18">
-                      상태
-                    </th>
-                    <th scope="col" className="w-28 px-3 py-2.5 text-right font-medium whitespace-nowrap lg:w-32">
-                      관리
+                    <th scope="col" className="w-12 px-1 py-2.5 text-center font-medium whitespace-nowrap">
+                      수정
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {fixedIncomes.map((rule) => {
+                  {sortedFixedIncomes.map((rule) => {
                     const netAmount = sumIncomeLines(rule.payments) - sumIncomeLines(rule.deductions);
                     return (
                       <tr key={rule.id} className="hover:bg-muted/20">
-                        <td className="px-3 py-2.5">
-                          <p className={cn('truncate font-semibold text-foreground', !rule.active && 'text-muted-foreground line-through')}>{rule.title}</p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {rule.kind} · {rule.payer || '지급처 미입력'}
-                          </p>
+                        <td className="px-2 py-2.5 text-xs">
+                          <p className="font-semibold text-foreground tabular-nums">매월 {rule.day}일</p>
                         </td>
                         <td className="px-2 py-2.5">
+                          <Badge variant="neutral">{rule.kind}</Badge>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <p className="truncate font-semibold text-foreground">{rule.title}</p>
+                          <p className="truncate text-xs text-muted-foreground">{rule.payer || '지급처 미입력'}</p>
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <p className="truncate text-xs font-medium text-foreground">{findAssetName(rule.accountId)}</p>
                           <div className="flex items-center gap-1.5">
                             <MemberAvatar name={rule.owner} size="xs" mode="icon-hover" />
-                            <span className="truncate text-xs font-medium text-foreground">{rule.owner}</span>
+                            <span className="truncate text-xs text-muted-foreground">{rule.owner}</span>
                           </div>
-                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{findAssetName(rule.accountId)}</p>
-                        </td>
-                        <td className="px-2 py-2.5 text-xs">
-                          <p className="font-medium text-foreground tabular-nums">매월 {rule.day}일</p>
-                          <p className="truncate text-muted-foreground tabular-nums">
-                            {rule.budgetRule === 'next' ? '익월 배정' : '당월 반영'} · {formatDisplayMonth(rule.startMonth)}~
-                          </p>
                         </td>
                         <td className="px-2 py-2.5 text-right font-bold whitespace-nowrap text-income tabular-nums">{formatWon(netAmount)}</td>
-                        <td className="px-2 py-2.5 text-center whitespace-nowrap">
-                          <Badge variant={rule.active ? 'positive' : 'neutral'}>{rule.active ? '활성' : '중지'}</Badge>
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          <div className="inline-flex items-center justify-end gap-1">
-                            <Button type="button" size="sm" variant="outline" onClick={() => openFixedIncomeEditor(rule)}>
-                              수정
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={() => void handleToggleFixedIncome(rule)}>
-                              {rule.active ? '중지' : '재개'}
-                            </Button>
-                          </div>
+                        <td className="px-1 py-2.5 text-center">
+                          <Button type="button" size="icon-xs" variant="outline" aria-label={`${rule.title} 수정`} title={`${rule.title} 수정`} onClick={() => openFixedIncomeEditor(rule)}>
+                            <Pencil aria-hidden="true" className="size-3.5" />
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -597,19 +653,10 @@ export const SettingsFixedTab = ({
             </div>
           </>
         )}
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p className="break-keep">수정·삭제해도 이미 생성된 월의 수입 내역은 바뀌지 않아요.</p>
-          <Button variant="ghost" size="sm" className="gap-1 text-primary" asChild>
-            <Link href={buildPreviewHref('/preview/income', previewQuery)}>
-              수입 내역에서 예정 수입 확인 <ArrowRight className="size-3.5" />
-            </Link>
-          </Button>
-        </div>
       </section>
 
       {/* 고정 지출 섹션 */}
-      <section className={sectionClass} aria-label="고정 지출 관리">
+      <section id="fixed-expense" className={cn(sectionClass, 'scroll-mt-20')} aria-label="고정 지출 관리">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <ArrowUpCircle aria-hidden="true" className="size-4 text-expense" />
@@ -628,7 +675,7 @@ export const SettingsFixedTab = ({
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed text-foreground break-keep">
-                매월 반복되는 구독·통신비·공과금 등을 등록하면 새 월이 생성될 때 예정 지출로 자동 추가되어 생활비와 카드 실적에 선반영돼요.
+                매월 반복되는 구독·통신비·공과금 등을 등록하면 신규 생성 월 장부에 예정 지출로 자동 추가되어 생활비와 카드 실적에 선반영돼요.
               </PopoverContent>
             </Popover>
           </div>
@@ -638,53 +685,44 @@ export const SettingsFixedTab = ({
         </div>
 
         {fixedExpenses.length === 0 ? (
-          <EmptyState title="등록된 고정 지출이 없어요" description="매월 고정으로 나가는 지출을 등록하면 새 달이 열릴 때 자동으로 예정 지출에 반영해요." />
+          <EmptyState title="등록된 고정 지출이 없어요" description="매월 고정으로 나가는 지출을 등록하면 신규 생성 월 장부에 예정 지출로 자동 반영해요." />
         ) : (
           <>
             {/* 모바일 카드 리스트 */}
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border md:hidden">
-              {fixedExpenses.map((rule) => {
-                const netAmount = rule.approvedAmount - rule.discountAmount;
+              {sortedFixedExpenses.map((rule) => {
+                const discountedAmount = rule.approvedAmount - rule.discountAmount;
                 return (
-                  <div key={rule.id} className="flex flex-col gap-2.5 p-3">
+                  <div
+                    key={rule.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${rule.title} 수정`}
+                    className="flex cursor-pointer flex-col gap-2 p-3 transition-colors hover:bg-muted/20 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
+                    onClick={() => openFixedExpenseEditor(rule)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      openFixedExpenseEditor(rule);
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex rounded-md bg-primary-tint/55 px-1.5 py-0.5 text-xs font-semibold text-primary tabular-nums">매월 {rule.day}일</span>
+                      <Badge variant="neutral">{findCategoryName(rule.categoryId)}</Badge>
+                    </div>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <strong className={cn('text-sm font-bold break-keep', !rule.active && 'text-muted-foreground line-through')}>{rule.title}</strong>
-                          <Badge variant="neutral">{findCategoryName(rule.categoryId)}</Badge>
-                          <Badge variant={rule.active ? 'positive' : 'neutral'}>{rule.active ? '활성' : '일시중지'}</Badge>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-                          <span className="truncate">{findExpensePaymentLabel(rule)}</span>
-                          <span aria-hidden="true">·</span>
-                          <MemberAvatar name={rule.actualUser} size="xs" mode="icon-hover" />
-                          <span>{rule.actualUser}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="tabular-nums">매월 {rule.day}일</span>
+                          <strong className="text-sm font-bold break-keep text-foreground">{rule.title}</strong>
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        <strong className="block text-sm font-bold whitespace-nowrap text-expense tabular-nums">{formatWon(netAmount)}</strong>
-                        {rule.discountAmount > 0 ? <span className="block text-[11px] text-muted-foreground tabular-nums">할인 {formatWon(rule.discountAmount)}</span> : null}
+                        <strong className="block text-sm font-bold whitespace-nowrap text-expense tabular-nums">{formatWon(discountedAmount)}</strong>
                       </div>
                     </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => openFixedExpenseEditor(rule)}>
-                        수정
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => void handleToggleFixedExpense(rule)}>
-                        {rule.active ? '일시중지' : '재개'}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="ml-auto text-destructive hover:bg-destructive-tint hover:text-destructive"
-                        onClick={() => void handleDeleteFixedExpense(rule)}
-                      >
-                        삭제
-                      </Button>
+                    <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      <MemberAvatar name={rule.actualUser} size="sm" mode="icon-hover" />
+                      <span className="min-w-0 flex-1 truncate">{findExpensePaymentLabel(rule)}</span>
                     </div>
                   </div>
                 );
@@ -696,80 +734,61 @@ export const SettingsFixedTab = ({
               <table className="w-full table-fixed border-collapse text-sm">
                 <thead className="bg-muted/40 text-xs text-muted-foreground">
                   <tr className="border-b border-border">
+                    <th scope="col" className="w-20 px-2 py-2.5 text-left font-medium whitespace-nowrap lg:w-24">
+                      예정일
+                    </th>
+                    <th scope="col" className="w-20 px-2 py-2.5 text-left font-medium whitespace-nowrap">
+                      지출 분류
+                    </th>
                     <th scope="col" className="px-3 py-2.5 text-left font-medium whitespace-nowrap">
                       내용
                     </th>
                     <th scope="col" className="w-30 px-2 py-2.5 text-left font-medium whitespace-nowrap lg:w-40">
-                      결제 · 실사용자
-                    </th>
-                    <th scope="col" className="w-26 px-2 py-2.5 text-left font-medium whitespace-nowrap lg:w-34">
-                      예정일 · 시작월
+                      지출 수단 · 구성원
                     </th>
                     <th scope="col" className="w-24 px-2 py-2.5 text-right font-medium whitespace-nowrap lg:w-28">
-                      예정 금액
+                      할인 전 금액
                     </th>
-                    <th scope="col" className="w-15 px-2 py-2.5 text-center font-medium whitespace-nowrap lg:w-18">
-                      상태
-                    </th>
-                    <th scope="col" className="w-28 px-3 py-2.5 text-right font-medium whitespace-nowrap lg:w-32">
-                      관리
+                    <th scope="col" className="w-12 px-1 py-2.5 text-center font-medium whitespace-nowrap">
+                      수정
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {fixedExpenses.map((rule) => {
-                    const netAmount = rule.approvedAmount - rule.discountAmount;
-                    return (
-                      <tr key={rule.id} className="hover:bg-muted/20">
-                        <td className="px-3 py-2.5">
-                          <p className={cn('truncate font-semibold text-foreground', !rule.active && 'text-muted-foreground line-through')}>{rule.title}</p>
-                          <p className="truncate text-xs text-muted-foreground">{findCategoryName(rule.categoryId)}</p>
-                        </td>
-                        <td className="px-2 py-2.5">
-                          <p className="truncate text-xs font-medium text-foreground">{findExpensePaymentLabel(rule)}</p>
-                          <div className="mt-0.5 flex items-center gap-1">
-                            <MemberAvatar name={rule.actualUser} size="xs" mode="icon-hover" />
-                            <span className="truncate text-xs text-muted-foreground">실사용자 {rule.actualUser}</span>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2.5 text-xs">
-                          <p className="font-medium text-foreground tabular-nums">매월 {rule.day}일</p>
-                          <p className="truncate text-muted-foreground tabular-nums">{formatDisplayMonth(rule.startMonth)}~</p>
-                        </td>
-                        <td className="px-2 py-2.5 text-right tabular-nums">
-                          <p className="font-bold whitespace-nowrap text-expense">{formatWon(netAmount)}</p>
-                          {rule.discountAmount > 0 ? <p className="text-[11px] text-muted-foreground">할인 {formatWon(rule.discountAmount)}</p> : null}
-                        </td>
-                        <td className="px-2 py-2.5 text-center whitespace-nowrap">
-                          <Badge variant={rule.active ? 'positive' : 'neutral'}>{rule.active ? '활성' : '중지'}</Badge>
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          <div className="inline-flex items-center justify-end gap-1">
-                            <Button type="button" size="sm" variant="outline" onClick={() => openFixedExpenseEditor(rule)}>
-                              수정
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={() => void handleToggleFixedExpense(rule)}>
-                              {rule.active ? '중지' : '재개'}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {sortedFixedExpenses.map((rule) => (
+                    <tr key={rule.id} className="hover:bg-muted/20">
+                      <td className="px-2 py-2.5 text-xs">
+                        <p className="font-medium text-foreground tabular-nums">매월 {rule.day}일</p>
+                      </td>
+                      <td className="px-2 py-2.5">
+                        <Badge variant="neutral">{findCategoryName(rule.categoryId)}</Badge>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="truncate font-semibold text-foreground">{rule.title}</p>
+                      </td>
+                      <td className="px-2 py-2.5">
+                        <p className="truncate text-xs font-medium text-foreground">{findExpensePaymentLabel(rule)}</p>
+                        <div className="mt-0.5 flex items-center gap-1">
+                          <MemberAvatar name={rule.actualUser} size="xs" mode="icon-hover" />
+                          <span className="truncate text-xs text-muted-foreground">{rule.actualUser}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2.5 text-right tabular-nums">
+                        <p className="font-bold whitespace-nowrap text-expense">{formatWon(rule.approvedAmount)}</p>
+                        {rule.discountAmount > 0 ? <p className="text-[11px] text-muted-foreground">할인 {formatWon(rule.discountAmount)}</p> : null}
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <Button type="button" size="icon-xs" variant="outline" aria-label={`${rule.title} 수정`} title={`${rule.title} 수정`} onClick={() => openFixedExpenseEditor(rule)}>
+                          <Pencil aria-hidden="true" className="size-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </>
         )}
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p className="break-keep">이미 생성된 월의 금액 보정·삭제는 지출 내역에서 해당 월 건만 수정해요.</p>
-          <Button variant="ghost" size="sm" className="gap-1 text-primary" asChild>
-            <Link href={buildPreviewHref('/preview/expenses', previewQuery)}>
-              지출 내역에서 예정 거래 확인 <ArrowRight className="size-3.5" />
-            </Link>
-          </Button>
-        </div>
       </section>
 
       {/* 고정 수입 추가 / 수정 모달 */}
@@ -783,21 +802,27 @@ export const SettingsFixedTab = ({
           <ResponsiveOverlayContent size="lg">
             <ResponsiveOverlayHeader>
               <ResponsiveOverlayTitle>{incomeDraft.id ? '고정 수입 수정' : '고정 수입 추가'}</ResponsiveOverlayTitle>
-              <ResponsiveOverlayDescription>새 월 생성 시 입금 예정 수입으로 자동 추가할 기본 구성을 설정해요.</ResponsiveOverlayDescription>
+              <ResponsiveOverlayDescription>신규 생성 월 장부에 입금 예정 수입으로 자동 추가할 기본 구성을 설정해요.</ResponsiveOverlayDescription>
             </ResponsiveOverlayHeader>
             <ResponsiveOverlayBody sheetClassName="gap-3" dialogClassName="gap-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-foreground">수입 종류</span>
+                  <span className="text-xs font-semibold text-foreground">소득 분류</span>
                   <Select
                     value={incomeDraft.kind}
                     onValueChange={(nextKind) => {
                       const kind = nextKind as IncomeKind;
+                      const nextDetails: IncomeDetails | undefined = kind === '근로소득' ? { employment: EMPLOYMENT_OPTIONS[0] } : undefined;
+                      setIncomeTaxOpen(INCOME_DETAIL_FIELDS[kind].some(({ key }) => Boolean(nextDetails?.[key])));
+                      setIncomePaymentsOpen(true);
+                      setIncomeDeductionsOpen(true);
                       setIncomeDraft((prev) =>
                         prev
                           ? {
                               ...prev,
                               kind,
+                              businessId: kind === '사업소득' ? prev.businessId : undefined,
+                              details: nextDetails,
                               payments: createIncomeLines(kind, 'payments'),
                               deductions: createIncomeLines(kind, 'deductions')
                             }
@@ -925,6 +950,8 @@ export const SettingsFixedTab = ({
                   <PeriodPicker
                     mode="month"
                     variant="outlined"
+                    size="default"
+                    className="min-h-control-lg px-2"
                     value={incomeDraft.startMonth}
                     invalid={incomeInvalid.has('startMonth')}
                     onChange={(next) => {
@@ -935,124 +962,59 @@ export const SettingsFixedTab = ({
                 </div>
               </div>
 
-              {/* 지급 항목 */}
-              <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-foreground">지급 항목</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIncomeDraft((prev) => (prev ? { ...prev, payments: [...prev.payments, { id: `custom-pay-${Date.now()}`, label: '', amount: '0', taxStatus: '과세' }] } : null))}
-                  >
-                    <Plus className="size-3.5" /> 지급 추가
-                  </Button>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {incomeDraft.payments.map((line) => {
-                    const meta = getIncomeLineItem(incomeDraft.kind, 'payments', line.itemId);
-                    return (
-                      <div key={line.id} className="grid grid-cols-[minmax(0,1fr)_8.5rem_auto] items-center gap-2">
-                        {meta ? (
-                          <span className="truncate text-xs font-medium text-foreground">{meta.label}</span>
-                        ) : (
-                          <Input
-                            size="md"
-                            placeholder="항목명"
-                            value={line.label ?? ''}
-                            onChange={(event) =>
-                              setIncomeDraft((prev) => (prev ? { ...prev, payments: prev.payments.map((entry) => (entry.id === line.id ? { ...entry, label: event.target.value } : entry)) } : null))
-                            }
-                          />
-                        )}
-                        <NumberInput
-                          size="md"
-                          suffix="원"
-                          value={Number(line.amount) || 0}
-                          invalid={incomeInvalid.has('payments')}
-                          onValueChange={(next) => {
-                            setIncomeDraft((prev) => (prev ? { ...prev, payments: prev.payments.map((entry) => (entry.id === line.id ? { ...entry, amount: String(next ?? 0) } : entry)) } : null));
-                            clearIncomeInvalid('payments');
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          disabled={incomeDraft.payments.length <= 1}
-                          aria-label="지급 항목 삭제"
-                          className="size-9 text-muted-foreground hover:text-destructive"
-                          onClick={() => setIncomeDraft((prev) => (prev ? { ...prev, payments: prev.payments.filter((entry) => entry.id !== line.id) } : null))}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <IncomeTaxSection
+                owner={incomeDraft.owner}
+                kind={incomeDraft.kind}
+                businessId={incomeDraft.businessId}
+                retainedRecordBusinessId={editingIncomeRule?.businessId}
+                details={incomeDraft.details}
+                onBusinessIdChange={(next) => setIncomeDraft((prev) => (prev ? { ...prev, businessId: next } : null))}
+                onDetailChange={(key: IncomeDetailKey, value: string) => {
+                  setIncomeDraft((prev) => {
+                    if (!prev) return null;
+                    const nextDetails = { ...prev.details, [key]: value || undefined };
+                    if (key === 'vatStatus' && value !== '포함' && value !== '별도') {
+                      delete nextDetails.vatAmount;
+                    }
+                    return { ...prev, details: nextDetails };
+                  });
+                  clearIncomeInvalid(key === 'employment' ? 'employment' : `detail:${key}`);
+                }}
+                open={incomeTaxOpen}
+                onOpenChange={setIncomeTaxOpen}
+                attributionRuleProps={{
+                  value: incomeDraft.attributionMonthRule,
+                  onChange: (next) => setIncomeDraft((prev) => (prev ? { ...prev, attributionMonthRule: next } : null))
+                }}
+                invalidFields={{
+                  employment: incomeInvalid.has('employment'),
+                  invalidServiceRange: incomeInvalid.has('invalidServiceRange'),
+                  invalidDetailAmountKeys: new Set(
+                    Array.from(incomeInvalid)
+                      .filter((item) => item.startsWith('detail:'))
+                      .map((item) => item.slice('detail:'.length))
+                  )
+                }}
+              />
 
-              {/* 공제 항목 */}
-              <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-foreground">공제 항목</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setIncomeDraft((prev) => (prev ? { ...prev, deductions: [...prev.deductions, { id: `custom-ded-${Date.now()}`, label: '', amount: '0' }] } : null))}
-                  >
-                    <Plus className="size-3.5" /> 공제 추가
-                  </Button>
-                </div>
-                {incomeDraft.deductions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">등록된 공제 항목이 없어요.</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {incomeDraft.deductions.map((line) => {
-                      const meta = getIncomeLineItem(incomeDraft.kind, 'deductions', line.itemId);
-                      return (
-                        <div key={line.id} className="grid grid-cols-[minmax(0,1fr)_8.5rem_auto] items-center gap-2">
-                          {meta ? (
-                            <span className="truncate text-xs font-medium text-foreground">{meta.label}</span>
-                          ) : (
-                            <Input
-                              size="md"
-                              placeholder="항목명"
-                              value={line.label ?? ''}
-                              onChange={(event) =>
-                                setIncomeDraft((prev) =>
-                                  prev ? { ...prev, deductions: prev.deductions.map((entry) => (entry.id === line.id ? { ...entry, label: event.target.value } : entry)) } : null
-                                )
-                              }
-                            />
-                          )}
-                          <NumberInput
-                            size="md"
-                            suffix="원"
-                            value={Number(line.amount) || 0}
-                            onValueChange={(next) =>
-                              setIncomeDraft((prev) =>
-                                prev ? { ...prev, deductions: prev.deductions.map((entry) => (entry.id === line.id ? { ...entry, amount: String(next ?? 0) } : entry)) } : null
-                              )
-                            }
-                          />
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            aria-label="공제 항목 삭제"
-                            className="size-9 text-muted-foreground hover:text-destructive"
-                            onClick={() => setIncomeDraft((prev) => (prev ? { ...prev, deductions: prev.deductions.filter((entry) => entry.id !== line.id) } : null))}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <IncomeLineItemsEditor
+                key={incomeDraft.kind}
+                kind={incomeDraft.kind}
+                payments={incomeDraft.payments}
+                deductions={incomeDraft.deductions}
+                taxRecordingEnabled={taxRecordingEnabled}
+                expandedSections={{ payments: incomePaymentsOpen, deductions: incomeDeductionsOpen }}
+                onExpandedChange={(section, expanded) => {
+                  if (section === 'payments') setIncomePaymentsOpen(expanded);
+                  else setIncomeDeductionsOpen(expanded);
+                }}
+                minPaymentRows={1}
+                errors={incomeInvalid.has('payments') ? { payments: { amount: new Set(incomeDraft.payments.map((line) => line.id)) } } : undefined}
+                onLinesChange={(section, rows) => {
+                  setIncomeDraft((prev) => (prev ? { ...prev, [section]: rows } : null));
+                  clearIncomeInvalid(section);
+                }}
+              />
 
               <div className="flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/35 px-3.5 py-2.5 text-sm tabular-nums">
                 <span className="font-semibold text-foreground">예정 실수령액 (지급 − 공제)</span>
@@ -1070,7 +1032,7 @@ export const SettingsFixedTab = ({
 
               <NoticeBox variant="info">
                 {incomeDraft.id
-                  ? '수정한 내용은 앞으로 새로 생성되는 월부터 적용해요. 이미 생성된 월의 수입 내역과 세부 급여 명세는 바뀌지 않아요.'
+                  ? '수정한 내용은 신규 생성 월부터 적용해요. 이미 생성된 월의 수입 내역은 바뀌지 않아요.'
                   : getFixedCreateNoticeText('수입', incomeDraft.applyNow, incomeDraft.startMonth)}
               </NoticeBox>
             </ResponsiveOverlayBody>
@@ -1110,7 +1072,7 @@ export const SettingsFixedTab = ({
           <ResponsiveOverlayContent size="lg">
             <ResponsiveOverlayHeader>
               <ResponsiveOverlayTitle>{expenseDraft.id ? '고정 지출 수정' : '고정 지출 추가'}</ResponsiveOverlayTitle>
-              <ResponsiveOverlayDescription>새 월 생성 시 예정 지출로 자동 추가할 기본 구성을 설정해요.</ResponsiveOverlayDescription>
+              <ResponsiveOverlayDescription>신규 생성 월 장부에 예정 지출로 자동 추가할 기본 구성을 설정해요.</ResponsiveOverlayDescription>
             </ResponsiveOverlayHeader>
             <ResponsiveOverlayBody sheetClassName="gap-3" dialogClassName="gap-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1166,7 +1128,8 @@ export const SettingsFixedTab = ({
                               paymentChoiceValue: next,
                               actualUser: ownerOfMethod ?? prev.actualUser,
                               discountAmount: parsed.type === 'card' ? prev.discountAmount : 0,
-                              performanceIncluded: parsed.type === 'card'
+                              performanceIncluded: parsed.type === 'card',
+                              taxInfo: parsed.type === 'card' && prev.taxInfo?.cashReceiptType ? { ...prev.taxInfo, cashReceiptType: undefined } : prev.taxInfo
                             }
                           : null
                       );
@@ -1212,7 +1175,7 @@ export const SettingsFixedTab = ({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-semibold text-foreground">실사용자</span>
+                  <span className="text-xs font-semibold text-foreground">구성원</span>
                   <Select value={expenseDraft.actualUser} onValueChange={(next) => setExpenseDraft((prev) => (prev ? { ...prev, actualUser: next } : null))}>
                     <SelectTrigger>
                       <SelectValue />
@@ -1248,6 +1211,8 @@ export const SettingsFixedTab = ({
                   <PeriodPicker
                     mode="month"
                     variant="outlined"
+                    size="default"
+                    className="min-h-control-lg px-2"
                     value={expenseDraft.startMonth}
                     invalid={expenseInvalid.has('startMonth')}
                     onChange={(next) => {
@@ -1292,6 +1257,25 @@ export const SettingsFixedTab = ({
                 ) : null}
               </div>
 
+              {(() => {
+                const { owner: methodOwner, methodKind } = resolveExpenseMethodOwner(expenseDraft.paymentChoiceValue, expenseDraft.actualUser);
+                return (
+                  <ExpenseTaxSection
+                    owner={methodOwner}
+                    methodKind={methodKind}
+                    taxInfo={expenseDraft.taxInfo}
+                    idPrefix="fix-exp-tax"
+                    businessIdInvalid={expenseInvalid.has('businessId')}
+                    inputVatInvalid={expenseInvalid.has('inputVatAmount')}
+                    onTaxInfoChange={(nextTaxInfo) => {
+                      setExpenseDraft((prev) => (prev ? { ...prev, taxInfo: nextTaxInfo } : null));
+                      clearExpenseInvalid('businessId');
+                      clearExpenseInvalid('inputVatAmount');
+                    }}
+                  />
+                );
+              })()}
+
               {parsePaymentChoice(expenseDraft.paymentChoiceValue).type === 'card' || !expenseDraft.id ? (
                 <div className="flex flex-col gap-1.5">
                   {parsePaymentChoice(expenseDraft.paymentChoiceValue).type === 'card' ? (
@@ -1316,7 +1300,7 @@ export const SettingsFixedTab = ({
 
               <NoticeBox variant="info">
                 {expenseDraft.id
-                  ? '수정한 내용은 앞으로 새로 생성되는 월부터 적용해요. 이미 생성된 월의 지출 내역은 바뀌지 않아요.'
+                  ? '수정한 내용은 신규 생성 월부터 적용해요. 이미 생성된 월의 지출 내역은 바뀌지 않아요.'
                   : getFixedCreateNoticeText('지출', expenseDraft.applyNow, expenseDraft.startMonth)}
               </NoticeBox>
             </ResponsiveOverlayBody>

@@ -1,14 +1,17 @@
 'use client';
 
 import { EmptyState, FilterChipGroup, FilterMultiSelect, PeriodPicker, SummaryHeroCard, dialog, mergeFilterOptions, type PeriodCellStatus, type PeriodMonthValue } from '@repo/ui-composition';
-import { Badge, Button, Card, CardHeader, CardTitle, SearchInput, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
+import { Badge, Button, Card, SearchInput, Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
 import { CalendarRange, ChevronRight, HandCoins, Plus, Repeat, Settings, SlidersHorizontal, Upload, WalletCards } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { INITIAL_INSTALLMENT_PLANS } from '@/previews/installments/installments-model';
 import { DesignAppShell } from '@/shared/DesignAppShell';
+import { FilterResetButton } from '@/shared/FilterResetButton';
 import { MemberAvatar } from '@/shared/MemberAvatar';
+import { SearchFilterToolbar } from '@/shared/SearchFilterToolbar';
+import { TransactionListHeader, TransactionMobileRow } from '@/shared/TransactionListLayout';
 import { INITIAL_DESIGN_ASSETS, findDesignAssetByName, getInitialAssetBalancesMap, type AccountBalanceDelta } from '@/shared/design-assets-store';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/shared/expense-form/ExpenseFormView';
@@ -20,7 +23,6 @@ type ExpenseRecord = {
   id: string;
   kind: ExpenseKind;
   dateLabel: string;
-  categoryLabel: string;
   categories: string[];
   merchant: string;
   installmentLabel?: string;
@@ -35,11 +37,39 @@ type ExpenseRecord = {
   draft: ExpenseDraft;
 };
 
-const EXPENSE_SECTIONS: ReadonlyArray<{ kind: ExpenseKind; title: string }> = [
-  { kind: 'regular', title: '일반 지출' },
-  { kind: 'installment', title: '할부 지출' },
-  { kind: 'fixed', title: '고정 지출' }
-];
+const EXPENSE_KIND_LABELS: Record<ExpenseKind, string> = {
+  regular: '일반',
+  installment: '할부',
+  fixed: '고정'
+};
+
+const KIND_FILTER_OPTIONS = ['일반', '할부', '고정'] as const;
+
+const renderExpenseKindBadges = (item: ExpenseRecord) => (
+  <>
+    {item.installmentLabel ? (
+      <Badge variant="neutral" className="shrink-0 tabular-nums">
+        {item.installmentLabel}
+      </Badge>
+    ) : null}
+    {item.kind === 'fixed' ? (
+      <Badge variant="neutral" className="shrink-0 gap-1">
+        <Repeat aria-hidden="true" className="size-3" />
+        고정
+      </Badge>
+    ) : null}
+  </>
+);
+
+const renderExpenseCategoryBadges = (categories: readonly string[], className?: string) => (
+  <div className={cn('flex flex-row flex-wrap gap-1 md:flex-col md:flex-nowrap', className)}>
+    {categories.map((category) => (
+      <Badge key={category} variant="neutral" className="max-w-full truncate">
+        {category}
+      </Badge>
+    ))}
+  </div>
+);
 
 const getExpenseKind = (draft: ExpenseDraft): ExpenseKind => {
   if (draft.paymentPlan === 'installment') {
@@ -71,7 +101,6 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
     id: 'exp-1',
     kind: 'regular',
     dateLabel: '11.04',
-    categoryLabel: '식비',
     categories: ['식비'],
     merchant: '점심 회식 정산',
     memo: '팀 회식 · 2인 정산',
@@ -116,7 +145,6 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
     id: 'exp-2',
     kind: 'regular',
     dateLabel: '11.03',
-    categoryLabel: '식비 외 1',
     categories: ['식비', '생활'],
     merchant: '이마트',
     memo: '장보기 · 주말 식료품',
@@ -156,7 +184,6 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
     id: 'exp-3',
     kind: 'installment',
     dateLabel: '11.02',
-    categoryLabel: '의류',
     categories: ['의류'],
     merchant: '가을 외투',
     installmentLabel: '1/3회차',
@@ -194,7 +221,6 @@ const INITIAL_EXPENSES: ExpenseRecord[] = [
     id: 'exp-4',
     kind: 'fixed',
     dateLabel: '11.01',
-    categoryLabel: '구독',
     categories: ['구독'],
     merchant: '넷플릭스',
     memo: '월간 정기구독 · 고정',
@@ -244,8 +270,6 @@ const draftToRecord = (draft: ExpenseDraft, fallbackId?: string): ExpenseRecord 
   const date = draft.transactionDate ?? new Date(2026, 10, 17);
   const dateLabel = `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
   const categories = Array.from(new Set(draft.splits.map((s) => s.category).filter(Boolean)));
-  const firstCategory = categories[0] ?? '기타';
-  const categoryLabel = categories.length > 1 ? `${firstCategory} 외 ${categories.length - 1}` : firstCategory;
   const paymentMethod = formatPaymentMethodName(draft.paymentMethod);
   const id = draft.id ?? fallbackId ?? `exp-${Date.now()}`;
 
@@ -258,7 +282,6 @@ const draftToRecord = (draft: ExpenseDraft, fallbackId?: string): ExpenseRecord 
     id,
     kind,
     dateLabel,
-    categoryLabel,
     categories: categories.length > 0 ? categories : ['기타'],
     merchant: draft.merchant.trim() || '새 지출 내역',
     installmentLabel,
@@ -302,6 +325,7 @@ export const ExpensesPreview = () => {
   const router = useRouter();
   const [periodMonth, setPeriodMonth] = useState<PeriodMonthValue>({ year: 2026, month: 11 });
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedKinds, setSelectedKinds] = useState<Set<string>>(() => new Set());
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(() => new Set());
   const [selectedMethods, setSelectedMethods] = useState<Set<string>>(() => new Set());
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(() => new Set());
@@ -312,32 +336,20 @@ export const ExpensesPreview = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [formDraft, setFormDraft] = useState<ExpenseDraft>(createEmptyExpensePreset);
 
-  const handleOpenFixedExpenses = () => {
-    void dialog.alert({
-      title: '고정 지출 설정',
-      description: '매월 반복되는 구독·고정 지출 템플릿을 관리합니다.'
-    });
+  const navigatePreview = (path: string, hash = '') => {
+    const query = new URLSearchParams(window.location.search).toString();
+    router.push(`${query ? `${path}?${query}` : path}${hash}`);
   };
 
-  const handleGoFunds = () => {
-    const query = new URLSearchParams(window.location.search).toString();
-    router.push(query ? `/preview/funds?${query}` : '/preview/funds');
-  };
-
-  const handleGoInstallments = () => {
-    const query = new URLSearchParams(window.location.search).toString();
-    router.push(query ? `/preview/installments?${query}` : '/preview/installments');
-  };
-
-  const handleGoReceivables = () => {
-    const query = new URLSearchParams(window.location.search).toString();
-    router.push(query ? `/preview/receivables?${query}` : '/preview/receivables');
-  };
+  const handleOpenFixedExpenses = () => navigatePreview('/preview/settings/fixed', '#fixed-expense');
+  const handleGoFunds = () => navigatePreview('/preview/funds');
+  const handleGoInstallments = () => navigatePreview('/preview/installments');
+  const handleGoReceivables = () => navigatePreview('/preview/receivables');
 
   const handleOpenImport = () => {
     void dialog.alert({
-      title: '카드 내역 가져오기',
-      description: 'CSV 또는 엑셀(.xlsx) 카드 이용 내역을 업로드해 일괄 등록합니다.'
+      title: '카드 내역 업로드',
+      description: 'CSV 또는 엑셀(.xlsx) 카드 이용 내역을 업로드하면 AI 분석·분류를 거쳐 기존 거래와 대조하고 일괄 등록할 수 있어요.'
     });
   };
 
@@ -506,19 +518,21 @@ export const ExpensesPreview = () => {
     [expenses]
   );
 
-  const selectedFilterCount = selectedCategories.size + selectedMethods.size + selectedUsers.size + selectedStatuses.size;
+  const selectedFilterCount = selectedKinds.size + selectedCategories.size + selectedMethods.size + selectedUsers.size + selectedStatuses.size;
   const hasActiveFilters = searchQuery.trim().length > 0 || selectedFilterCount > 0;
 
   const renderUserOption = (option: string): ReactNode => <MemberAvatar name={option} size="xs" />;
 
   const filterGroups = [
-    { key: 'category', label: '분류', options: categoryOptions, selected: selectedCategories, onChange: setSelectedCategories },
+    { key: 'kind', label: '구분', options: KIND_FILTER_OPTIONS, selected: selectedKinds, onChange: setSelectedKinds },
+    { key: 'category', label: '지출 분류', options: categoryOptions, selected: selectedCategories, onChange: setSelectedCategories },
     { key: 'method', label: '결제 수단', options: methodOptions, selected: selectedMethods, onChange: setSelectedMethods },
     { key: 'user', label: '실사용자', options: userOptions, selected: selectedUsers, onChange: setSelectedUsers, renderOption: renderUserOption },
     { key: 'status', label: '지불 상태', options: STATUS_FILTER_OPTIONS, selected: selectedStatuses, onChange: setSelectedStatuses }
   ] as const;
 
   const handleResetDetailFilters = () => {
+    setSelectedKinds(new Set());
     setSelectedCategories(new Set());
     setSelectedMethods(new Set());
     setSelectedUsers(new Set());
@@ -530,26 +544,31 @@ export const ExpensesPreview = () => {
     handleResetDetailFilters();
   };
 
-  const filteredExpenses = expenses.filter((item) => {
-    if (selectedCategories.size > 0 && !item.categories.some((cat) => selectedCategories.has(cat))) {
-      return false;
-    }
-    if (selectedMethods.size > 0 && !selectedMethods.has(item.paymentMethod)) {
-      return false;
-    }
-    if (selectedUsers.size > 0 && !selectedUsers.has(item.actualUser)) {
-      return false;
-    }
-    if (selectedStatuses.size > 0 && !selectedStatuses.has(item.status)) {
-      return false;
-    }
+  const filteredExpenses = expenses
+    .filter((item) => {
+      if (selectedKinds.size > 0 && !selectedKinds.has(EXPENSE_KIND_LABELS[item.kind])) {
+        return false;
+      }
+      if (selectedCategories.size > 0 && !item.categories.some((cat) => selectedCategories.has(cat))) {
+        return false;
+      }
+      if (selectedMethods.size > 0 && !selectedMethods.has(item.paymentMethod)) {
+        return false;
+      }
+      if (selectedUsers.size > 0 && !selectedUsers.has(item.actualUser)) {
+        return false;
+      }
+      if (selectedStatuses.size > 0 && !selectedStatuses.has(item.status)) {
+        return false;
+      }
 
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) {
-      return true;
-    }
-    return [item.merchant, item.memo].some((field) => field.toLowerCase().includes(q));
-  });
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) {
+        return true;
+      }
+      return [item.merchant, item.memo].some((field) => field.toLowerCase().includes(q));
+    })
+    .sort((a, b) => (b.draft.transactionDate?.getTime() ?? 0) - (a.draft.transactionDate?.getTime() ?? 0));
   const livingExpenseTotal = filteredExpenses.reduce((sum, item) => sum + item.livingAmount, 0);
   const paidExpenseTotal = filteredExpenses.reduce((sum, item) => sum + item.actualAmount, 0);
   const expenseDetails = filteredExpenses.reduce(
@@ -584,7 +603,7 @@ export const ExpensesPreview = () => {
 
           <Button variant="outline" size="md" className="px-2.5 lg:px-3" onClick={handleOpenImport}>
             <Upload className="size-4" />
-            <span>카드 내역 가져오기</span>
+            <span>카드 내역 업로드</span>
           </Button>
 
           <Button variant="expense" size="md" className="px-2.5 lg:px-3" onClick={handleOpenCreate}>
@@ -597,7 +616,10 @@ export const ExpensesPreview = () => {
       <SummaryHeroCard
         variant="hero-expense"
         aria-label={hasActiveFilters ? '검색 결과 지출 요약' : '월별 지출 요약'}
-        title={hasActiveFilters ? '검색 결과 생활비 지출 합계' : '생활비 지출 합계'}
+        title="생활비 지출 합계"
+        action={
+          hasActiveFilters ? <span className="rounded-full border border-hero-foreground/25 bg-hero-foreground/15 px-2.5 py-0.5 text-[11px] font-semibold text-hero-foreground">검색 결과</span> : null
+        }
         helpLabel="생활비 지출 안내"
         helpText="실결제 금액에서 회수 대상 금액을 뺀 값이에요."
         value={filteredExpenses.length ? formatWon(livingExpenseTotal) : '—'}
@@ -702,11 +724,10 @@ export const ExpensesPreview = () => {
         })}
       </section>
 
-      {/* Search & Multi-Select Dropdown Filters */}
-      <section aria-label="검색 및 상세 검색" className="flex flex-col gap-2 md:flex-row md:items-center">
-        <div className="flex items-center gap-2 md:min-w-36 md:max-w-44 md:flex-1 lg:w-64 lg:max-w-64 lg:flex-none">
-          <SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="내역 검색" wrapperClassName="min-w-0 flex-1" />
-
+      <SearchFilterToolbar
+        ariaLabel="검색 및 상세 검색"
+        search={<SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="내역 검색" wrapperClassName="min-w-0 flex-1" />}
+        mobileAction={
           <button
             type="button"
             aria-label={selectedFilterCount > 0 ? `상세 검색 ${selectedFilterCount}개 선택됨` : '상세 검색'}
@@ -724,215 +745,160 @@ export const ExpensesPreview = () => {
               </span>
             ) : null}
           </button>
-        </div>
+        }
+        filters={
+          <>
+            {filterGroups.map((group) => (
+              <FilterMultiSelect
+                key={group.key}
+                label={group.label}
+                options={group.options}
+                selected={group.selected}
+                onChange={group.onChange}
+                renderOption={'renderOption' in group ? group.renderOption : undefined}
+              />
+            ))}
+            {hasActiveFilters ? <FilterResetButton onClick={handleResetFilters} /> : null}
+          </>
+        }
+      />
 
-        <div className="hidden md:flex md:shrink-0 md:items-center md:gap-1.5 lg:gap-2">
-          {filterGroups.map((group) => (
-            <FilterMultiSelect
-              key={group.key}
-              label={group.label}
-              options={group.options}
-              selected={group.selected}
-              onChange={group.onChange}
-              renderOption={'renderOption' in group ? group.renderOption : undefined}
-            />
-          ))}
-          {hasActiveFilters ? (
-            <Button type="button" variant="ghost" size="sm" onClick={handleResetFilters} className="shrink-0 px-2 text-muted-foreground">
-              필터 초기화
-            </Button>
-          ) : null}
-        </div>
-      </section>
-
-      {/* Expense Sections (일반 지출 · 할부 지출 · 고정 지출) */}
-      <section aria-label="지출 내역 목록" className="flex flex-col gap-3 md:gap-4">
-        {filteredExpenses.length === 0 ? (
-          <Card padding="none">
-            <EmptyState
-              description={expenses.length === 0 ? '이번 달 지출 내역이 없어요. 지출을 추가하거나 카드 내역을 가져와 보세요.' : '조건에 맞는 지출 내역이 없어요.'}
-              actions={
-                expenses.length === 0 ? (
-                  <>
-                    <Button variant="expense" size="md" onClick={handleOpenCreate}>
-                      <Plus className="size-4" />
-                      <span>지출 추가</span>
-                    </Button>
-                    <Button variant="outline" size="md" onClick={handleOpenImport}>
-                      <Upload className="size-4" />
-                      <span>카드 내역 가져오기</span>
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="outline" size="md" onClick={handleResetFilters}>
-                    필터 초기화
-                  </Button>
-                )
-              }
-              className="p-6 md:py-10"
-            />
-            <div className="flex justify-end px-3.5 pb-3 md:hidden">
-              <Button variant="outline" size="sm" className="relative after:absolute after:-inset-y-1.5 after:inset-x-0" onClick={handleOpenFixedExpenses}>
-                고정 지출 설정
+      {/* Unified Expense List */}
+      <Card padding="none" className="gap-0 overflow-hidden" aria-label="지출 목록">
+        <TransactionListHeader
+          title="지출 목록"
+          count={filteredExpenses.length}
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label="카드 내역 업로드"
+                className="relative px-2 min-[360px]:px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0"
+                onClick={handleOpenImport}
+              >
+                <Upload />
+                <span className="hidden min-[360px]:inline">카드 업로드</span>
               </Button>
-            </div>
-          </Card>
+              <Button variant="outline" size="sm" aria-label="고정 지출 설정" className="relative px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0" onClick={handleOpenFixedExpenses}>
+                <Settings /> 고정 지출
+              </Button>
+            </>
+          }
+        />
+
+        {filteredExpenses.length === 0 ? (
+          <EmptyState
+            description={expenses.length === 0 ? '이번 달 지출 내역이 없어요. 지출을 추가하거나 카드 내역을 업로드해 보세요.' : '조건에 맞는 지출 내역이 없어요.'}
+            actions={
+              expenses.length === 0 ? (
+                <>
+                  <Button variant="expense" size="md" onClick={handleOpenCreate}>
+                    <Plus className="size-4" />
+                    <span>지출 추가</span>
+                  </Button>
+                  <Button variant="outline" size="md" onClick={handleOpenImport}>
+                    <Upload className="size-4" />
+                    <span>카드 내역 업로드</span>
+                  </Button>
+                </>
+              ) : (
+                <Button variant="outline" size="md" onClick={handleResetFilters}>
+                  필터 초기화
+                </Button>
+              )
+            }
+            className="p-6 md:py-10"
+          />
         ) : (
           <>
-            {EXPENSE_SECTIONS.map((section) => {
-              const items = filteredExpenses.filter((item) => item.kind === section.kind);
-              if (items.length === 0) {
-                return null;
-              }
-              const actualSum = items.reduce((sum, item) => sum + item.actualAmount, 0);
-              const livingSum = items.reduce((sum, item) => sum + item.livingAmount, 0);
-
-              return (
-                <Card key={section.kind} padding="none" className="gap-0 overflow-hidden">
-                  <CardHeader className="flex flex-col gap-1 border-b border-border px-3.5 py-2.5 md:flex-row md:items-center md:justify-between md:gap-2 md:px-4 md:py-3">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-sm font-bold text-foreground md:text-base">{section.title}</CardTitle>
-                      <Badge variant="neutral" className="tabular-nums">
-                        {items.length}건
-                      </Badge>
-                      {section.kind === 'fixed' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label="고정 지출 설정"
-                          className="relative ml-auto px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0 md:hidden"
-                          onClick={handleOpenFixedExpenses}
-                        >
-                          <Settings /> 설정
-                        </Button>
-                      ) : null}
+            {/* Mobile Rows (< 768px) */}
+            <div className="divide-y divide-border md:hidden">
+              {filteredExpenses.map((item) => (
+                <TransactionMobileRow
+                  key={item.id}
+                  onClick={() => handleOpenEdit(item)}
+                  date={<span className="text-xs font-medium text-muted-foreground tabular-nums">{item.dateLabel}</span>}
+                  category={renderExpenseCategoryBadges(item.categories, 'items-end')}
+                  content={
+                    <div className="min-w-0 flex flex-col gap-0.5">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="truncate text-sm font-bold text-foreground">{item.merchant}</span>
+                        {renderExpenseKindBadges(item)}
+                      </div>
+                      {item.memo ? <span className="truncate text-xs text-muted-foreground">{item.memo}</span> : null}
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium text-muted-foreground tabular-nums md:text-xs">
-                      <span>
-                        실결제 <strong className="font-bold text-expense">{formatWon(actualSum)}</strong>
-                      </span>
-                      <span aria-hidden="true">·</span>
-                      <span>
-                        생활비 <strong className="font-bold text-expense">{formatWon(livingSum)}</strong>
-                      </span>
+                  }
+                  amount={
+                    <div className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
+                      <span className="text-sm font-extrabold text-expense">{formatWon(item.amount)}</span>
+                      {item.uncollectedAmount > 0 ? <span className="text-[11px] font-semibold text-warning">미회수 {formatWon(item.uncollectedAmount)}</span> : null}
                     </div>
-                  </CardHeader>
+                  }
+                  metadata={
+                    <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      <MemberAvatar name={item.actualUser} mode="icon-hover" size="xs" />
+                      <span className="truncate">{item.paymentMethod}</span>
+                    </div>
+                  }
+                  status={<Badge {...STATUS_BADGE_PROPS[item.status]}>{item.status}</Badge>}
+                />
+              ))}
+            </div>
 
-                  {/* Mobile Rows (< 768px) */}
-                  <div className="divide-y divide-border md:hidden">
-                    {items.map((item) => (
-                      <button key={item.id} type="button" onClick={() => handleOpenEdit(item)} className="flex w-full flex-col gap-1.5 p-3.5 text-left transition-colors hover:bg-muted/35">
-                        <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
-                          {item.dateLabel} · {item.categoryLabel}
-                        </span>
-
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex flex-col gap-0.5">
-                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                              <span className="truncate text-sm font-bold text-foreground">{item.merchant}</span>
-                              {item.installmentLabel ? (
-                                <Badge variant="neutral" className="shrink-0 tabular-nums">
-                                  {item.installmentLabel}
-                                </Badge>
-                              ) : null}
-                            </div>
-                            {item.memo ? <span className="truncate text-xs text-muted-foreground">{item.memo}</span> : null}
+            {/* Tablet / PC Table (>= 768px) */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full table-fixed border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs font-medium text-muted-foreground">
+                    <th className="w-16 px-2 py-3 text-center font-medium whitespace-nowrap">날짜</th>
+                    <th className="w-24 px-2 py-3 text-center font-medium whitespace-nowrap">지출 분류</th>
+                    <th className="px-3 py-3 text-left font-medium">내역</th>
+                    <th className="w-36 px-3 py-3 text-left font-medium whitespace-nowrap lg:w-44">지출 수단 · 구성원</th>
+                    <th className="w-24 px-3 py-3 text-center font-medium whitespace-nowrap">지불 상태</th>
+                    <th className="w-28 py-3 pl-3 pr-4 text-right font-medium whitespace-nowrap">금액</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredExpenses.map((item) => (
+                    <tr key={item.id} onClick={() => handleOpenEdit(item)} className="cursor-pointer transition-colors hover:bg-muted/40">
+                      <td className="px-2 py-3.5 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">{item.dateLabel}</td>
+                      <td className="px-2 py-3.5 text-center align-middle">{renderExpenseCategoryBadges(item.categories, 'items-center')}</td>
+                      <td className="min-w-0 px-3 py-3.5">
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate font-bold text-foreground">{item.merchant}</span>
+                            {renderExpenseKindBadges(item)}
                           </div>
-                          <div className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
-                            <span className="text-sm font-extrabold text-expense">{formatWon(item.amount)}</span>
-                            {item.uncollectedAmount > 0 ? <span className="text-[11px] font-semibold text-warning">미회수 {formatWon(item.uncollectedAmount)}</span> : null}
-                          </div>
+                          {item.memo ? <span className="truncate text-xs text-muted-foreground">{item.memo}</span> : null}
                         </div>
-
-                        <div className="flex items-center justify-between gap-2 pt-0.5">
-                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      </td>
+                      <td className="min-w-0 px-3 py-3.5">
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <p className="truncate text-xs font-medium text-foreground">{item.paymentMethod}</p>
+                          <div className="flex min-w-0 items-center gap-1.5">
                             <MemberAvatar name={item.actualUser} mode="icon-hover" size="xs" />
-                            <span className="truncate">{item.paymentMethod}</span>
+                            <span className="truncate text-xs text-muted-foreground">{item.actualUser}</span>
                           </div>
-                          <Badge {...STATUS_BADGE_PROPS[item.status]}>{item.status}</Badge>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Tablet / PC Table (>= 768px) */}
-                  <div className="hidden overflow-x-auto md:block">
-                    <table className="w-full table-fixed border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-xs font-medium text-muted-foreground">
-                          <th className="w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:w-16">
-                            <span className="lg:hidden">날짜 · 분류</span>
-                            <span className="hidden lg:inline">날짜</span>
-                          </th>
-                          <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">분류</th>
-                          <th className="px-3 py-3 text-left font-medium">내역</th>
-                          <th className="w-40 px-3 py-3 text-left font-medium whitespace-nowrap lg:w-44">결제 수단</th>
-                          <th className="hidden w-20 px-3 py-3 text-center font-medium whitespace-nowrap lg:table-cell">실사용자</th>
-                          <th className="w-24 px-3 py-3 text-center font-medium whitespace-nowrap">지불 상태</th>
-                          <th className="w-28 py-3 pl-3 pr-4 text-right font-medium whitespace-nowrap">금액</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {items.map((item) => (
-                          <tr key={item.id} onClick={() => handleOpenEdit(item)} className="cursor-pointer transition-colors hover:bg-muted/40">
-                            <td className="px-3 py-3.5 text-center text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span>{item.dateLabel}</span>
-                                <span className="max-w-full truncate text-[11px] font-medium text-foreground/80 lg:hidden">{item.categoryLabel}</span>
-                              </div>
-                            </td>
-                            <td className="hidden truncate px-3 py-3.5 text-center text-xs font-medium text-foreground whitespace-nowrap lg:table-cell">{item.categoryLabel}</td>
-                            <td className="min-w-0 px-3 py-3.5">
-                              <div className="flex min-w-0 flex-col gap-0.5">
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <span className="truncate font-bold text-foreground">{item.merchant}</span>
-                                  {item.installmentLabel ? (
-                                    <Badge variant="neutral" className="shrink-0 tabular-nums">
-                                      {item.installmentLabel}
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                                {item.memo ? <span className="truncate text-xs text-muted-foreground">{item.memo}</span> : null}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3.5 text-xs whitespace-nowrap">
-                              <div className="flex min-w-0 items-center gap-1.5">
-                                <span className="lg:hidden">
-                                  <MemberAvatar name={item.actualUser} mode="icon-hover" size="xs" />
-                                </span>
-                                <span className="min-w-0 truncate text-muted-foreground">{item.paymentMethod}</span>
-                              </div>
-                            </td>
-                            <td className="hidden px-3 py-3.5 text-center whitespace-nowrap lg:table-cell">
-                              <MemberAvatar name={item.actualUser} mode="icon-hover" size="sm" />
-                            </td>
-                            <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                              <Badge {...STATUS_BADGE_PROPS[item.status]}>{item.status}</Badge>
-                            </td>
-                            <td className="py-3.5 pl-3 pr-4 text-right tabular-nums whitespace-nowrap">
-                              <div className="flex flex-col items-end gap-0.5">
-                                <span className="font-extrabold text-expense">{formatWon(item.amount)}</span>
-                                {item.uncollectedAmount > 0 ? <span className="text-[11px] font-semibold text-warning">미회수 {formatWon(item.uncollectedAmount)}</span> : null}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              );
-            })}
-            {!filteredExpenses.some((item) => item.kind === 'fixed') ? (
-              <div className="flex justify-end md:hidden">
-                <Button variant="outline" size="sm" className="relative gap-1.5 px-2.5 after:absolute after:-inset-y-1.5 after:inset-x-0" onClick={handleOpenFixedExpenses}>
-                  <Settings /> 고정 지출 설정
-                </Button>
-              </div>
-            ) : null}
+                      </td>
+                      <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                        <Badge {...STATUS_BADGE_PROPS[item.status]}>{item.status}</Badge>
+                      </td>
+                      <td className="py-3.5 pl-3 pr-4 text-right tabular-nums whitespace-nowrap">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="font-extrabold text-expense">{formatWon(item.amount)}</span>
+                          {item.uncollectedAmount > 0 ? <span className="text-[11px] font-semibold text-warning">미회수 {formatWon(item.uncollectedAmount)}</span> : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
-      </section>
+      </Card>
 
       {/* Mobile Detail Search Sheet */}
       <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
@@ -971,7 +937,6 @@ export const ExpensesPreview = () => {
         onDraftChange={setFormDraft}
         onSave={(draft) => void handleSaveExpense(draft)}
         onDelete={(draft) => void handleDeleteExpense(draft)}
-        onOpenImport={handleOpenImport}
       />
     </DesignAppShell>
   );

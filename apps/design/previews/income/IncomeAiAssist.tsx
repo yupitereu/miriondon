@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import type { IncomeRecord } from '@/previews/income/income-model';
 import { showValidationAlert } from '@/shared/design-validation';
 
-export const IncomeAiAssist = ({ draft, onBack, onApply }: { draft: IncomeRecord; onBack: () => void; onApply: (next: IncomeRecord) => void }) => {
+export const IncomeAiAssist = ({ draft, onApply }: { draft: IncomeRecord; onApply: (next: IncomeRecord) => void }) => {
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [review, setReview] = useState(false);
@@ -39,24 +39,7 @@ export const IncomeAiAssist = ({ draft, onBack, onApply }: { draft: IncomeRecord
   };
 
   return (
-    <section
-      aria-label="AI 입력 보조"
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 md:p-4"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        selectFile(event.dataTransfer.files[0]);
-      }}
-      onPaste={(event) => {
-        const image = Array.from(event.clipboardData.items)
-          .find((item) => item.type.startsWith('image/'))
-          ?.getAsFile();
-        if (image) {
-          event.preventDefault();
-          selectFile(image);
-        }
-      }}
-    >
+    <section aria-label="AI 입력 보조" className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5 md:p-4">
       {!review ? (
         <>
           <div className="flex flex-col gap-1.5">
@@ -71,7 +54,7 @@ export const IncomeAiAssist = ({ draft, onBack, onApply }: { draft: IncomeRecord
                 setText(event.target.value);
               }}
               placeholder="예: 11월 급여 기본급 300만원, 소득세 10만원"
-              className="w-full resize-y rounded-md border border-border-strong bg-card px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/25 focus:outline-none"
+              className="w-full resize-y rounded-md border border-border-strong bg-card px-3 py-2 text-sm focus:border-primary focus:outline-none"
             />
           </div>
           <div className="rounded-lg border border-dashed border-border-strong bg-muted/35 p-3">
@@ -105,9 +88,6 @@ export const IncomeAiAssist = ({ draft, onBack, onApply }: { draft: IncomeRecord
             ) : null}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onBack}>
-              직접 입력
-            </Button>
             <Button
               type="button"
               size="sm"
@@ -119,7 +99,7 @@ export const IncomeAiAssist = ({ draft, onBack, onApply }: { draft: IncomeRecord
                 setReview(true);
               }}
             >
-              <Sparkles className="size-3.5" /> 초안 만들기 · 시연
+              <Sparkles className="size-3.5" /> 초안 생성
             </Button>
           </div>
         </>

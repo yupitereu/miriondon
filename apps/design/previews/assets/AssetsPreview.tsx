@@ -1,6 +1,6 @@
 'use client';
 
-import { EmptyState, FilterChipGroup, FilterMultiSelect, SummaryHeroCard, dialog, type ProfileAvatarColor } from '@repo/ui-composition';
+import { EmptyState, FilterChipGroup, FilterMultiSelect, SummaryHeroCard, type ProfileAvatarColor } from '@repo/ui-composition';
 import {
   Badge,
   Button,
@@ -21,16 +21,16 @@ import {
   SheetTitle,
   cn
 } from '@repo/ui-core';
-import { Calculator, ChevronDown, ChevronRight, HandCoins, Handshake, HelpCircle, Info, Landmark, Pencil, PiggyBank, Settings, SlidersHorizontal, Wallet } from 'lucide-react';
+import { Calculator, ChevronDown, ChevronRight, HandCoins, HelpCircle, Pencil, Settings, SlidersHorizontal, StickyNote } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type ComponentType } from 'react';
+import { useMemo, useState } from 'react';
 
 import { AssetBalanceEditDialog, AssetReceivablesDialog, ExpectedFlowDetailDialog, LivingBudgetDiffDialog, type AssetBalanceSavePayload } from '@/previews/assets/AssetsDialogs';
+import { ASSET_GROUP_VISUALS } from '@/previews/assets/asset-group-visuals';
 import {
   ASSET_GROUP_ORDER,
   ASSET_OWNER_ORDER,
   ASSET_RECEIVABLES_BY_PERSON,
-  ASSET_REFERENCE_RATES_NOTICE,
   BUDGET_REMAINING_BASELINE,
   INITIAL_DETAILED_ASSETS,
   INITIAL_OWNER_PROFILES,
@@ -39,119 +39,87 @@ import {
   getAssetCurrentValuation,
   getAssetExpectedTotals,
   getAssetProjectedBalance,
+  getCounterpartyRoleLabel,
   getTotalUncollectedReceivables,
   type AssetDetailItem,
   type AssetGroupKey,
   type AssetOwnerKey
 } from '@/previews/assets/assets-model';
 import { DesignAppShell } from '@/shared/DesignAppShell';
+import { FilterResetButton } from '@/shared/FilterResetButton';
 import { MemberAvatar } from '@/shared/MemberAvatar';
+import { SearchFilterToolbar } from '@/shared/SearchFilterToolbar';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
-import { DESIGN_PROFILE_NAME, updatePersonalProfile } from '@/shared/design-personal-businesses';
 
 const GROUP_LABEL_OPTIONS = ASSET_GROUP_ORDER.map((group) => group.label);
 
-const AssetOwnerAvatar = ({
-  owner,
-  profile,
-  onColorChange,
-  onImageChange,
-  size = 'sm'
-}: {
-  owner: AssetOwnerKey;
-  profile: { color: ProfileAvatarColor; src: string | null };
-  onColorChange: (color: ProfileAvatarColor) => void;
-  onImageChange: (src: string | null) => void;
-  size?: 'sm' | 'md';
-}) => (
-  <MemberAvatar
-    name={owner}
-    mode="icon-interactive"
-    size={size}
-    colorOverride={owner === DESIGN_PROFILE_NAME ? undefined : profile.color}
-    srcOverride={owner === DESIGN_PROFILE_NAME ? undefined : profile.src}
-    onColorChange={owner === DESIGN_PROFILE_NAME ? (avatarColor) => updatePersonalProfile((prev) => ({ ...prev, avatarColor, avatarSrc: null })) : onColorChange}
-    onImageChange={owner === DESIGN_PROFILE_NAME ? (avatarSrc) => updatePersonalProfile((prev) => ({ ...prev, avatarSrc })) : onImageChange}
-  />
+const AssetOwnerAvatar = ({ owner, profile, size = 'sm' }: { owner: AssetOwnerKey; profile: { color: ProfileAvatarColor; src: string | null }; size?: 'sm' | 'md' }) => (
+  <MemberAvatar name={owner} label={owner.replace(/\(나\)$/, '')} mode="icon-label" size={size} colorOverride={profile.color} srcOverride={profile.src} labelClassName="text-current" />
 );
 
 const AssetOwnerDescription = ({
+  assetName,
   owner,
   profile,
-  onColorChange,
-  onImageChange,
-  description,
-  multiline = false,
+  institution,
+  typeLabel,
+  memo,
   className
 }: {
+  assetName: string;
   owner: AssetOwnerKey;
   profile: { color: ProfileAvatarColor; src: string | null };
-  onColorChange: (color: ProfileAvatarColor) => void;
-  onImageChange: (src: string | null) => void;
-  description: string;
-  multiline?: boolean;
+  institution?: string;
+  typeLabel?: string;
+  memo?: string;
   className?: string;
 }) => (
   <div className={cn('flex min-w-0 items-center gap-1.5 text-muted-foreground', className)}>
-    <span className="-m-3 inline-flex shrink-0">
-      <AssetOwnerAvatar owner={owner} profile={profile} onColorChange={onColorChange} onImageChange={onImageChange} size="sm" />
+    <span className="inline-flex shrink-0">
+      <AssetOwnerAvatar owner={owner} profile={profile} size="sm" />
     </span>
-    <span className={cn('min-w-0', multiline ? 'leading-snug break-keep' : 'truncate')}>{description}</span>
+    {institution ? <span className="min-w-0 truncate">· {institution}</span> : null}
+    <span className="hidden shrink-0 md:inline-flex" onClick={(event) => event.stopPropagation()}>
+      <AssetMemoPopover assetName={assetName} memo={memo} />
+    </span>
+    {typeLabel ? <span className="min-w-0 truncate md:hidden">· {typeLabel}</span> : null}
+    <span className="ml-auto shrink-0 md:hidden" onClick={(event) => event.stopPropagation()}>
+      <AssetMemoPopover assetName={assetName} memo={memo} compact />
+    </span>
   </div>
 );
 
-const AssetEditIconButton = ({ assetName, onClick }: { assetName: string; onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    aria-label={`${assetName} 금액 수정`}
-    title="금액 수정"
-    className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-  >
-    <Pencil className="size-3.5" />
-  </button>
-);
+const AssetMemoPopover = ({ assetName, memo, compact = false }: { assetName: string; memo?: string; compact?: boolean }) => {
+  if (!memo) return null;
 
-const ASSET_GROUP_VISUALS: Record<
-  AssetGroupKey,
-  {
-    icon: ComponentType<{ className?: string }>;
-    iconBoxClass: string;
-    headerBgClass: string;
-    totalTextClass: string;
-  }
-> = {
-  'cash-liquid': {
-    icon: Wallet,
-    iconBoxClass: 'bg-primary-tint text-primary',
-    headerBgClass: 'bg-primary-tint/35',
-    totalTextClass: 'text-foreground'
-  },
-  'savings-invest': {
-    icon: PiggyBank,
-    iconBoxClass: 'bg-positive-tint text-positive',
-    headerBgClass: 'bg-positive-tint/35',
-    totalTextClass: 'text-foreground'
-  },
-  'loan-deposit': {
-    icon: Handshake,
-    iconBoxClass: 'bg-warning-tint text-warning',
-    headerBgClass: 'bg-warning-tint/35',
-    totalTextClass: 'text-foreground'
-  },
-  debt: {
-    icon: Landmark,
-    iconBoxClass: 'bg-destructive-tint text-destructive',
-    headerBgClass: 'bg-destructive-tint/40',
-    totalTextClass: 'text-destructive'
-  }
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${assetName} 메모 보기`}
+          title="메모 보기"
+          onClick={(event) => event.stopPropagation()}
+          className={cn(
+            "relative inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md text-amber-600 transition-colors before:absolute before:content-[''] hover:bg-muted/60 dark:text-amber-700",
+            compact ? '-ml-1 size-5 before:-inset-3' : '-ml-1 h-6 w-5 before:-inset-2'
+          )}
+        >
+          <StickyNote aria-hidden="true" strokeWidth={1.9} className={cn(compact ? 'size-3.5' : 'size-4', '[&>path:first-child]:fill-yellow-300 [&>path:last-child]:fill-yellow-100')} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" collisionPadding={8} className="w-[min(18rem,calc(100vw-2rem))] p-3 text-xs leading-relaxed text-foreground break-keep">
+        <p>{memo}</p>
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 export const AssetsPreview = () => {
   const router = useRouter();
 
   const [assets, setAssets] = useState<AssetDetailItem[]>(INITIAL_DETAILED_ASSETS);
-  const [ownerProfiles, setOwnerProfiles] = useState<Record<AssetOwnerKey, { color: ProfileAvatarColor; src: string | null }>>(INITIAL_OWNER_PROFILES);
+  const ownerProfiles = INITIAL_OWNER_PROFILES;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOwners, setSelectedOwners] = useState<Set<string>>(() => new Set());
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(() => new Set());
@@ -293,7 +261,9 @@ export const AssetsPreview = () => {
             ? {
                 ...item.marketQuote,
                 valuationMode: payload.valuationMode ?? item.marketQuote.valuationMode,
-                quantity: payload.quantity ?? item.marketQuote.quantity
+                quantity: payload.quantity ?? item.marketQuote.quantity,
+                unitLabel: payload.unitLabel ?? item.marketQuote.unitLabel,
+                ratePerUnit: payload.ratePerUnit ?? item.marketQuote.ratePerUnit
               }
             : undefined
         };
@@ -301,12 +271,7 @@ export const AssetsPreview = () => {
     );
   };
 
-  const handleOpenSettingsGuide = async () => {
-    await dialog.alert({
-      title: '자산 · 카드 설정 안내',
-      description: '새 자산·부채 등록, 표시명·구분·생활비 포함 여부 수정, 사용 중지는 가계부 설정의 자산 · 카드 탭에서 관리해요.'
-    });
-  };
+  const handleOpenAssetSettings = () => navigateWithQuery('/preview/settings/assets');
 
   const ownerFilter = (mobile: boolean) => (
     <FilterMultiSelect
@@ -323,9 +288,9 @@ export const AssetsPreview = () => {
 
   const topNotice =
     livingBudgetDiff !== 0 ? (
-      <NoticeBox variant="warning" className="items-center">
+      <NoticeBox variant="warning">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-medium text-foreground tabular-nums break-keep">
+          <span className="text-xs leading-5 font-medium text-foreground tabular-nums break-keep">
             생활비 계좌·현금 예상 잔액이 11월 예산상 남은 생활비보다{' '}
             <strong className="font-bold text-warning">
               {formatWon(Math.abs(livingBudgetDiff))} {livingBudgetDiff > 0 ? '더 많아요' : '더 적어요'}
@@ -352,13 +317,7 @@ export const AssetsPreview = () => {
       mobileActions={
         <>
           {ownerFilter(true)}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="-mr-2 text-muted-foreground hover:text-foreground"
-            aria-label="가계부 설정에서 자산·카드 관리 안내"
-            onClick={() => void handleOpenSettingsGuide()}
-          >
+          <Button variant="ghost" size="icon" className="-mr-2 text-muted-foreground hover:text-foreground" aria-label="자산·카드 설정" onClick={handleOpenAssetSettings}>
             <Settings className="size-4" />
           </Button>
         </>
@@ -366,7 +325,7 @@ export const AssetsPreview = () => {
       desktopActions={
         <>
           {ownerFilter(false)}
-          <Button variant="outline" size="md" onClick={() => void handleOpenSettingsGuide()} className="gap-1.5">
+          <Button variant="outline" size="md" onClick={handleOpenAssetSettings} className="gap-1.5">
             <Settings className="size-4" />
             <span>자산·카드 설정</span>
           </Button>
@@ -384,7 +343,7 @@ export const AssetsPreview = () => {
           subContent={
             overallExpectedNet !== 0 ? (
               <div className="flex items-center justify-between gap-2 text-xs text-hero-foreground/80">
-                <span>예정 입출금 반영 시</span>
+                <span>예상 잔액 기준</span>
                 <span className="font-semibold whitespace-nowrap text-hero-foreground">{formatWon(overallProjectedNetWorth)}</span>
               </div>
             ) : null
@@ -523,7 +482,7 @@ export const AssetsPreview = () => {
 
           {overallExpectedNet !== 0 ? (
             <div className="flex items-center justify-between gap-2 border-t border-hero-foreground/20 pt-2.5 text-xs tabular-nums md:text-[11px] lg:text-xs">
-              <span className="text-hero-foreground/80 break-keep">예정 입출금 반영 시</span>
+              <span className="text-hero-foreground/80 break-keep">예상 잔액 기준</span>
               <span className="font-bold whitespace-nowrap text-hero-foreground">{formatWon(overallProjectedNetWorth)}</span>
             </div>
           ) : null}
@@ -543,7 +502,7 @@ export const AssetsPreview = () => {
               </span>
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="text-xs font-bold text-foreground">미회수 금액</span>
-                <span className="text-sm font-extrabold text-positive tabular-nums">{formatWon(totalUncollected)}</span>
+                <span className="text-[13px] font-extrabold text-positive tabular-nums min-[360px]:text-sm">{formatWon(totalUncollected)}</span>
                 <span className="text-[11px] text-muted-foreground tabular-nums">상대 {ASSET_RECEIVABLES_BY_PERSON.length}명</span>
               </div>
             </div>
@@ -557,11 +516,10 @@ export const AssetsPreview = () => {
 
       {totalUncollected > 0 ? <hr className="border-0 border-t border-border" /> : null}
 
-      {/* Search & Multi-Select Filters (1-line on >= 768px) */}
-      <section aria-label="자산 검색 및 필터" className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-        <div className="flex items-center gap-2 md:min-w-40 md:max-w-56 md:flex-1 lg:w-64 lg:max-w-64 lg:flex-none">
-          <SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="자산 검색" wrapperClassName="min-w-0 flex-1" />
-
+      <SearchFilterToolbar
+        ariaLabel="자산 검색 및 필터"
+        search={<SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="자산 검색" wrapperClassName="min-w-0 flex-1" />}
+        mobileAction={
           <button
             type="button"
             aria-label={detailFilterCount > 0 ? `상세 검색 ${detailFilterCount}개 선택됨` : '상세 검색'}
@@ -577,31 +535,17 @@ export const AssetsPreview = () => {
               <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-extrabold text-primary-foreground tabular-nums">{detailFilterCount}</span>
             ) : null}
           </button>
-        </div>
-
-        <div className="hidden md:flex md:shrink-0 md:items-center md:gap-1.5 lg:gap-2">
-          {filterGroups.map((group) => (
-            <FilterMultiSelect key={group.key} label={group.label} options={group.options} selected={group.selected} onChange={group.onChange} />
-          ))}
-
-          {hasActiveFilters ? (
-            <Button type="button" variant="ghost" size="sm" onClick={handleResetFilters} className="shrink-0 px-2 text-muted-foreground">
-              필터 초기화
-            </Button>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          aria-pressed={livingOnly}
-          onClick={() => setLivingOnly((prev) => !prev)}
-          className={cn(
-            'hidden min-h-11 w-fit cursor-pointer rounded-lg border px-3 text-xs font-semibold md:ml-auto md:inline-flex md:items-center',
-            livingOnly ? 'border-primary bg-primary-tint text-primary' : 'border-border-strong bg-card text-foreground hover:bg-accent/40'
-          )}
-        >
-          생활비만 보기
-        </button>
-      </section>
+        }
+        filters={
+          <>
+            {filterGroups.map((group) => (
+              <FilterMultiSelect key={group.key} label={group.label} options={group.options} selected={group.selected} onChange={group.onChange} />
+            ))}
+            <Checkbox checked={livingOnly} onCheckedChange={(checked) => setLivingOnly(checked === true)} label="생활비만 보기" wrapperClassName="min-h-control-md px-1 whitespace-nowrap" />
+            {hasActiveFilters ? <FilterResetButton onClick={handleResetFilters} /> : null}
+          </>
+        }
+      />
 
       {/* 자산 유형별 내역 */}
       {groupedAssets.length === 0 ? (
@@ -633,28 +577,23 @@ export const AssetsPreview = () => {
 
             return (
               <section key={meta.key} aria-label={meta.label} className="flex flex-col overflow-hidden rounded-xl border border-border-strong/75 bg-card">
-                {/* Prominent Category Header with Large Subtotal */}
-                <div className={cn('flex flex-col gap-2 border-b border-border px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between md:px-4', visual.headerBgClass)}>
-                  <div className="flex items-center gap-2">
+                {/* Category header with the current total beside its name */}
+                <div className={cn('flex items-center justify-between gap-2 border-b border-border px-3.5 py-2.5 md:px-4', visual.headerBgClass)}>
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span className={cn('inline-flex size-7 shrink-0 items-center justify-center rounded-lg', visual.iconBoxClass)}>
                       <GroupIcon className="size-4" />
                     </span>
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="text-sm font-extrabold tracking-tight text-foreground">{meta.label}</h3>
-                      <Badge variant="count" className="tabular-nums">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 md:gap-1.5">
+                      <h3 className="text-[13px] font-extrabold tracking-tight break-keep text-foreground min-[360px]:text-sm min-[360px]:whitespace-nowrap sm:text-base">{meta.label}</h3>
+                      <Badge variant="count" className="shrink-0 px-1.5 py-0 text-[10px] tabular-nums sm:px-2 sm:py-0.5 sm:text-xs">
                         {items.length}건
                       </Badge>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 tabular-nums sm:justify-end sm:gap-2.5">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-[11px] font-semibold text-muted-foreground">소계</span>
-                      <span className={cn('text-base font-extrabold tracking-tight', visual.totalTextClass)}>{formatWon(groupCurrentTotal)}</span>
-                    </div>
-                    {groupHasExpected ? (
-                      <span className="inline-flex items-center rounded-md bg-primary-tint px-2 py-0.5 text-xs font-bold text-primary">예상 잔액 {formatWon(groupProjectedTotal)}</span>
-                    ) : null}
+                  <div className="flex shrink-0 flex-col items-end gap-1 tabular-nums">
+                    <span className={cn('text-[13px] font-extrabold tracking-tight min-[360px]:text-sm sm:text-lg', visual.totalTextClass)}>{formatWon(groupCurrentTotal)}</span>
+                    {groupHasExpected ? <span className="text-right text-[11px] font-bold text-primary min-[360px]:text-xs sm:text-sm">예상 잔액 {formatWon(groupProjectedTotal)}</span> : null}
                   </div>
                 </div>
 
@@ -667,81 +606,84 @@ export const AssetsPreview = () => {
                     const projectedVal = getAssetProjectedBalance(item);
                     const isFxAsset = item.marketQuote?.assetKind === 'fx';
                     const isQuoteAsset = Boolean(item.marketQuote);
+                    const editActionLabel = isLiquid || meta.key === 'savings-invest' ? '보유량 수정' : isDebtGroup ? '남은 원금 수정' : '평가액 수정';
 
                     return (
-                      <div key={item.id} className="flex flex-col gap-2 px-3.5 py-3">
-                        <div className="min-w-0 flex flex-col gap-0.5">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-sm font-bold text-foreground break-keep">{item.name}</span>
-                            {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
-                            {isQuoteAsset ? <Badge variant="neutral">공통 시세</Badge> : null}
+                      <div key={item.id} className="flex flex-col gap-0.5 px-3.5 py-3">
+                        <div className="flex min-w-0 items-center justify-between gap-2 text-left">
+                          <div className="min-w-0 flex-1">
+                            <span className="flex min-w-0 items-center gap-1 min-[360px]:gap-1.5">
+                              <span className="truncate text-[13px] font-bold text-foreground min-[360px]:text-sm">{item.name}</span>
+                              {item.includeInLivingBudget ? (
+                                <Badge variant="wine" className="max-[359px]:px-1.5 max-[359px]:py-0 max-[359px]:text-[10px]">
+                                  생활비
+                                </Badge>
+                              ) : null}
+                            </span>
                           </div>
-                          <AssetOwnerDescription
-                            owner={item.owner}
-                            profile={ownerProfiles[item.owner]}
-                            onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
-                            onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
-                            description={item.typeLabel}
-                            multiline
-                            className="text-[11px]"
-                          />
-                          {item.counterparty ? (
-                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                              <span>상대</span>
-                              <MemberAvatar name={item.counterparty} size="xs" />
+                          <span className="flex shrink-0 items-center gap-0.5 tabular-nums">
+                            <span className={cn('text-[13px] font-bold min-[360px]:text-sm', isDebtGroup && !isQuoteAsset ? 'text-destructive' : 'text-foreground')}>
+                              {isQuoteAsset && item.marketQuote ? formatQuantityWithUnit(item.marketQuote) : formatWon(currentVal)}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`${item.name} ${editActionLabel}`}
+                              title={editActionLabel}
+                              onClick={() => handleOpenEditAsset(item)}
+                              className="relative -mr-1 inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors before:absolute before:-inset-3 before:content-[''] hover:bg-muted/60 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                            >
+                              <Pencil aria-hidden="true" className="size-3" />
+                            </button>
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex flex-col gap-0.5">
+                          <div className="flex min-w-0 items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <AssetOwnerDescription
+                                assetName={item.name}
+                                owner={item.owner}
+                                profile={ownerProfiles[item.owner]}
+                                institution={item.institution || item.counterparty}
+                                typeLabel={item.typeLabel}
+                                memo={item.memo}
+                                className="text-[10px] min-[360px]:text-[11px]"
+                              />
                             </div>
-                          ) : null}
+                            {isQuoteAsset ? <span className="shrink-0 whitespace-nowrap text-xs font-bold text-primary tabular-nums min-[360px]:text-sm">≈ {formatWon(currentVal)}</span> : null}
+                          </div>
                           {item.marketQuote ? (
-                            <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+                            <span className="self-end text-right text-[10px] font-medium text-muted-foreground tabular-nums min-[360px]:text-[11px]">
                               {isFxAsset
-                                ? `1 ${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`
-                                : `보유 ${formatQuantityWithUnit(item.marketQuote)} · 1${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`}
+                                ? `시세 1 ${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`
+                                : `시세 1${item.marketQuote.unitLabel} = ${formatWon(item.marketQuote.ratePerUnit)}`}
                             </span>
                           ) : null}
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 text-xs tabular-nums">
-                          <div className="flex min-w-0 items-center gap-1">
-                            {isFxAsset && item.marketQuote ? (
-                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                <span className="text-sm font-bold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
-                                <span className="text-[11px] font-medium text-muted-foreground">≈ {formatWon(currentVal)}</span>
-                              </div>
-                            ) : (
-                              <span className={cn('text-sm font-bold', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
-                                {isQuoteAsset ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}
-                              </span>
-                            )}
-                            <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
-                          </div>
-                          <span className="shrink-0 text-[11px] text-muted-foreground">{item.updatedAt}</span>
                         </div>
 
                         {hasExpected ? (
                           <button
                             type="button"
                             onClick={() => setFlowDetailAssetId(item.id)}
-                            className="flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border border-border bg-muted/35 px-3 py-2.5 text-left text-xs tabular-nums transition-colors hover:border-primary/40 hover:bg-primary-tint/30"
+                            className="flex w-full cursor-pointer flex-col gap-1.5 rounded-lg border border-border bg-muted/35 px-3 py-2 text-left text-[11px] tabular-nums transition-colors hover:border-primary/40 hover:bg-primary-tint/30 min-[360px]:py-2.5 min-[360px]:text-xs"
                           >
                             <div className="flex flex-col gap-1">
                               {inflow > 0 ? (
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="text-[11px] text-muted-foreground">입금 예정</span>
+                                  <span className="text-[10px] text-muted-foreground min-[360px]:text-[11px]">입금 예정</span>
                                   <span className="font-semibold whitespace-nowrap text-income">{formatSignedWon(inflow)}</span>
                                 </div>
                               ) : null}
                               {outflow > 0 ? (
                                 <div className="flex items-center justify-between gap-2">
-                                  <span className="text-[11px] text-muted-foreground">출금 예정</span>
+                                  <span className="text-[10px] text-muted-foreground min-[360px]:text-[11px]">출금 예정</span>
                                   <span className="font-semibold whitespace-nowrap text-expense">{formatSignedWon(-outflow)}</span>
                                 </div>
                               ) : null}
                             </div>
                             <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-1.5">
-                              <span className="text-[11px] font-bold text-primary">예상 잔액</span>
+                              <span className="text-[10px] font-bold text-primary min-[360px]:text-[11px]">예상 잔액</span>
                               <span className="inline-flex items-center gap-0.5 font-extrabold whitespace-nowrap text-primary">
                                 <span>{formatWon(projectedVal)}</span>
-                                <ChevronRight className="size-3.5 shrink-0" />
                               </span>
                             </div>
                           </button>
@@ -757,12 +699,11 @@ export const AssetsPreview = () => {
                     <table className="w-full table-fixed border-collapse text-sm">
                       <thead>
                         <tr className="border-b border-border/80 bg-card text-[11px] font-medium text-muted-foreground">
-                          <th className="py-2 pl-4 pr-2 text-left font-medium">계좌 · 현금</th>
-                          <th className="hidden w-16 px-2 py-2 text-center font-medium whitespace-nowrap lg:table-cell">소유자</th>
-                          <th className="w-[128px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-40">현재 보유금</th>
-                          <th className="w-[124px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-40">입금 · 출금 예정</th>
-                          <th className="w-[116px] py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-32 lg:pr-2">예상 잔액</th>
-                          <th className="hidden py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:table-cell lg:w-28">최종 수정</th>
+                          <th className="py-2 pl-4 pr-2 text-left font-medium">자산 항목</th>
+                          <th className="w-24 px-2 py-2 text-left font-medium whitespace-nowrap">유형</th>
+                          <th className="w-[136px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-[152px]">보유량</th>
+                          <th className="w-[108px] px-2 py-2 text-right font-medium whitespace-nowrap lg:w-32">입출금 예정</th>
+                          <th className="w-[104px] py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-32">예상 잔액(평가액)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/80">
@@ -771,43 +712,35 @@ export const AssetsPreview = () => {
                           const { inflow, outflow } = getAssetExpectedTotals(item);
                           const hasExpected = inflow > 0 || outflow > 0;
                           const projectedVal = getAssetProjectedBalance(item);
-                          const description = item.typeLabel;
-
                           return (
                             <tr key={item.id} className="transition-colors hover:bg-muted/25">
                               <td className="min-w-0 py-3 pl-4 pr-2">
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                   <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                    <span className="truncate font-bold text-foreground">{item.name}</span>
+                                    <span className="truncate text-left font-bold text-foreground">{item.name}</span>
                                     {item.includeInLivingBudget ? <Badge variant="wine">생활비</Badge> : null}
                                   </div>
                                   <AssetOwnerDescription
+                                    assetName={item.name}
                                     owner={item.owner}
                                     profile={ownerProfiles[item.owner]}
-                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
-                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
-                                    description={description}
-                                    className="text-xs lg:hidden"
-                                  />
-                                  <span className="hidden truncate text-xs text-muted-foreground lg:block">{description}</span>
-                                </div>
-                              </td>
-                              <td className="hidden px-2 py-1 text-center whitespace-nowrap lg:table-cell">
-                                <div className="inline-flex items-center justify-center">
-                                  <AssetOwnerAvatar
-                                    owner={item.owner}
-                                    profile={ownerProfiles[item.owner]}
-                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
-                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
-                                    size="md"
+                                    institution={item.institution}
+                                    typeLabel={item.typeLabel}
+                                    memo={item.memo}
+                                    className="text-xs"
                                   />
                                 </div>
                               </td>
+                              <td className="px-2 py-3 text-xs text-muted-foreground break-keep">{item.typeLabel}</td>
                               <td className="px-2 py-3 text-right tabular-nums whitespace-nowrap">
-                                <div className="inline-flex items-center justify-end gap-1">
-                                  <span className="font-bold text-foreground">{formatWon(currentVal)}</span>
-                                  <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
-                                </div>
+                                <span className="inline-flex items-center justify-end gap-1">
+                                  <span className="font-bold text-foreground">
+                                    {item.typeLabel === '현금' && item.marketQuote?.assetKind === 'fx' ? formatQuantityWithUnit(item.marketQuote) : formatWon(currentVal)}
+                                  </span>
+                                  <Button type="button" variant="ghost" size="icon-xs" aria-label={`${item.name} 보유량 수정`} title="보유량 수정" onClick={() => handleOpenEditAsset(item)}>
+                                    <Pencil aria-hidden="true" className="size-3.5" />
+                                  </Button>
+                                </span>
                               </td>
                               <td className="px-2 py-3 text-right text-xs tabular-nums whitespace-nowrap">
                                 {hasExpected ? (
@@ -820,16 +753,24 @@ export const AssetsPreview = () => {
                                       {inflow > 0 ? <span className="font-semibold text-income">{formatSignedWon(inflow)}</span> : null}
                                       {outflow > 0 ? <span className="font-semibold text-expense">{formatSignedWon(-outflow)}</span> : null}
                                     </span>
-                                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
                                   </button>
                                 ) : (
                                   <span className="text-muted-foreground">—</span>
                                 )}
                               </td>
-                              <td className="py-3 pl-2 pr-4 text-right tabular-nums whitespace-nowrap lg:pr-2">
-                                <span className={cn('font-bold', hasExpected ? 'text-primary' : 'text-foreground')}>{formatWon(projectedVal)}</span>
+                              <td className="py-3 pl-2 pr-4 text-right tabular-nums whitespace-nowrap">
+                                <span className="flex flex-col items-end gap-0.5">
+                                  <span className={cn('font-bold', hasExpected || item.marketQuote ? 'text-primary' : 'text-foreground')}>
+                                    {item.marketQuote ? '≈ ' : ''}
+                                    {formatWon(projectedVal)}
+                                  </span>
+                                  {item.typeLabel === '현금' && item.marketQuote?.assetKind === 'fx' ? (
+                                    <span className="text-[10px] font-normal text-muted-foreground">
+                                      1 {item.marketQuote.unitLabel} = {formatWon(item.marketQuote.ratePerUnit)}
+                                    </span>
+                                  ) : null}
+                                </span>
                               </td>
-                              <td className="hidden py-3 pl-2 pr-4 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap lg:table-cell">{item.updatedAt}</td>
                             </tr>
                           );
                         })}
@@ -840,68 +781,88 @@ export const AssetsPreview = () => {
                       <thead>
                         <tr className="border-b border-border/80 bg-card text-[11px] font-medium text-muted-foreground">
                           <th className="py-2 pl-4 pr-2 text-left font-medium">{isDebtGroup ? '부채 항목' : '자산 항목'}</th>
-                          <th className="hidden w-16 px-2 py-2 text-center font-medium whitespace-nowrap lg:table-cell">소유자</th>
-                          <th className="w-44 px-2 py-2 text-left font-medium whitespace-nowrap lg:w-56">{meta.key === 'savings-invest' ? '보유 · 시세 기준' : '유형 · 상대방'}</th>
-                          <th className="w-40 py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:w-44 lg:pr-2">{isDebtGroup ? '남은 원금' : '현재 평가액'}</th>
-                          <th className="hidden py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap lg:table-cell lg:w-28">최종 수정</th>
+                          <th className="w-24 px-2 py-2 text-left font-medium whitespace-nowrap">유형</th>
+                          {meta.key === 'savings-invest' ? (
+                            <>
+                              <th className="w-32 px-2 py-2 text-right font-medium whitespace-nowrap">보유량</th>
+                              <th className="w-[128px] py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap">평가액</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="w-28 px-2 py-2 text-left font-medium whitespace-nowrap">{getCounterpartyRoleLabel(meta.key)}</th>
+                              <th className="w-40 py-2 pl-2 pr-4 text-right font-medium whitespace-nowrap">{isDebtGroup ? '남은 원금' : '평가액'}</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/80">
                         {items.map((item) => {
                           const currentVal = getAssetCurrentValuation(item);
-                          const isQuoteAsset = Boolean(item.marketQuote);
-                          const description = item.typeLabel;
                           return (
                             <tr key={item.id} className="transition-colors hover:bg-muted/25">
                               <td className="min-w-0 py-3 pl-4 pr-2">
                                 <div className="flex min-w-0 flex-col gap-0.5">
-                                  <span className="truncate font-bold text-foreground">{item.name}</span>
-                                  <AssetOwnerDescription
-                                    owner={item.owner}
-                                    profile={ownerProfiles[item.owner]}
-                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
-                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
-                                    description={description}
-                                    className="text-xs lg:hidden"
-                                  />
-                                  <span className="hidden truncate text-xs text-muted-foreground lg:block">{description}</span>
-                                </div>
-                              </td>
-                              <td className="hidden px-2 py-1 text-center whitespace-nowrap lg:table-cell">
-                                <div className="inline-flex items-center justify-center">
-                                  <AssetOwnerAvatar
-                                    owner={item.owner}
-                                    profile={ownerProfiles[item.owner]}
-                                    onColorChange={(nextColor) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], color: nextColor } }))}
-                                    onImageChange={(nextSrc) => setOwnerProfiles((prev) => ({ ...prev, [item.owner]: { ...prev[item.owner], src: nextSrc } }))}
-                                    size="md"
-                                  />
-                                </div>
-                              </td>
-                              <td className="min-w-0 px-2 py-3 text-xs text-muted-foreground">
-                                {item.marketQuote ? (
-                                  <div className="flex flex-col gap-0.5 tabular-nums">
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="font-semibold text-foreground">{formatQuantityWithUnit(item.marketQuote)}</span>
-                                      <Badge variant="neutral">공통 시세</Badge>
-                                    </div>
-                                    <span className="text-[11px] text-muted-foreground">
-                                      1{item.marketQuote.assetKind === 'fx' ? ` ${item.marketQuote.unitLabel}` : item.marketQuote.unitLabel} = {formatWon(item.marketQuote.ratePerUnit)}
-                                    </span>
+                                  <div className="flex min-w-0 items-center gap-1.5">
+                                    <span className="truncate text-left font-bold text-foreground">{item.name}</span>
                                   </div>
-                                ) : item.counterparty ? (
-                                  <MemberAvatar name={item.counterparty} size="xs" labelClassName="font-medium text-foreground" />
-                                ) : (
-                                  <span>직접 입력 평가액</span>
-                                )}
-                              </td>
-                              <td className={cn('py-3 pl-2 pr-4 text-right font-bold tabular-nums whitespace-nowrap lg:pr-2', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
-                                <div className="inline-flex items-center justify-end gap-1">
-                                  <span>{isQuoteAsset ? `≈ ${formatWon(currentVal)}` : formatWon(currentVal)}</span>
-                                  <AssetEditIconButton assetName={item.name} onClick={() => handleOpenEditAsset(item)} />
+                                  <AssetOwnerDescription
+                                    assetName={item.name}
+                                    owner={item.owner}
+                                    profile={ownerProfiles[item.owner]}
+                                    institution={item.institution}
+                                    typeLabel={item.typeLabel}
+                                    memo={item.memo}
+                                    className="text-xs"
+                                  />
                                 </div>
                               </td>
-                              <td className="hidden py-3 pl-2 pr-4 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap lg:table-cell">{item.updatedAt}</td>
+                              <td className="px-2 py-3 text-xs text-muted-foreground break-keep">{item.typeLabel}</td>
+                              {meta.key === 'savings-invest' ? (
+                                <>
+                                  <td className="px-2 py-3 text-right text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                                      {item.marketQuote ? formatQuantityWithUnit(item.marketQuote) : formatWon(currentVal)}
+                                      <Button type="button" variant="ghost" size="icon-xs" aria-label={`${item.name} 보유량 수정`} title="보유량 수정" onClick={() => handleOpenEditAsset(item)}>
+                                        <Pencil aria-hidden="true" className="size-3.5" />
+                                      </Button>
+                                    </span>
+                                  </td>
+                                  <td className={cn('py-3 pl-2 pr-4 text-right text-sm tabular-nums whitespace-nowrap', item.marketQuote ? 'text-primary' : 'text-foreground')}>
+                                    <span className="flex flex-col items-end gap-0.5">
+                                      <span className="font-bold">
+                                        {item.marketQuote ? '≈ ' : ''}
+                                        {formatWon(currentVal)}
+                                      </span>
+                                      {item.marketQuote ? (
+                                        <span className="text-[10px] font-normal text-muted-foreground">
+                                          {item.marketQuote.assetKind === 'fx' ? `1 ${item.marketQuote.unitLabel}` : `1${item.marketQuote.unitLabel}`} = {formatWon(item.marketQuote.ratePerUnit)}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="min-w-0 px-2 py-3 text-xs text-muted-foreground">
+                                    {item.counterparty ? <span className="font-medium text-foreground break-keep">{item.counterparty}</span> : null}
+                                  </td>
+                                  <td className={cn('py-3 pl-2 pr-4 text-right text-sm font-bold tabular-nums whitespace-nowrap', isDebtGroup ? 'text-destructive' : 'text-foreground')}>
+                                    <span className="inline-flex items-center gap-1">
+                                      {formatWon(currentVal)}
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        aria-label={`${item.name} ${isDebtGroup ? '남은 원금' : '평가액'} 수정`}
+                                        title={isDebtGroup ? '남은 원금 수정' : '평가액 수정'}
+                                        onClick={() => handleOpenEditAsset(item)}
+                                      >
+                                        <Pencil aria-hidden="true" className="size-3.5" />
+                                      </Button>
+                                    </span>
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })}
@@ -915,17 +876,6 @@ export const AssetsPreview = () => {
         </div>
       )}
 
-      {/* Reference Rates & Policy Meta Footer */}
-      <div className="flex flex-col gap-1 px-0.5 text-xs text-muted-foreground">
-        <div className="flex items-start gap-1.5">
-          <Info className="mt-0.5 size-3.5 shrink-0" />
-          <span className="break-keep tabular-nums">{ASSET_REFERENCE_RATES_NOTICE}</span>
-        </div>
-        <p className="pl-5 text-[11px] break-keep">
-          자산 등록·속성 변경·사용 중지는 가계부 설정에서 관리하며, 잔액 수정은 새 수입·지출을 만들지 않아요. 서로 다른 시각에 입력한 금액은 실시간 은행 잔액과 다를 수 있어요.
-        </p>
-      </div>
-
       {/* Mobile Detail Filter Sheet */}
       <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
         <SheetContent side="bottom">
@@ -937,7 +887,7 @@ export const AssetsPreview = () => {
             {filterGroups.map((group) => (
               <FilterChipGroup key={group.key} label={group.label} mode="multi" options={group.options} selected={group.selected} onChange={group.onChange} />
             ))}
-            <Checkbox label="생활비만 보기" checked={livingOnly} onCheckedChange={(checked) => setLivingOnly(checked === true)} />
+            <Checkbox checked={livingOnly} onCheckedChange={(checked) => setLivingOnly(checked === true)} label="생활비만 보기" />
           </SheetBody>
           <SheetFooter className="grid grid-cols-2 gap-2">
             <Button type="button" variant="outline" size="lg" onClick={handleResetDetailFilters}>

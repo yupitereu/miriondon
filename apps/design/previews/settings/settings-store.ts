@@ -19,7 +19,6 @@ export type SettingsRole = '소유자' | '관리자' | '구성원';
 export type SettingsMember = { id: string; name: string; email: string; role: SettingsRole; pending?: boolean; linkedOutsider?: string };
 
 export type SettingsStoreState = {
-  ledgerName: string;
   members: SettingsMember[];
   outsiders: string[];
   assets: LedgerAssetRecord[];
@@ -37,7 +36,6 @@ const INITIAL_MEMBERS: SettingsMember[] = [
 ];
 
 const INITIAL_STATE: SettingsStoreState = {
-  ledgerName: '우리집 가계부',
   members: INITIAL_MEMBERS,
   outsiders: ['지은'],
   assets: INITIAL_LEDGER_ASSETS,

@@ -381,10 +381,10 @@ export const AnnualSettlementNotice = ({ year }: { year: number }) => {
   if (!differenceMonths.length && !unverifiedMonths.length) return null;
 
   return (
-    <NoticeBox variant="warning" className="[&>svg]:mt-1">
+    <NoticeBox variant="warning">
       {differenceMonths.length ? (
         <details className="group">
-          <summary className="-my-2.5 flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 py-2.5 font-bold [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-2 leading-5 font-bold [&::-webkit-details-marker]:hidden">
             <span>수입과 예산 간 {formatSignedWon(sum(differenceMonths.map((item) => item.amount)))} 차이가 있습니다.</span>
             <ChevronDown aria-hidden="true" className="size-4 shrink-0 group-open:rotate-180" />
           </summary>
@@ -745,7 +745,7 @@ export const AnnualSettlementView = ({ year, ownerSelection }: { year: number; o
               <div className="min-w-0">
                 <AnnualIncomeTable key={year} records={incomes} availableKinds={example.incomes.map((income) => income.kind)} />
                 <details className="mt-4 border-t border-border pt-3">
-                  <summary className="min-h-control-lg cursor-pointer py-2 text-sm font-semibold text-primary">수입 종류별 그래프 보기</summary>
+                  <summary className="min-h-control-lg cursor-pointer py-2 text-sm font-semibold text-primary">소득 분류별 그래프 보기</summary>
                   <AnnualIncomeChart key={`${year}-${selectionKey}`} records={incomes} availableKinds={example.incomes.map((income) => income.kind)} />
                 </details>
               </div>

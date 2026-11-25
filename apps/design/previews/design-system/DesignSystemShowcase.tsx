@@ -74,11 +74,13 @@ import {
   TooltipContent,
   TooltipTrigger
 } from '@repo/ui-core';
-import { ChevronRight, SearchX } from 'lucide-react';
+import { ChevronRight, Pencil, SearchX } from 'lucide-react';
 import { useState } from 'react';
 
 import { CardPerformanceCard, type CardPerformanceItem } from '@/shared/CardPerformanceCard';
+import { FilterResetButton } from '@/shared/FilterResetButton';
 import { MemberAvatar } from '@/shared/MemberAvatar';
+import { TransactionListHeader, TransactionMobileRow } from '@/shared/TransactionListLayout';
 
 const STANDARD_CARD_TIERS = [
   { step: 1, threshold: 300000, benefits: [{ name: '생활 영역 할인', limit: '월 한도 10,000원' }] },
@@ -86,7 +88,7 @@ const STANDARD_CARD_TIERS = [
   { step: 3, threshold: 1000000, benefits: [{ name: '생활 영역 할인', limit: '월 한도 30,000원' }] }
 ];
 
-const CARD_PERFORMANCE_STATES: Array<{ stateLabel: string; card: CardPerformanceItem }> = [
+const CARD_PERFORMANCE_STATES: Array<{ stateLabel: string; card: CardPerformanceItem; period?: { month: number; previousMonth: number; previousAmount: number | null } }> = [
   {
     stateLabel: 'State=Below (미달)',
     card: {
@@ -129,6 +131,7 @@ const CARD_PERFORMANCE_STATES: Array<{ stateLabel: string; card: CardPerformance
   },
   {
     stateLabel: 'State=NeedsReview (일부 조건 확인 필요)',
+    period: { month: 11, previousMonth: 10, previousAmount: 330000 },
     card: {
       id: 'state-review',
       name: '예시 카드 B',
@@ -333,6 +336,9 @@ export const DesignSystemShowcase = () => {
                   </Button>
                   <Button variant="link" size="sm">
                     기준일 안내
+                  </Button>
+                  <Button variant="outline" size="icon-xs" aria-label="행 수정">
+                    <Pencil />
                   </Button>
                   <Button variant="primary" size="md" disabled>
                     비활성
@@ -680,18 +686,12 @@ export const DesignSystemShowcase = () => {
                   <FilterSingleSelect label="기간" options={samplePeriodOptions} value={periodScope} defaultValue="all" onChange={setPeriodScope} />
                   <FilterMultiSelect label="분류" options={sampleFilterOptions} selected={selectedCategories} onChange={setSelectedCategories} />
                   {periodScope !== 'all' || selectedCategories.size > 0 ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
+                    <FilterResetButton
                       onClick={() => {
                         setPeriodScope('all');
                         setSelectedCategories(new Set());
                       }}
-                      className="px-2 text-muted-foreground"
-                    >
-                      필터 초기화
-                    </Button>
+                    />
                   ) : null}
                 </div>
 
@@ -867,9 +867,28 @@ export const DesignSystemShowcase = () => {
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {CARD_PERFORMANCE_STATES.map((item) => (
-                <CardPerformanceCard key={item.card.id} stateLabel={item.stateLabel} card={item.card} />
+                <CardPerformanceCard key={item.card.id} stateLabel={item.stateLabel} card={item.card} period={item.period} />
               ))}
             </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>TransactionListHeader · TransactionMobileRow</CardTitle>
+              <CardDescription>수입·지출 목록에서 공유하는 제목/건수 헤더와 모바일 거래 행</CardDescription>
+            </CardHeader>
+            <div className="overflow-hidden rounded-b-xl border-t border-border">
+              <TransactionListHeader title="수입 목록" count={1} />
+              <TransactionMobileRow
+                date={<span className="text-xs font-medium text-muted-foreground tabular-nums">11.25</span>}
+                category={<Badge variant="income">근로소득</Badge>}
+                content={<span className="truncate text-sm font-bold text-foreground">11월 급여</span>}
+                amount={<strong className="shrink-0 text-sm font-extrabold text-income tabular-nums">3,250,000원</strong>}
+                metadata={<MemberAvatar name="민지 (나)" size="xs" mode="icon-hover" />}
+                status={<Badge variant="positive">입금 완료</Badge>}
+                onClick={() => void dialog.alert({ title: '수입 내역', description: '거래 행을 눌러 상세를 엽니다.' })}
+              />
+            </div>
           </Card>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">

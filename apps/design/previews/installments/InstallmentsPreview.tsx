@@ -43,7 +43,9 @@ import {
   type InstallmentTabKey
 } from '@/previews/installments/installments-model';
 import { DesignAppShell } from '@/shared/DesignAppShell';
-import { formatDateRangeLabel, getRecentMonthsDateRange, isDateWithinRange, isSameDateRange, toLocalDayStart, type DateRangeValue } from '@/shared/design-date-range';
+import { FilterResetButton } from '@/shared/FilterResetButton';
+import { SearchFilterToolbar } from '@/shared/SearchFilterToolbar';
+import { formatDateRangeLabel, getRecentMonthsDateRange, isDateWithinRange, isSameDateRange, shiftDateByMonths, toLocalDayStart, type DateRangeValue } from '@/shared/design-date-range';
 import { formatSignedWon, formatWon } from '@/shared/design-format';
 import { ExpenseFormOverlay, createEmptyExpensePreset, type ExpenseDraft, type PaymentStatus } from '@/shared/expense-form/ExpenseFormView';
 import { DEFAULT_VIEWED_MONTH, PAYMENT_METHOD_ITEMS, formatInstallmentTypeLabel, formatPaymentMethodName, formatYearMonth, isCreditCardMethod } from '@/shared/expense-form/expense-form-model';
@@ -76,6 +78,8 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
   const isCompletedTab = activeTab === 'completed';
   const startDate = completedDateRange.start;
   const endDate = completedDateRange.end;
+  const startDateMin = useMemo(() => (endDate ? shiftDateByMonths(endDate, -6) : undefined), [endDate]);
+  const endDateMax = useMemo(() => (startDate ? shiftDateByMonths(startDate, 6) : undefined), [startDate]);
 
   // Conclusion timeline & accordion states
   const [timelineSelection, setTimelineSelection] = useState<{ ym: string | null; userToggled: boolean }>({ ym: null, userToggled: false });
@@ -118,16 +122,38 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
   };
 
   const handleStartDateChange = (next: Date | null) => {
+    if (!next) return;
     setCompletedDateRange((prev) => {
-      const nextEnd = next && prev.end && toLocalDayStart(next).getTime() > toLocalDayStart(prev.end).getTime() ? next : prev.end;
-      return { start: next, end: nextEnd };
+      const normalized = toLocalDayStart(next);
+      const maxAllowedEnd = shiftDateByMonths(normalized, 6);
+      let nextEnd = prev.end;
+      if (nextEnd) {
+        const endStart = toLocalDayStart(nextEnd);
+        if (endStart.getTime() < normalized.getTime()) {
+          nextEnd = normalized;
+        } else if (endStart.getTime() > maxAllowedEnd.getTime()) {
+          nextEnd = maxAllowedEnd;
+        }
+      }
+      return { start: normalized, end: nextEnd };
     });
   };
 
   const handleEndDateChange = (next: Date | null) => {
+    if (!next) return;
     setCompletedDateRange((prev) => {
-      const nextStart = next && prev.start && toLocalDayStart(next).getTime() < toLocalDayStart(prev.start).getTime() ? next : prev.start;
-      return { start: nextStart, end: next };
+      const normalized = toLocalDayStart(next);
+      const minAllowedStart = shiftDateByMonths(normalized, -6);
+      let nextStart = prev.start;
+      if (nextStart) {
+        const startDay = toLocalDayStart(nextStart);
+        if (startDay.getTime() > normalized.getTime()) {
+          nextStart = normalized;
+        } else if (startDay.getTime() < minAllowedStart.getTime()) {
+          nextStart = minAllowedStart;
+        }
+      }
+      return { start: nextStart, end: normalized };
     });
   };
 
@@ -825,10 +851,11 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
         </div>
 
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-          <div className="flex items-center gap-2 lg:contents">
-            <div className="flex min-w-0 flex-1 items-center gap-2 lg:w-52 lg:max-w-52 lg:flex-none">
-              <SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="내역 검색" wrapperClassName="min-w-0 flex-1" />
-
+          <SearchFilterToolbar
+            ariaLabel="할부 검색 및 필터"
+            className="lg:contents"
+            search={<SearchInput size="md" value={searchQuery} onValueChange={setSearchQuery} placeholder="내역 검색" aria-label="내역 검색" wrapperClassName="min-w-0 flex-1" />}
+            mobileAction={
               <button
                 type="button"
                 aria-label={detailFilterCount > 0 ? `상세 검색 ${detailFilterCount}개 선택됨` : '상세 검색'}
@@ -846,18 +873,15 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
                   </span>
                 ) : null}
               </button>
-            </div>
-
-            <div className="hidden md:flex md:shrink-0 md:items-center md:gap-1.5 lg:order-3 lg:gap-2">
-              <FilterMultiSelect label="결제 수단" options={cardOptions} selected={selectedCards} onChange={setSelectedCards} />
-
-              {hasActiveFilters ? (
-                <Button type="button" variant="ghost" size="sm" onClick={handleResetFilters} className="shrink-0 px-2 text-muted-foreground">
-                  필터 초기화
-                </Button>
-              ) : null}
-            </div>
-          </div>
+            }
+            filters={
+              <>
+                <FilterMultiSelect label="결제 수단" options={cardOptions} selected={selectedCards} onChange={setSelectedCards} />
+                {hasActiveFilters ? <FilterResetButton onClick={handleResetFilters} /> : null}
+              </>
+            }
+            filtersClassName="lg:order-3"
+          />
 
           {isCompletedTab ? (
             <div className="hidden md:flex md:items-center md:gap-1.5 lg:order-2 lg:shrink-0">
@@ -866,9 +890,9 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
                 <DatePicker
                   value={startDate}
                   onChange={handleStartDateChange}
+                  minDate={startDateMin}
                   maxDate={endDate ?? undefined}
                   presets={[]}
-                  clearable
                   placeholder="완료 시작일"
                   aria-label="완료 시작일"
                   sheetTitle="완료 시작일 선택"
@@ -881,8 +905,8 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
                   value={endDate}
                   onChange={handleEndDateChange}
                   minDate={startDate ?? undefined}
+                  maxDate={endDateMax}
                   presets={['today']}
-                  clearable
                   placeholder="완료 종료일"
                   aria-label="완료 종료일"
                   sheetTitle="완료 종료일 선택"
@@ -902,7 +926,6 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
             >
               <CalendarRange className="size-3.5 shrink-0 text-primary" />
               <span className="truncate tabular-nums">완료 기간 · {formatDateRangeLabel(completedDateRange)}</span>
-              {!hasCustomCompletedDateRange ? <span className="shrink-0 text-[10px] font-medium text-muted-foreground">(최근 3개월)</span> : null}
             </button>
           </div>
         ) : null}
@@ -920,7 +943,7 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
                   ? hasActiveFilters
                     ? '검색어나 결제 수단 필터를 바꾸거나 지출 추가에서 할부를 등록할 수 있어요.'
                     : '지출 추가에서 납부방식을 할부로 선택하면 여기에서 일정을 관리할 수 있어요.'
-                  : '완료 기간을 넓히거나 지우면 이전 완료 · 조기 완납 내역도 함께 확인할 수 있어요.'
+                  : '완료 기간을 넓혀 이전 완료 · 조기 완납 내역을 확인할 수 있어요.'
               }
               actions={
                 <>
@@ -955,17 +978,14 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
           <SheetBody className="flex flex-col gap-5 py-4">
             {isCompletedTab ? (
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-foreground">완료 기간</span>
-                  <span className="text-[11px] text-muted-foreground">기본 최근 3개월 · 지우면 전체 조회</span>
-                </div>
+                <span className="text-xs font-bold text-foreground">완료 기간</span>
                 <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
                   <DatePicker
                     value={startDate}
                     onChange={handleStartDateChange}
+                    minDate={startDateMin}
                     maxDate={endDate ?? undefined}
                     presets={[]}
-                    clearable
                     placeholder="완료 시작일"
                     aria-label="완료 시작일"
                     sheetTitle="완료 시작일 선택"
@@ -975,8 +995,8 @@ export const InstallmentsPreview = ({ initialTab }: { initialTab?: InstallmentTa
                     value={endDate}
                     onChange={handleEndDateChange}
                     minDate={startDate ?? undefined}
+                    maxDate={endDateMax}
                     presets={['today']}
-                    clearable
                     placeholder="완료 종료일"
                     aria-label="완료 종료일"
                     sheetTitle="완료 종료일 선택"

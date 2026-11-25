@@ -10,7 +10,7 @@ export const TAX_OPTIONS = ['과세', '비과세'] as const;
 
 export type IncomeKind = (typeof INCOME_KINDS)[number];
 
-type IncomeDetailKey =
+export type IncomeDetailKey =
   | 'employment'
   | 'vatStatus'
   | 'vatAmount'
@@ -29,8 +29,8 @@ type IncomeDetailKey =
   | 'acquisitionCost'
   | 'disposalExpenses';
 
-type IncomeDetails = Partial<Record<IncomeDetailKey, string>>;
-type IncomeDetailField = { key: IncomeDetailKey; label: string } & ({ type: 'choice'; options: readonly string[] } | { type: 'text' | 'amount' | 'date' });
+export type IncomeDetails = Partial<Record<IncomeDetailKey, string>>;
+export type IncomeDetailField = { key: IncomeDetailKey; label: string } & ({ type: 'choice'; options: readonly string[] } | { type: 'text' | 'amount' | 'date' });
 
 const financialIncomeFields: readonly IncomeDetailField[] = [
   { key: 'financialSource', label: '소득 발생지', type: 'choice', options: ['국내', '국외'] },
@@ -69,7 +69,7 @@ export const INCOME_DETAIL_FIELDS: Record<IncomeKind, readonly IncomeDetailField
 export type IncomeTaxStatus = (typeof TAX_OPTIONS)[number];
 export type IncomeLineItem = { id: string; label: string; taxStatus?: IncomeTaxStatus; aliases?: readonly string[] };
 type IncomeOwner = (typeof INCOME_OWNERS)[number];
-const DEPOSIT_ACCOUNT_TYPES = new Set(['입출금 계좌', '결제 전용', '외화 계좌']);
+const DEPOSIT_ACCOUNT_TYPES = new Set(['일반계좌', '외화 계좌']);
 
 export const getIncomeDepositAccounts = (owner: IncomeOwner) => INITIAL_DETAILED_ASSETS.filter((asset) => asset.owner === owner && DEPOSIT_ACCOUNT_TYPES.has(asset.typeLabel));
 export const getIncomeDepositAccountName = (accountId: string): string | null => INITIAL_DETAILED_ASSETS.find((asset) => asset.id === accountId)?.name ?? null;

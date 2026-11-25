@@ -1,8 +1,8 @@
 'use client';
 
 import { ProfileAvatar, dialog } from '@repo/ui-composition';
-import { Button, Popover, PopoverContent, PopoverTrigger, Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
-import { ArrowLeft, BookOpen, Check, ClipboardCheck, ChevronDown, ChevronRight, ChevronsUpDown, Landmark, LayoutGrid, List, Menu, Plus, Settings, Wallet } from 'lucide-react';
+import { Button, Popover, PopoverContent, PopoverTrigger, Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, cn } from '@repo/ui-core';
+import { ArrowLeft, Check, ClipboardCheck, ChevronDown, ChevronRight, Landmark, LayoutGrid, List, Menu, Plus, Settings, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 
@@ -10,38 +10,33 @@ import { IncomeEditor } from '@/previews/income/IncomeEditor';
 import { createIncome, netIncome, type IncomeRecord } from '@/previews/income/income-model';
 import { MiriondonSymbol, MiriondonWordmark } from '@/shared/BrandLogo';
 import { PersonalProfileOverlay } from '@/shared/PersonalProfileOverlay';
+import { TransactionConfirmationModal } from '@/shared/TransactionConfirmationModal';
 import { formatWon } from '@/shared/design-format';
+import { LedgerIcon, findDesignLedger, setActiveLedgerId, useActiveLedgerId, useDesignLedgers } from '@/shared/design-ledger-settings';
 import { usePersonalProfile } from '@/shared/design-personal-businesses';
 import { useConfirmationItems } from '@/shared/design-transaction-confirmation';
 import { ExpenseFormOverlay, computeExpensePreview, createEmptyExpensePreset, type ExpenseDraft } from '@/shared/expense-form/ExpenseFormView';
 
-export type AppNavKey = 'settlement' | 'confirmation' | 'expenses' | 'income' | 'assets' | 'settings';
-
-export const DESIGN_LEDGERS = [
-  { id: 'home', name: '우리집 가계부', shortName: '우리집', role: '소유자 · 3명' },
-  { id: 'personal', name: '민지 개인 가계부', shortName: '개인', role: '소유자 · 1명' }
-] as const;
+export type AppNavKey = 'settlement' | 'expenses' | 'income' | 'assets' | 'settings';
 
 type NavItem = {
   key: AppNavKey;
   pcLabel: string;
   compactLabel: string;
-  description: string;
   icon: typeof LayoutGrid;
   href?: string;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'settlement', pcLabel: '결산', compactLabel: '결산', description: '월별·연간 예산 및 지출 결산', icon: LayoutGrid, href: '/preview/settlement' },
-  { key: 'confirmation', pcLabel: '입출금 확인', compactLabel: '확인', description: '입금과 지불 여부 확인', icon: ClipboardCheck, href: '/preview/transaction-confirmation' },
-  { key: 'expenses', pcLabel: '지출 내역', compactLabel: '지출', description: '월별 지출 내역·분할·할부 현황', icon: List, href: '/preview/expenses' },
-  { key: 'income', pcLabel: '수입 내역', compactLabel: '수입', description: '월급·상여·기타 수입 기록 및 공제 확인', icon: Wallet, href: '/preview/income' },
-  { key: 'assets', pcLabel: '자산 현황', compactLabel: '자산', description: '계좌·현금·저축·부채 보유금 갱신 및 대조', icon: Landmark, href: '/preview/assets' },
-  { key: 'settings', pcLabel: '가계부 설정', compactLabel: '설정', description: '카드·고정 거래·분류·구성원 관리', icon: Settings, href: '/preview/settings/assets' }
+  { key: 'settlement', pcLabel: '결산', compactLabel: '결산', icon: LayoutGrid, href: '/preview/settlement' },
+  { key: 'expenses', pcLabel: '지출 내역', compactLabel: '지출', icon: List, href: '/preview/expenses' },
+  { key: 'income', pcLabel: '수입 내역', compactLabel: '수입', icon: Wallet, href: '/preview/income' },
+  { key: 'assets', pcLabel: '자산 현황', compactLabel: '자산', icon: Landmark, href: '/preview/assets' },
+  { key: 'settings', pcLabel: '가계부 설정', compactLabel: '설정', icon: Settings, href: '/preview/settings/assets' }
 ];
 
 const MOBILE_PRIMARY_NAV_KEYS: AppNavKey[] = ['settlement', 'expenses', 'income'];
-const MOBILE_OVERFLOW_NAV_KEYS: AppNavKey[] = ['confirmation', 'assets', 'settings'];
+const MOBILE_OVERFLOW_NAV_KEYS: AppNavKey[] = ['assets', 'settings'];
 
 type DesignAppShellMobilePrimaryAction = {
   label: string;
@@ -62,12 +57,16 @@ const MOBILE_NAV_ACTIVE_TEXT_CLASS: Partial<Record<AppNavKey, string>> = {
 
 const getMobileNavTextClass = (key: AppNavKey, active: boolean) => (active ? (MOBILE_NAV_ACTIVE_TEXT_CLASS[key] ?? 'font-bold text-primary') : 'text-muted-foreground');
 
-const ConfirmationCountBadge = ({ count, compact = false }: { count: number; compact?: boolean }) =>
+const ConfirmationCountBadge = ({ count, placement = 'inline' }: { count: number; placement?: 'inline' | 'compact' | 'header' }) =>
   count > 0 ? (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-full bg-primary font-bold leading-none text-primary-foreground tabular-nums',
-        compact ? 'absolute -top-1.5 -right-2.5 h-4 min-w-4 px-1 text-[10px]' : 'h-5 min-w-5 px-1.5 text-[11px]'
+        'pointer-events-none inline-flex items-center justify-center rounded-full bg-primary font-bold leading-none text-primary-foreground tabular-nums',
+        placement === 'compact'
+          ? 'absolute -top-1.5 -right-2.5 h-4 min-w-4 px-1 text-[10px]'
+          : placement === 'header'
+            ? 'absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px]'
+            : 'h-5 min-w-5 px-1.5 text-[11px]'
       )}
     >
       {count}
@@ -120,10 +119,10 @@ export const DesignAppShell = ({
   children
 }: DesignAppShellProps) => {
   const router = useRouter();
-  const [internalLedgerId, setInternalLedgerId] = useState<string>('home');
+  const ledgers = useDesignLedgers();
+  const activeLedgerId = useActiveLedgerId();
   const [railLedgerMenuOpen, setRailLedgerMenuOpen] = useState(false);
   const [sidebarLedgerMenuOpen, setSidebarLedgerMenuOpen] = useState(false);
-  const [mobileLedgerMenuOpen, setMobileLedgerMenuOpen] = useState(false);
   const [sheetLedgerMenuOpen, setSheetLedgerMenuOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -131,9 +130,9 @@ export const DesignAppShell = ({
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(() => createEmptyExpensePreset());
   const [profileOpen, setProfileOpen] = useState(false);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
   const profile = usePersonalProfile();
   const confirmationItems = useConfirmationItems();
-  const visibleNavItems = NAV_ITEMS.filter((item) => item.key !== 'confirmation' || confirmationItems.length > 0);
 
   useEffect(() => {
     if (!addMenuOpen) return;
@@ -144,18 +143,17 @@ export const DesignAppShell = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [addMenuOpen]);
 
-  const ledgerId = controlledLedgerId ?? internalLedgerId;
-  const currentLedger = DESIGN_LEDGERS.find((item) => item.id === ledgerId) ?? DESIGN_LEDGERS[0];
+  const ledgerId = controlledLedgerId ?? activeLedgerId;
+  const currentLedger = findDesignLedger(ledgers, ledgerId);
 
   const handleSelectLedger = (nextId: string) => {
     if (onLedgerChange) {
       onLedgerChange(nextId);
     } else {
-      setInternalLedgerId(nextId);
+      setActiveLedgerId(nextId);
     }
     setRailLedgerMenuOpen(false);
     setSidebarLedgerMenuOpen(false);
-    setMobileLedgerMenuOpen(false);
     setSheetLedgerMenuOpen(false);
   };
 
@@ -183,7 +181,7 @@ export const DesignAppShell = ({
 
   const renderLedgerOptions = () => (
     <div className="flex flex-col gap-1">
-      {DESIGN_LEDGERS.map((ledger) => {
+      {ledgers.map((ledger) => {
         const selected = ledger.id === ledgerId;
         return (
           <button
@@ -192,9 +190,14 @@ export const DesignAppShell = ({
             onClick={() => handleSelectLedger(ledger.id)}
             className={cn('flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent', selected && 'bg-primary-tint text-primary')}
           >
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold">{ledger.name}</span>
-              <span className="text-[11px] text-muted-foreground">{ledger.role}</span>
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className={cn('inline-flex size-7 shrink-0 items-center justify-center rounded-md', selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+                <LedgerIcon iconKey={ledger.iconKey} className="size-3.5" />
+              </span>
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold">{ledger.name}</span>
+                <span className="text-[11px] text-muted-foreground">{ledger.role}</span>
+              </div>
             </div>
             {selected ? <Check className="size-4 shrink-0 text-primary" /> : null}
           </button>
@@ -203,9 +206,9 @@ export const DesignAppShell = ({
     </div>
   );
 
-  const renderLedgerSwitcher = (mode: 'rail' | 'full' | 'mobile') => {
-    const open = mode === 'rail' ? railLedgerMenuOpen : mode === 'mobile' ? mobileLedgerMenuOpen : sidebarLedgerMenuOpen;
-    const setOpen = mode === 'rail' ? setRailLedgerMenuOpen : mode === 'mobile' ? setMobileLedgerMenuOpen : setSidebarLedgerMenuOpen;
+  const renderLedgerSwitcher = (mode: 'rail' | 'full') => {
+    const open = mode === 'rail' ? railLedgerMenuOpen : sidebarLedgerMenuOpen;
+    const setOpen = mode === 'rail' ? setRailLedgerMenuOpen : setSidebarLedgerMenuOpen;
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
@@ -215,35 +218,26 @@ export const DesignAppShell = ({
               type="button"
               aria-label={`가계부 변경 (${currentLedger.name})`}
               title={`${currentLedger.name} · 가계부 변경`}
-              className="flex w-full flex-col items-center justify-center gap-0.5 rounded-lg border border-border-strong bg-card px-1 py-1.5 text-[10px] font-bold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              className="flex w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-border-strong bg-card px-1.5 py-1.5 text-center text-[10px] font-bold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
             >
-              <BookOpen className="size-4 shrink-0 text-primary" />
-              <span className="inline-flex max-w-full items-center gap-0.5 leading-tight">
-                <span className="truncate">{currentLedger.shortName}</span>
-                <ChevronsUpDown className="size-2.5 shrink-0 text-muted-foreground" />
-              </span>
-            </button>
-          ) : mode === 'mobile' ? (
-            <button
-              type="button"
-              aria-label={`가계부 변경 (${currentLedger.name})`}
-              className="inline-flex h-8 max-w-[144px] cursor-pointer items-center gap-1 rounded-full border border-border-strong bg-background/80 px-2.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            >
-              <span className="truncate">{currentLedger.name}</span>
-              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+              <LedgerIcon iconKey={currentLedger.iconKey} className="size-4 shrink-0 text-primary" />
+              <span className="w-full leading-tight break-keep break-words">{currentLedger.name}</span>
             </button>
           ) : (
             <button
               type="button"
               aria-label={`가계부 변경 (${currentLedger.name})`}
-              className="inline-flex min-h-control-md w-full items-center justify-between gap-1.5 rounded-md border border-border-strong bg-card px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              className="inline-flex min-h-control-md w-full items-center justify-between gap-2 rounded-md border border-border-strong bg-card px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
             >
-              <span className="truncate">{currentLedger.name}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <LedgerIcon iconKey={currentLedger.iconKey} className="size-4 shrink-0 text-primary" />
+                <span className="truncate">{currentLedger.name}</span>
+              </span>
               <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
             </button>
           )}
         </PopoverTrigger>
-        <PopoverContent side={mode === 'rail' ? 'right' : 'bottom'} align={mode === 'mobile' ? 'end' : 'start'} sideOffset={mode === 'rail' ? 8 : 4} className="w-56 p-1.5">
+        <PopoverContent side={mode === 'rail' ? 'right' : 'bottom'} align="start" sideOffset={mode === 'rail' ? 8 : 4} className="w-56 p-1.5">
           {renderLedgerOptions()}
         </PopoverContent>
       </Popover>
@@ -345,7 +339,7 @@ export const DesignAppShell = ({
           <div className="w-full px-2">{renderLedgerSwitcher('rail')}</div>
 
           <nav aria-label="주 메뉴" className="flex w-full flex-col items-center gap-1.5 px-2 pt-1">
-            {visibleNavItems.map((item) => {
+            {NAV_ITEMS.map((item) => {
               const NavIcon = item.icon;
               const active = activeNav === item.key;
               return (
@@ -358,10 +352,7 @@ export const DesignAppShell = ({
                     active ? 'bg-sidebar-accent font-bold text-sidebar-accent-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
                   )}
                 >
-                  <span className="relative inline-flex">
-                    <NavIcon className="size-5" />
-                    {item.key === 'confirmation' ? <ConfirmationCountBadge count={confirmationItems.length} compact /> : null}
-                  </span>
+                  <NavIcon className="size-5" />
                   <span>{item.compactLabel}</span>
                 </button>
               );
@@ -369,14 +360,31 @@ export const DesignAppShell = ({
           </nav>
         </div>
 
-        <button
-          type="button"
-          aria-label="내 정보"
-          onClick={() => setProfileOpen(true)}
-          className="inline-flex size-11 cursor-pointer items-center justify-center rounded-full hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          <ProfileAvatar name={profile.name} src={profile.avatarSrc} color={profile.avatarColor} className="size-9 text-sm" />
-        </button>
+        <div className="flex w-full flex-col items-center gap-2 px-2">
+          {confirmationItems.length > 0 ? (
+            <button
+              type="button"
+              aria-label={`입출금 확인 (${confirmationItems.length}건)`}
+              onClick={() => setConfirmationOpen(true)}
+              className="flex w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span className="relative inline-flex">
+                <ClipboardCheck className="size-5 text-primary" />
+                <ConfirmationCountBadge count={confirmationItems.length} placement="compact" />
+              </span>
+              <span>확인</span>
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            aria-label="내 정보"
+            onClick={() => setProfileOpen(true)}
+            className="inline-flex size-11 cursor-pointer items-center justify-center rounded-full hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <ProfileAvatar name={profile.name} src={profile.avatarSrc} color={profile.avatarColor} className="size-9 text-sm" />
+          </button>
+        </div>
       </aside>
 
       {/* PC Full Sidebar (>= 1024px): full descriptive labels */}
@@ -390,7 +398,7 @@ export const DesignAppShell = ({
           {renderLedgerSwitcher('full')}
 
           <nav aria-label="주 메뉴" className="flex flex-col gap-1 pt-2">
-            {visibleNavItems.map((item) => {
+            {NAV_ITEMS.map((item) => {
               const NavIcon = item.icon;
               const active = activeNav === item.key;
               return (
@@ -405,30 +413,43 @@ export const DesignAppShell = ({
                 >
                   <NavIcon className="size-5 shrink-0" />
                   <span>{item.pcLabel}</span>
-                  {item.key === 'confirmation' && confirmationItems.length > 0 ? (
-                    <span className="ml-auto">
-                      <ConfirmationCountBadge count={confirmationItems.length} />
-                    </span>
-                  ) : null}
                 </button>
               );
             })}
           </nav>
         </div>
 
-        <button
-          type="button"
-          aria-label="내 정보"
-          onClick={() => setProfileOpen(true)}
-          className="flex min-h-control-lg cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-1 text-left hover:bg-sidebar-accent/60"
-        >
-          <ProfileAvatar name={profile.name} src={profile.avatarSrc} color={profile.avatarColor} className="size-8 shrink-0 text-xs" />
-          <span className="min-w-0 flex flex-1 flex-col">
-            <span className="truncate text-xs font-bold text-sidebar-foreground">{profile.name}</span>
-            <span className="truncate text-[11px] text-muted-foreground">{profile.email}</span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-        </button>
+        <div className="flex flex-col gap-2">
+          {confirmationItems.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setConfirmationOpen(true)}
+              className="flex min-h-control-md cursor-pointer items-center gap-3 rounded-lg px-3.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <ClipboardCheck className="size-5 shrink-0 text-primary" />
+              <span>입출금 확인</span>
+              <span className="ml-auto">
+                <ConfirmationCountBadge count={confirmationItems.length} />
+              </span>
+            </button>
+          ) : null}
+
+          <div className="border-t border-sidebar-border/70 pt-2">
+            <button
+              type="button"
+              aria-label="내 정보"
+              onClick={() => setProfileOpen(true)}
+              className="flex min-h-control-lg w-full cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-1 text-left hover:bg-sidebar-accent/60"
+            >
+              <ProfileAvatar name={profile.name} src={profile.avatarSrc} color={profile.avatarColor} className="size-8 shrink-0 text-xs" />
+              <span className="min-w-0 flex flex-1 flex-col">
+                <span className="truncate text-xs font-bold text-sidebar-foreground">{profile.name}</span>
+                <span className="truncate text-[11px] text-muted-foreground">{profile.email}</span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -449,9 +470,31 @@ export const DesignAppShell = ({
         ) : (
           <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur md:hidden">
             <div className="flex h-12 items-center justify-between gap-2 px-page-mobile">
-              <MiriondonWordmark size="sm" />
-              <div className="flex min-w-0 items-center gap-1.5">
-                {renderLedgerSwitcher('mobile')}
+              <div className="flex min-w-0 items-center gap-2">
+                <MiriondonWordmark size="sm" className="shrink-0" />
+                {currentLedger ? (
+                  <div
+                    role="group"
+                    aria-label={`현재 가계부 ${currentLedger.name}`}
+                    className="inline-flex h-8 max-w-[146px] min-w-0 items-center gap-1.5 rounded-full bg-muted/70 px-2.5 text-xs font-semibold text-foreground min-[360px]:max-w-[184px]"
+                  >
+                    <LedgerIcon iconKey={currentLedger.iconKey} className="size-3.5 shrink-0 text-primary" />
+                    <span className="truncate">{currentLedger.name}</span>
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {confirmationItems.length > 0 ? (
+                  <button
+                    type="button"
+                    aria-label={`입출금 확인 (${confirmationItems.length}건)`}
+                    onClick={() => setConfirmationOpen(true)}
+                    className="relative inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    <ClipboardCheck className="size-4.5 text-primary" />
+                    <ConfirmationCountBadge count={confirmationItems.length} placement="header" />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   aria-label="내 정보"
@@ -654,10 +697,7 @@ export const DesignAppShell = ({
             MOBILE_OVERFLOW_NAV_KEYS.includes(activeNav) ? 'font-bold text-primary' : 'text-muted-foreground'
           )}
         >
-          <span className="relative inline-flex">
-            <Menu className="size-5" />
-            <ConfirmationCountBadge count={confirmationItems.length} compact />
-          </span>
+          <Menu className="size-5" />
           <span>전체</span>
         </button>
       </nav>
@@ -672,12 +712,11 @@ export const DesignAppShell = ({
           }
         }}
       >
-        <SheetContent side="bottom">
+        <SheetContent side="bottom" aria-describedby={undefined}>
           <SheetHeader>
             <SheetTitle className="flex items-center">
               <MiriondonWordmark size="md" />
             </SheetTitle>
-            <SheetDescription>{currentLedger.name}의 모든 화면으로 바로 이동할 수 있어요.</SheetDescription>
           </SheetHeader>
           <SheetBody className="max-h-[70dvh] gap-3 overflow-y-auto pb-1">
             <button
@@ -707,7 +746,7 @@ export const DesignAppShell = ({
                 className="inline-flex min-h-control-md w-full items-center justify-between gap-2 rounded-lg border border-border-strong bg-card px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <BookOpen className="size-4 shrink-0 text-primary" />
+                  <LedgerIcon iconKey={currentLedger.iconKey} className="size-4 shrink-0 text-primary" />
                   <span className="truncate">{currentLedger.name}</span>
                 </span>
                 <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', sheetLedgerMenuOpen && 'rotate-180')} />
@@ -716,7 +755,7 @@ export const DesignAppShell = ({
             </div>
 
             <div className="flex flex-col gap-2">
-              {visibleNavItems.map((item) => {
+              {NAV_ITEMS.map((item) => {
                 const NavIcon = item.icon;
                 const active = activeNav === item.key;
                 return (
@@ -725,23 +764,17 @@ export const DesignAppShell = ({
                     type="button"
                     onClick={() => void handleNavClick(item.key)}
                     className={cn(
-                      'flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors',
+                      'flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-left transition-colors',
                       active ? 'border-primary bg-primary-tint/50' : 'border-border bg-card hover:border-border-strong hover:bg-accent/40'
                     )}
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className={cn('inline-flex size-9 shrink-0 items-center justify-center rounded-lg', active ? 'bg-primary text-primary-foreground' : 'bg-primary-tint text-primary')}>
+                      <span className={cn('inline-flex size-8 shrink-0 items-center justify-center rounded-lg', active ? 'bg-primary text-primary-foreground' : 'bg-primary-tint text-primary')}>
                         <NavIcon className="size-4" />
                       </span>
-                      <div className="min-w-0 flex flex-col gap-0.5">
-                        <span className="text-sm font-bold text-foreground">{item.pcLabel}</span>
-                        <span className="text-xs text-muted-foreground break-keep">{item.description}</span>
-                      </div>
+                      <span className="truncate text-sm font-bold text-foreground">{item.pcLabel}</span>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {item.key === 'confirmation' ? <ConfirmationCountBadge count={confirmationItems.length} /> : null}
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                    </div>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                   </button>
                 );
               })}
@@ -750,6 +783,7 @@ export const DesignAppShell = ({
         </SheetContent>
       </Sheet>
       {profileOpen ? <PersonalProfileOverlay onClose={() => setProfileOpen(false)} /> : null}
+      <TransactionConfirmationModal open={confirmationOpen} onOpenChange={setConfirmationOpen} />
       {draftIncome ? (
         <IncomeEditor
           record={draftIncome}

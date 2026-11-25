@@ -37,10 +37,12 @@ export type AssetDetailItem = {
   name: string;
   institution?: string;
   group: AssetGroupKey;
-  typeLabel: string; // 예: 생활비 계좌, 결제 전용, 기본 원화 현금, 예·적금, 투자상품, 외화, 금, 임차 보증금, 대여금, 일반 부채 등
+  typeLabel: string; // 예: 일반계좌, 현금, 예·적금, 투자상품, 외화 계좌, 금 통장, 금 실물, 임차 보증금, 대여금, 일반 부채 등
+  currency?: string;
   owner: AssetOwnerKey;
   includeInLivingBudget: boolean;
   currentBalance: number;
+  memo?: string;
   counterparty?: string;
   marketQuote?: AssetMarketQuote;
   expectedFlows?: ExpectedFlowEntry[];
@@ -59,20 +61,20 @@ export const ASSET_OWNER_ORDER: readonly AssetOwnerKey[] = ['민지(나)', '지�
 export const ASSET_GROUP_ORDER: readonly AssetGroupMeta[] = [
   {
     key: 'cash-liquid',
-    label: '현금 · 수시입출금',
-    shortLabel: '현금 · 입출금',
-    description: '생활비 계좌 · 결제 계좌 · 기본 원화 현금'
+    label: '현금·계좌',
+    shortLabel: '현금·계좌',
+    description: '생활비 계좌 · 결제 계좌 · 현금'
   },
   {
     key: 'savings-invest',
-    label: '저축 · 투자',
-    shortLabel: '저축 · 투자',
+    label: '저축·투자',
+    shortLabel: '저축·투자',
     description: '예·적금 · 투자상품 · 연금 · 외화 · 금 · 부동산'
   },
   {
     key: 'loan-deposit',
-    label: '대여금 · 임차 보증금',
-    shortLabel: '대여 · 보증금',
+    label: '대여·임차보증금',
+    shortLabel: '대여·임차보증금',
     description: '돌려받을 대여 원금 · 임차 보증금'
   },
   {
@@ -82,8 +84,6 @@ export const ASSET_GROUP_ORDER: readonly AssetGroupMeta[] = [
     description: '대출 남은 원금 · 차입금 · 임대 보증금'
   }
 ] as const;
-
-export const ASSET_REFERENCE_RATES_NOTICE = 'USD 1,385원 · 금 465,000원/돈 (공통 참고 시세 · 11.04 09:00 기준)';
 
 /** 예산상 남은 생활비 기준값 (월별 결산 시안과 일치) */
 export const BUDGET_REMAINING_BASELINE = 1420000;
@@ -110,6 +110,9 @@ export const getAssetCurrentValuation = (asset: AssetDetailItem): number => {
   }
   return asset.currentBalance;
 };
+
+/** 자산 구분에 따른 상대방 역할명(`채무자` 또는 `채권자`)을 반환한다. */
+export const getCounterpartyRoleLabel = (group: AssetGroupKey): string => (group === 'loan-deposit' ? '채무자' : group === 'debt' ? '채권자' : '상대');
 
 export const getAssetExpectedTotals = (asset: AssetDetailItem): { inflow: number; outflow: number } => {
   if (!asset.expectedFlows || asset.expectedFlows.length === 0) {
@@ -168,10 +171,11 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     name: '신한 쏠편한 입출금',
     institution: '신한은행',
     group: 'cash-liquid',
-    typeLabel: '입출금 계좌',
+    typeLabel: '일반계좌',
     owner: '민지(나)',
     includeInLivingBudget: true,
     currentBalance: 1920000,
+    memo: '급여 입금 · 생활비 지출 주 계좌',
     updatedAt: '11.04 09:00',
     expectedFlows: [
       {
@@ -201,10 +205,11 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     name: 'KB 국민ONE 통장',
     institution: '국민은행',
     group: 'cash-liquid',
-    typeLabel: '결제 전용',
+    typeLabel: '일반계좌',
     owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 1100000,
+    memo: '신한·국민카드 대금 출금용',
     updatedAt: '11.04 09:00',
     expectedFlows: [
       {
@@ -223,11 +228,55 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     id: 'asset-minji-cash',
     name: '민지 현금',
     group: 'cash-liquid',
-    typeLabel: '기본 원화 현금',
+    typeLabel: '현금',
+    currency: 'KRW',
     owner: '민지(나)',
     includeInLivingBudget: true,
     currentBalance: 180000,
+    memo: '지갑 현금',
     updatedAt: '11.03 21:10'
+  },
+  {
+    id: 'asset-minji-cash-usd',
+    name: 'USD 현금',
+    group: 'cash-liquid',
+    typeLabel: '현금',
+    currency: 'USD',
+    owner: '민지(나)',
+    includeInLivingBudget: false,
+    currentBalance: 138500,
+    memo: '여행 경비',
+    updatedAt: '11.03 21:10',
+    marketQuote: {
+      assetKind: 'fx',
+      unitLabel: 'USD',
+      quantity: 100,
+      ratePerUnit: 1385,
+      rateSource: '공통 환율 참고 시세',
+      rateUpdatedAt: '11.04 09:00',
+      valuationMode: 'reference-rate'
+    }
+  },
+  {
+    id: 'asset-minji-cash-thb',
+    name: '태국 밧 현금',
+    group: 'cash-liquid',
+    typeLabel: '현금',
+    currency: 'THB',
+    owner: '민지(나)',
+    includeInLivingBudget: false,
+    currentBalance: 195000,
+    memo: '태국 여행 경비',
+    updatedAt: '11.03 21:10',
+    marketQuote: {
+      assetKind: 'fx',
+      unitLabel: 'THB',
+      quantity: 5000,
+      ratePerUnit: 39,
+      rateSource: '공통 환율 참고 시세',
+      rateUpdatedAt: '11.04 09:00',
+      valuationMode: 'reference-rate'
+    }
   },
   {
     id: 'asset-minji-usd',
@@ -264,7 +313,7 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     id: 'asset-minji-gold',
     name: '순금 골드바 (실물)',
     group: 'savings-invest',
-    typeLabel: '금',
+    typeLabel: '금 실물',
     owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 4650000,
@@ -288,6 +337,7 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     includeInLivingBudget: false,
     currentBalance: 180000000,
     counterparty: '임대인 김OO',
+    memo: '만기 2027.10 · 전세대출 연계',
     updatedAt: '10.01 09:00'
   },
   {
@@ -304,13 +354,13 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
   {
     id: 'asset-minji-jeonse-loan',
     name: '전세자금 대출',
-    institution: '카카오뱅크',
     group: 'debt',
     typeLabel: '일반 부채',
     owner: '민지(나)',
     includeInLivingBudget: false,
     currentBalance: 120000000,
     counterparty: '카카오뱅크',
+    memo: '매월 1일 이자 출금',
     updatedAt: '11.01 09:00'
   },
 
@@ -320,7 +370,7 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     name: '신한 주거래 통장',
     institution: '신한은행',
     group: 'cash-liquid',
-    typeLabel: '결제 전용',
+    typeLabel: '일반계좌',
     owner: '지은',
     includeInLivingBudget: false,
     currentBalance: 620000,
@@ -352,7 +402,8 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
     id: 'asset-jieun-cash',
     name: '지은 현금',
     group: 'cash-liquid',
-    typeLabel: '기본 원화 현금',
+    typeLabel: '현금',
+    currency: 'KRW',
     owner: '지은',
     includeInLivingBudget: true,
     currentBalance: 0,
@@ -383,7 +434,6 @@ export const INITIAL_DETAILED_ASSETS: AssetDetailItem[] = [
   {
     id: 'asset-jieun-debt',
     name: '학자금 잔여 대출',
-    institution: '한국장학재단',
     group: 'debt',
     typeLabel: '일반 부채',
     owner: '지은',

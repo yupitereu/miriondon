@@ -114,8 +114,10 @@ export const CardPerformanceCard = ({ card, paymentSummary, stateLabel, period }
         <div className={cn('flex flex-col gap-3.5', paymentSummary && 'border-t border-border-strong pt-3')}>
           <div className="flex flex-col gap-1 rounded-md bg-muted px-3 py-2.5">
             <div className="flex min-h-badge flex-wrap items-center gap-1.5">
-              <span className="text-xs font-semibold text-foreground">{period.month}월 적용 혜택</span>
-              {appliedTier ? <Badge variant="positive">{appliedTier.step}단계 달성</Badge> : null}
+              <span className="text-xs font-semibold text-foreground">
+                {period.month}월 {card.needsReview ? '혜택' : '적용 혜택'}
+              </span>
+              {card.needsReview ? <Badge variant="warning">조건 확인 필요</Badge> : appliedTier ? <Badge variant="positive">{appliedTier.step}단계 달성</Badge> : null}
             </div>
             <p className="text-xs text-muted-foreground break-keep tabular-nums">
               {period.previousMonth}월 인정 실적 {previousAmount === null ? '미확인' : <span className="font-medium whitespace-nowrap">{formatWon(previousAmount)}</span>}

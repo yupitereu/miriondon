@@ -11,6 +11,14 @@ export const EMPTY_DATE_RANGE: DateRangeValue = { start: null, end: null };
 
 export const toLocalDayStart = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
+export const shiftDateByMonths = (date: Date, months: number): Date => {
+  const totalMonths = date.getFullYear() * 12 + date.getMonth() + months;
+  const targetYear = Math.floor(totalMonths / 12);
+  const targetMonth = ((totalMonths % 12) + 12) % 12;
+  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return new Date(targetYear, targetMonth, Math.min(date.getDate(), lastDayOfTargetMonth));
+};
+
 export const parseYearMonthToRange = (yearMonth?: string): DateRangeValue => {
   if (!yearMonth || !/^\d{4}\.\d{2}$/.test(yearMonth)) {
     return { start: null, end: null };
