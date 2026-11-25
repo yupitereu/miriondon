@@ -5,7 +5,7 @@ import { ComponentProps } from 'react';
 import { cn } from '../../lib/utils';
 import { Icon } from '../icon/Icon';
 
-const noticeBoxVariants = cva('flex items-start gap-2 rounded-sm border px-3 py-2.5 text-xs leading-relaxed', {
+const noticeBoxVariants = cva('flex items-start gap-2 rounded-sm border px-3 py-2.5 text-xs leading-5', {
   variants: {
     variant: {
       info: 'border-primary/20 bg-primary-tint text-primary',
@@ -34,7 +34,11 @@ const NoticeBox = ({ className, variant = 'info', icon, children, ...props }: No
 
   return (
     <div role={resolvedVariant === 'error' ? 'alert' : 'note'} className={cn(noticeBoxVariants({ variant: resolvedVariant }), className)} {...props}>
-      {IconComponent ? <Icon icon={IconComponent} size="md" className="mt-0.5" /> : null}
+      {IconComponent ? (
+        <span className="flex h-[1lh] w-4 shrink-0 items-center justify-center">
+          <Icon icon={IconComponent} size="md" />
+        </span>
+      ) : null}
       <div className="min-w-0 flex-1 break-keep">{children}</div>
     </div>
   );

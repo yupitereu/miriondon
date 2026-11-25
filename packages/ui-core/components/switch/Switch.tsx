@@ -23,7 +23,7 @@ const Switch = ({ className, wrapperClassName, label, description, id, disabled,
         'peer inline-flex h-[22px] w-[38px] shrink-0 cursor-pointer items-center rounded-full border border-transparent p-[2px] transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'data-[state=checked]:bg-primary data-[state=unchecked]:bg-border-strong',
+        'data-[state=checked]:border-transparent data-[state=checked]:bg-primary data-[state=unchecked]:border-border-strong data-[state=unchecked]:bg-muted-foreground/30',
         className
       )}
       {...props}

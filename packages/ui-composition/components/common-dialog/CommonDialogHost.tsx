@@ -73,7 +73,7 @@ const CommonDialogView = ({ request }: CommonDialogViewProps) => {
       {request.description || request.kind === 'prompt' || request.notice ? (
         <DialogBody>
           {request.description ? (
-            <DialogDescription id={descriptionId} className="whitespace-pre-wrap">
+            <DialogDescription id={descriptionId} className="text-sm leading-relaxed font-medium whitespace-pre-wrap text-foreground">
               {request.description}
             </DialogDescription>
           ) : null}

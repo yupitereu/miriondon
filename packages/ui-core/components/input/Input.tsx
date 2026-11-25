@@ -29,8 +29,8 @@ const Input = ({ className, wrapperClassName, size = 'lg', type = 'text', error,
         className={cn(
           'flex w-full min-w-0 items-center gap-2 rounded-md border border-border-strong bg-card text-foreground transition-colors',
           INPUT_SIZE_CLASS[size],
-          'focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25',
-          isInvalid && 'border-destructive focus-within:border-destructive focus-within:ring-destructive/25',
+          'focus-within:border-primary',
+          isInvalid && 'border-destructive focus-within:border-destructive',
           disabled && 'cursor-not-allowed bg-muted opacity-60'
         )}
       >

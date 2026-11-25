@@ -25,6 +25,7 @@ const buttonVariants = cva(
         md: 'min-h-control-md px-3 py-1.5 text-sm font-semibold',
         default: 'min-h-control-md px-3 py-1.5 text-sm font-semibold',
         lg: 'min-h-control-lg px-4 py-2 text-sm font-semibold',
+        'icon-xs': 'size-control-xs min-h-control-xs min-w-control-xs p-0',
         icon: 'size-control-md min-h-control-md min-w-control-md p-0'
       }
     },
